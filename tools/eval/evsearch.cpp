@@ -101,6 +101,11 @@ static const int *canon_table(int p)
 }
 
 // ---------------- scalar features ----------------
+// The scalar features and features() (the hot code of the feature indices) are in the code section ".text$a1", at the
+// start of the code: their place, and the time they take, do not depend on the size of the other code.
+#ifdef _MSC_VER
+#pragma code_seg(".text$a1")
+#endif
 static uint64_t get_moves(uint64_t P, uint64_t O)
 {
 	uint64_t moves = 0, mO = O & 0x7e7e7e7e7e7e7e7eULL, flip, pre;
@@ -191,6 +196,9 @@ static int edge_stable(uint64_t P, uint64_t O)
 	}
 	return popc(st);
 }
+#ifdef _MSC_VER
+#pragma code_seg()
+#endif
 
 // ---------------- configuration ----------------
 enum { S_MOB, S_MOBP, S_CMOB, S_QPAR, S_STAB, S_FRONT, S_DISC, S_ESTAB, S_MOBHV, S_MOBD, S_MOB2D, S_N };
@@ -246,6 +254,9 @@ static int parse_config(char *line, Config *c)
 	return 1;
 }
 
+#ifdef _MSC_VER
+#pragma code_seg(".text$a1")
+#endif
 static void features(const Config *c, uint64_t P, uint64_t O, unsigned int *f)
 {
 	int k = 0;
@@ -299,6 +310,9 @@ static void features(const Config *c, uint64_t P, uint64_t O, unsigned int *f)
 	}
 	if (c->scalar[S_ESTAB]) { f[k++] = c->scalar_ofs[S_ESTAB] + edge_stable(P, O); f[k++] = c->scalar_ofs[S_ESTAB] + 32 + edge_stable(O, P); }
 }
+#ifdef _MSC_VER
+#pragma code_seg()
+#endif
 
 // ---------------- data ----------------
 static Source src[8];
