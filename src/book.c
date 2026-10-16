@@ -3062,7 +3062,7 @@ bool book_load(Book *book, const char *file)
 
 		if (pool && used < expected) { // release the unused part of the pool
 			book_pool_shrink(&loaded, used);
-			pool = loaded.pool;
+			pool = (Position*) loaded.pool;
 		}
 		if (ferror(f) || !book_stream_at_end(&stream) || loaded.n_nodes != expected) {
 			error("Invalid opening book size or position count in %s\n", file);
@@ -6225,7 +6225,7 @@ static void book_pool_compact(Book *book)
 {
 #if !defined(BOOK_TEST_NO_POOL_COMPACT)
 	PositionArray *a;
-	Position *end = book->pool;
+	Position *end = (Position*) book->pool;
 	long long in_pool = 0;
 
 	if (book->pool == NULL) return;

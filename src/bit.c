@@ -544,7 +544,7 @@ int get_rand_bit(unsigned long long b, Random *r)
 void bitboard_write(unsigned long long b, FILE *f)
 {
 	int i, j;
-	static const char color[2] = ".X";
+	static const char color[] = ".X";
 
 	fputs("  A B C D E F G H\n", f);
 	for (i = 0; i < 8; ++i) {

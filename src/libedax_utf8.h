@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <wchar.h>
+#include <io.h> /* declares remove before the macro below replaces it */
 #include <winsock2.h>
 #include <windows.h>
 

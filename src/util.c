@@ -992,7 +992,7 @@ Thread thread_self(void)
  */
 void thread_set_cpu(Thread thread, int i)
 {
-#if defined(__linux__) && defined(CPU_SET)
+#if defined(__linux__) && defined(CPU_SET) && !defined(__ANDROID__)
 	cpu_set_t cpu;
 
 	CPU_ZERO(&cpu);
@@ -1016,7 +1016,7 @@ void thread_set_cpu(Thread thread, int i)
  */
 bool thread_cpu_bound(void)
 {
-#if defined(__linux__) && defined(CPU_SET)
+#if defined(__linux__) && defined(CPU_SET) && !defined(__ANDROID__)
 	return true;
 #else
 	return false;
@@ -1113,7 +1113,7 @@ unsigned long long random_get(Random *random)
 	const unsigned long long MASK48 = 0xFFFFFFFFFFFFull;
 	const unsigned long long A = 0x5DEECE66Dull;
 	const unsigned long long B = 0xBull;
-	register unsigned long long r;
+	unsigned long long r;
 
 	random->x = ((A * random->x + B) & MASK48);
 	r = random->x >> 16;

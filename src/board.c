@@ -1159,7 +1159,7 @@ void board_print(const Board *board, const int player, FILE *f)
 {
 	int i, j, square;
 	unsigned long long bk, wh;
-	const char color[5] = "?*O-.";
+	const char color[] = "?*O-.";
 	unsigned long long moves = board_get_moves(board);
 
 	if (player == BLACK) {
@@ -1212,7 +1212,7 @@ char* board_to_string(const Board *board, const int player, char *s)
 {
 	int square, x;
 	unsigned long long bk, wh;
-	static const char color[4] = "XO-?";
+	static const char color[] = "XO-?";
 
 	if (player == BLACK) {
 		bk = board->player;
@@ -1262,8 +1262,8 @@ char* board_to_FEN(const Board *board, const int player, char *string)
 {
 	int square, x, r, c;
 	unsigned long long bk, wh;
-	static const char piece[4] = "pP-?";
-	static const char color[2] = "bw";
+	static const char piece[] = "pP-?";
+	static const char color[] = "bw";
 	int n_empties = 0;
 	char *s = string;
 	static char local_string[128];

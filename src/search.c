@@ -386,7 +386,7 @@ void search_set_hash_size(Search *search, const int bits)
 
 void search_alloc_thread_hash(Search *search)
 {
-	search->thread_hash.hash = mm_malloc((1 << THREAD_LOCAL_HASH_SIZE) * sizeof (Hash));
+	search->thread_hash.hash = (Hash*) mm_malloc((1 << THREAD_LOCAL_HASH_SIZE) * sizeof (Hash));
 	if (search->thread_hash.hash == NULL) {
 		fatal_error("Cannot allocate a thread hash\n");
 	}

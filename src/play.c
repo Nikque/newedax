@@ -1571,7 +1571,7 @@ void play_print(Play *play, FILE *f)
 {
 	int i, j, x, discs[2], mobility[2], square;
 	char history[64];
-	const char color[5] = "?*O-.";
+	const char color[] = "?*O-.";
 	const char big_color[3][4] = {"|##", "|()", "|  "};
 	const char player[2][6] = {"Black", "White"};
 	const int p = play->player;
