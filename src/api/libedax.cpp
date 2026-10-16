@@ -1537,7 +1537,7 @@ LIBEDAX_API void edax_book_new(const int level, const int depth)
 LIBEDAX_API void edax_book_load(const char *book_file)
 {
 	Book *book;
-	Book next = {0};
+	Book next = {};
 	FILE *exists;
 	if (g_ui == NULL) return;
 	book = lib_book_begin_change();
@@ -1642,7 +1642,7 @@ LIBEDAX_API void edax_book_import(const char *import_file)
 
 	// import an opening book (text format); as book load, the current book is kept when nothing is imported
 	{
-		Book next = {0};
+		Book next = {};
 		next.search = book->search;
 		if (book_import(&next, import_file)) {
 			book_free(book);

@@ -3106,8 +3106,8 @@ bool book_load(Book *book, const char *file)
 		return false;
 	}
 	if (f) {
-		Book loaded = {0};
-		BookStream stream = {0};
+		Book loaded = {};
+		BookStream stream = {};
 		Position p, *pool = NULL;
 		unsigned int used = 0;
 		int last_bucket = -1;
@@ -4149,7 +4149,7 @@ static void book_link_plan(Book *book, const BookTask *task, const int n)
 static void book_link_tasks(Book *book, const bool exact)
 {
 	BookTask task[MAX_THREADS];
-	ChangedSet changed = {0};
+	ChangedSet changed = {};
 	int i, n, value = 0;
 	long long j, n_items = 0, i_item = 0, next = real_clock() + 1000;
 	bool first = true, oom = false, plan = false;
@@ -4291,7 +4291,7 @@ void book_sort_parallel(Book *book)
 bool book_merge_file(Book *dest, const char *file)
 {
 	FILE *f = file_open(file, "rb");
-	BookStream stream = {0};
+	BookStream stream = {};
 	Position p, merged;
 	unsigned int header_edax = 0, header_book = 0;
 	unsigned char header[2];	// version, release
@@ -5825,7 +5825,7 @@ static void* loss_worker_run(void *v)
 static bool book_deviate_total_by_loss(Book *book, Position *root, const int mode, const int move_loss, const int total_loss)
 {
 	LossWorker lw[MAX_THREADS];
-	PositionList *level, cur = {0};
+	PositionList *level, cur = {};
 	int i, j, L, n = options.n_task;
 	bool ok = true;
 
@@ -5940,7 +5940,7 @@ static void* depth_worker_run(void *v)
 static bool book_deviate_by_depth(Book *book, Position *root, const int player_deviation, const int opponent_deviation, const int lower, const int upper)
 {
 	LossWorker lw[MAX_THREADS];
-	PositionList cur = {0}, next = {0};
+	PositionList cur = {}, next = {};
 	volatile bool conflict = false;
 	int i, depth, n = options.n_task;
 	long long j;
@@ -6657,7 +6657,7 @@ void book_info(Book *book)
 	Position *p;
 	unsigned long long n_links = 0;
 	unsigned long long n_leaves = 0;
-	unsigned long long n_level[61] = {0};
+	unsigned long long n_level[61] = {};
 	unsigned long long n_other = 0; // positions of another level than the book
 	const unsigned long long max_shown = 10; // (they were all printed: millions of lines for a book merged from a book of another level)
 	int min_array = INT_MAX, max_array = 0;

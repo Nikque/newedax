@@ -690,7 +690,7 @@ void ui_loop_edax(UI *ui)
 
 				// load an opening book (binary format) from the disc
 				} else if (string_is(book_cmd, "load", "open")) {
-					Book next = {0};
+					Book next = {};
 					FILE *exists;
 					parse_word(book_param, book_file, FILENAME_MAX);
 					next.search = book->search;
@@ -717,7 +717,7 @@ void ui_loop_edax(UI *ui)
 
 				// import an opening book (text format)
 				} else if (string_is(book_cmd, "import")) {
-					Book next = {0};
+					Book next = {};
 					parse_word(book_param, book_file, FILENAME_MAX);
 					next.search = book->search;
 					if (book_import(&next, book_file)) { // as book load: the current book is kept when nothing is imported
