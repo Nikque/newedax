@@ -202,7 +202,7 @@ def t_book_form2(a, d):
     if not a.edax:
         return None, 'no --edax'
     b2, b1 = os.path.join(d, 'b2.dat'), os.path.join(d, 'b1.dat')	# the form 1 book written back from b2 (same order)
-    run([a.edax, '-book-format', '2', '-book-convert', os.path.join(a.work, 'A_big.dat'), b2], d)	# (more than the 16 MB buffer of BookReader in both forms)
+    run([a.edax, '-book-format', '2', '-book-convert', os.path.join(a.work, 'A_big.dat'), b2], d)	# (many times the buffer of BookReader in both forms)
     run([a.edax, '-book-format', '1', '-book-convert', b2, b1], d)
     if not (os.path.exists(b2) and os.path.exists(b1)):
         return False, 'no book of form 2 or 1 written'

@@ -184,7 +184,7 @@ struct BookRecord {
 struct BookReader {
 	FILE *f;
 	const char *file;
-	unsigned char *buf;             // the file is read in this buffer, 16 MB at a time
+	unsigned char *buf;             // the file is read in this buffer, 1 MB at a time
 	size_t pos, n;                  // next byte, bytes in the buffer
 	int form;                       // 1 or 2
 	uint64_t n_positions, read;
@@ -195,7 +195,7 @@ struct BookReader {
 
 /** bytes of BookReader::buf (EVTOOL_BOOK_BUFFER), and the stdio buffer of the file (EVTOOL_BOOK_STDIO: 0 none, 1 the default) */
 #ifndef EVTOOL_BOOK_BUFFER
-	#define EVTOOL_BOOK_BUFFER (1 << 24)
+	#define EVTOOL_BOOK_BUFFER (1 << 20)
 #endif
 #ifndef EVTOOL_BOOK_STDIO
 	#define EVTOOL_BOOK_STDIO 0
