@@ -20,6 +20,8 @@ set EXTRA=%EXTRA% %1
 shift
 goto more
 :go
+rem cmd splits the arguments at "=": options with "=" (e.g. /vlen=256) are given in CL_EXTRA instead
+if defined CL_EXTRA set EXTRA=%CL_EXTRA%
 if "%EXTRA%"=="" if /i "%ARCH%"=="x64" set EXTRA=/D HAS_CPU_64 /arch:AVX512 /vlen=256 /D POPCOUNT
 set "PATH=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer;%PATH%"
 call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=%ARCH% -host_arch=x64 >nul

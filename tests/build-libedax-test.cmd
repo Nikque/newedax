@@ -21,6 +21,8 @@ if errorlevel 1 exit /b 1
 cl /nologo /utf-8 /O1 /MT /D_CRT_SECURE_NO_DEPRECATE tests\libedax_test.c tests\libedax\libedax-x64.lib /Fo:tests\libedax\libedax_test.obj /Fe:tests\libedax\libedax_test.exe
 if errorlevel 1 exit /b 1
 cd tests\libedax
+rem the files of a previous run are removed: base unique keeps the games already in its output file
+del /q libtest-* 2>nul
 .\libedax_test.exe > libedax_test.log 2>&1
 if errorlevel 1 (
     type libedax_test.log

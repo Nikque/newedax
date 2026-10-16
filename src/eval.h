@@ -33,6 +33,10 @@ typedef union {
 #endif
 } EVAL_FEATURE_V;
 
+/* defined in eval.cpp; declared here so that they are visible from the other translation units (eval_sse.cpp on Android) */
+extern const EVAL_FEATURE_V EVAL_FEATURE[65];
+extern const EVAL_FEATURE_V EVAL_FEATURE_all_opponent;
+
 typedef struct Eval {
 	EVAL_FEATURE_V feature;                       /**!< discs' features (96) */
 	int n_empties;                                /**< number of empty squares (4) */
