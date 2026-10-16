@@ -50,6 +50,7 @@ typedef struct Book {
 	bool need_saving;
 	bool failed;                 /**< a position could not be added (out of memory): learning stops */
 	unsigned char epoch; /**< current done/todo epoch (see book_clean) */
+	unsigned char file_format;   /**< form of the file the book was loaded from (1: Edax 4, 2: NEDXBOOK), 0 for a new book */
 	struct {
 		unsigned long long *item; /**< (bucket << 32 | index) of positions marked todo since book_clean */
 		long long n, size;
@@ -78,6 +79,7 @@ void book_free(Book*);
 
 void book_new(Book*, int, int);
 bool book_load(Book*, const char*);
+bool book_convert(const char*, const char*);
 void book_load_at_startup(Book*);
 bool book_save(Book*, const char*);
 bool book_save_to_book_file(Book*);

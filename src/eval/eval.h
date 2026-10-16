@@ -67,6 +67,7 @@ extern Eval_weight (*EVAL_WEIGHT)[EVAL_N_2PLY - 1];	// for 2..53, interleaved
 /* function declaration */
 void eval_open(const char*);
 void eval_close(void);
+bool eval_convert(const char*, const char*);
 // void eval_init(Eval*);
 // void eval_free(Eval*);
 void eval_set(Eval*, const struct Board*);

@@ -233,6 +233,8 @@ static inline int _tzcnt_u64(unsigned long long x) {
 	unsigned int crc32c_u8(unsigned int crc, unsigned int data);
 #endif
 
+unsigned int crc32c_bytes(unsigned int crc, const void *data, size_t n);
+
 #ifdef __GNUC__
 	#define UNREACHABLE	__builtin_unreachable()
 #elif defined(_MSC_VER)

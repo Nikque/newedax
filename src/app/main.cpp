@@ -8,9 +8,11 @@
  * @version 4.5
  */
 
+#include "book/book.h"
 #include "core/board.h"
 #include "protocol/cassio.h"
 #include "core/hash.h"
+#include "eval/eval.h"
 #include "app/obftest.h"
 #include "util/options.h"
 #include "app/perft.h"
@@ -75,7 +77,9 @@ void usage(void)
 		" -cassio Cassio protocol.\n"
 		" -solve <problem_file>    Automatic problem solver/checker.\n"
 		" -wtest <wthor_file>      Test edax using WThor's theoric score.\n"
-		" -count <level>           Count positions up to <level>.\n");
+		" -count <level>           Count positions up to <level>.\n"
+		" -book-convert <in> <out> Convert a book file (into the form of -book-format; auto: into the other form).\n"
+		" -eval-convert <in> <out> Convert an evaluation file (form 1 into form 2, form 2 into form 1).\n");
 	options_usage();
 }
 
@@ -96,6 +100,8 @@ int main(int argc, char **argv)
 	char *problem_file = NULL;
 	char *wthor_file = NULL;
 	char *count_type = NULL;
+	char *book_convert_file[2] = {NULL, NULL};
+	char *eval_convert_file[2] = {NULL, NULL};
 	int n_bench = 0;
 
 	// options.n_task default to system cpu number
@@ -131,6 +137,8 @@ int main(int argc, char **argv)
 		else if (string_is(arg, "solve") && argv[i + 1]) problem_file = argv[++i];
 		else if (string_is(arg, "wtest") && argv[i + 1]) wthor_file = argv[++i];
 		else if (string_is(arg, "bench") && argv[i + 1]) n_bench = atoi(argv[++i]);
+		else if (string_is(arg, "book-convert") && argv[i + 1] && argv[i + 2]) { book_convert_file[0] = argv[++i]; book_convert_file[1] = argv[++i]; }
+		else if (string_is(arg, "eval-convert") && argv[i + 1] && argv[i + 2]) { eval_convert_file[0] = argv[++i]; eval_convert_file[1] = argv[++i]; }
 		else if (string_is(arg, "count") && argv[i + 1]) {
 			count_type = argv[++i];
 			if (argv[i + 1]) level = string_to_int(argv[++i], 0);
@@ -149,6 +157,17 @@ int main(int argc, char **argv)
 	bit_init();
 	edge_stability_init();
 	statistics_init();
+
+	// file conversions: no evaluation function is needed
+	if (book_convert_file[0] || eval_convert_file[0]) {
+		bool ok = true;
+		if (eval_convert_file[0]) ok = eval_convert(eval_convert_file[0], eval_convert_file[1]) && ok;
+		if (book_convert_file[0]) ok = book_convert(book_convert_file[0], book_convert_file[1]) && ok;
+		options_free();
+		mm_free(ui);
+		return ok ? EXIT_SUCCESS : EXIT_FAILURE;
+	}
+
 	eval_open(options.eval_file);
 	search_global_init();
 

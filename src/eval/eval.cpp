@@ -555,6 +555,257 @@ static int set_eval_packing(short *pe, int *T, const int *kd, int l, int k, int 
 	return n;
 }
 
+/** number of packed weights of a ply in an evaluation file */
+constexpr int EVAL_N_PACKED = 114364;
+
+/*
+ * Evaluation files of form 2 ("NEDXEVAL", see docs/port/DESIGN-format.md):
+ * a header of EVAL2_HEADER_SIZE bytes (or more), the packed weights of n_plies plies (16 bits each,
+ * little-endian), a trailer (CRC-32C of the weights, "EEND").
+ */
+#define EVAL2_GROUP_SIZE 20
+#define EVAL2_N_GROUP 13
+#define EVAL2_GROUPS_AT 96
+#define EVAL2_HEADER_SIZE (EVAL2_GROUPS_AT + EVAL2_N_GROUP * EVAL2_GROUP_SIZE + 4)
+static const char EVAL2_MAGIC[8] = {'N', 'E', 'D', 'X', 'E', 'V', 'A', 'L'};
+static const char EVAL2_END[4] = {'E', 'E', 'N', 'D'};
+
+/** pattern groups of the weights, in the order of the packed weights: squares, places on the board, packed weights, squares of the first place */
+static const struct EvalGroup {
+	unsigned char n_square, n_place;
+	unsigned int n_packed;
+	unsigned char x[12];
+} EVAL_GROUP[EVAL2_N_GROUP] = {
+	{ 9, 4, 10206, {A1, B1, A2, B2, C1, A3, C2, B3, C3}},            // C9 (features 0-3)
+	{10, 4, 29889, {A5, A4, A3, A2, A1, B2, B1, C1, D1, E1}},        // C10 (4-7)
+	{10, 4, 29646, {B2, A1, B1, C1, D1, E1, F1, G1, H1, G2}},        // S100 (8-11)
+	{10, 4, 29646, {A1, C1, D1, C2, D2, E2, F2, E1, F1, H1}},        // S101 (12-15)
+	{ 8, 4,  3321, {A2, B2, C2, D2, E2, F2, G2, H2}},                // S8 (16-19)
+	{ 8, 4,  3321, {A3, B3, C3, D3, E3, F3, G3, H3}},                // S8 (20-23)
+	{ 8, 4,  3321, {A4, B4, C4, D4, E4, F4, G4, H4}},                // S8 (24-27)
+	{ 8, 2,  3321, {A1, B2, C3, D4, E5, F6, G7, H8}},                // S8 (28-29)
+	{ 7, 4,  1134, {B1, C2, D3, E4, F5, G6, H7}},                    // S7 (30-33)
+	{ 6, 4,   378, {C1, D2, E3, F4, G5, H6}},                        // S6 (34-37)
+	{ 5, 4,   135, {D1, E2, F3, G4, H5}},                            // S5 (38-41)
+	{ 4, 4,    45, {D1, C2, B3, A4}},                                // S4 (42-45)
+	{ 0, 1,     1, {}},                                              // S0 (46)
+};
+
+/** evaluation function error coefficients of the weights of Edax 4.4 and 4.5 */
+static const double EVAL_ERROR_COEFFICIENT[6] = { -0.10026799, 0.31027733, -0.57772603, 0.07585621, 1.16492647, 5.4171698 };
+
+/** header of an evaluation file */
+typedef struct EvalFileHeader {
+	int format;                  /**< 1: Edax 4 ("EDAX" "EVAL", or swapped bytes), 2: NEDXEVAL */
+	bool swap;                   /**< weights of swapped bytes */
+	unsigned int version, release, build;
+	double date;
+	int n_plies;                 /**< form 2: plies in the file */
+	double coefficient[6];       /**< error coefficients A, B, C, a, b, c */
+} EvalFileHeader;
+
+/** @brief Write the pattern groups in the form of a file header. */
+static void eval_groups_write(unsigned char *x)
+{
+	for (int i = 0; i < EVAL2_N_GROUP; ++i, x += EVAL2_GROUP_SIZE) {
+		memset(x, 0, EVAL2_GROUP_SIZE);
+		x[0] = EVAL_GROUP[i].n_square;
+		x[1] = EVAL_GROUP[i].n_place;
+		memcpy(x + 4, &EVAL_GROUP[i].n_packed, 4);
+		memcpy(x + 8, EVAL_GROUP[i].x, EVAL_GROUP[i].n_square);
+	}
+}
+
+/**
+ * @brief Read the header of an evaluation file (form 1 or 2); stop Edax if it cannot be used.
+ *
+ * @param f File, at its start; then at its first weight.
+ * @param file File name.
+ * @param h Header.
+ */
+static void eval_file_header_read(FILE *f, const char *file, EvalFileHeader *h)
+{
+	unsigned char magic[8];
+	unsigned int edax_header, eval_header;
+	int r;
+
+	if (fread(magic, 1, 8, f) != 8) fatal_error("%s is not an Edax evaluation file\n", file);
+	if (memcmp(magic, EVAL2_MAGIC, 8) == 0) {
+		unsigned char x[EVAL2_HEADER_SIZE], groups[EVAL2_N_GROUP * EVAL2_GROUP_SIZE];
+		unsigned short format, size, n_plies, first_ply, n_group;
+		unsigned int flags, n_weights, crc;
+
+		memcpy(x, magic, 8);
+		if (fread(x + 8, 1, 4, f) != 4) fatal_error("Cannot read version info from %s\n", file);
+		memcpy(&format, x + 8, 2);
+		memcpy(&size, x + 10, 2);
+		if (format != 2 || size != EVAL2_HEADER_SIZE) fatal_error("%s is an evaluation file of another form (%u)\n", file, format);
+		if (fread(x + 12, 1, size - 12, f) != (size_t) (size - 12)) fatal_error("Cannot read version info from %s\n", file);
+		memcpy(&crc, x + size - 4, 4);
+		if (crc32c_bytes(0, x, size - 4) != crc) fatal_error("Damaged header in %s\n", file);
+		memcpy(&flags, x + 12, 4);
+		memcpy(&h->version, x + 16, 4);
+		memcpy(&h->release, x + 20, 4);
+		memcpy(&h->build, x + 24, 4);
+		memcpy(&h->date, x + 28, 8);
+		memcpy(&n_plies, x + 36, 2);
+		memcpy(&first_ply, x + 38, 2);
+		memcpy(&n_weights, x + 40, 4);
+		memcpy(&n_group, x + 44, 2);
+		memcpy(h->coefficient, x + 48, sizeof h->coefficient);
+		eval_groups_write(groups);
+		if (flags != 0 || n_weights != EVAL_N_PACKED || n_group != EVAL2_N_GROUP || memcmp(x + EVAL2_GROUPS_AT, groups, sizeof groups) != 0)
+			fatal_error("%s holds weights of patterns this Edax does not use\n", file);
+		if (first_ply != 0 || n_plies < EVAL_N_2PLY * 2) fatal_error("%s does not hold the weights of plies 0 to %d\n", file, EVAL_N_2PLY * 2 - 1);
+		h->format = 2;
+		h->swap = false;
+		h->n_plies = n_plies;
+		return;
+	}
+
+	memcpy(&edax_header, magic, 4);
+	memcpy(&eval_header, magic + 4, 4);
+	if (!((edax_header == EDAX && eval_header == EVAL) || (edax_header == XADE && eval_header == LAVE))) fatal_error("%s is not an Edax evaluation file\n", file);
+	r = fread(&h->version, sizeof (int), 1, f);
+	r += fread(&h->release, sizeof (int), 1, f);
+	r += fread(&h->build, sizeof (int), 1, f);
+	r += fread(&h->date, sizeof (double), 1, f);
+	if (r != 4) fatal_error("Cannot read version info from %s\n", file);
+	h->format = 1;
+	h->swap = (edax_header == XADE);
+	if (h->swap) {
+		h->version = bswap_int(h->version);
+		h->release = bswap_int(h->release);
+		h->build = bswap_int(h->build);
+	}
+	h->n_plies = 0; // (not told by the file)
+	memcpy(h->coefficient, EVAL_ERROR_COEFFICIENT, sizeof h->coefficient);
+}
+
+/**
+ * @brief Check the rest of an evaluation file of form 2: the weights not read yet and the trailer.
+ *
+ * @param f File, after the weights of read_plies plies.
+ * @param file File name.
+ * @param h Header.
+ * @param crc CRC of the weights read.
+ * @param w Room for the weights of a ply.
+ */
+static void eval_file_check_2(FILE *f, const char *file, const EvalFileHeader *h, unsigned int crc, const int read_plies, short *w)
+{
+	unsigned char t[8];
+	unsigned int c;
+
+	for (int ply = read_plies; ply < h->n_plies; ++ply) {
+		if (fread(w, sizeof (short), EVAL_N_PACKED, f) != EVAL_N_PACKED) fatal_error("Cannot read evaluation weight from %s\n", file);
+		crc = crc32c_bytes(crc, w, EVAL_N_PACKED * sizeof (short));
+	}
+	if (fread(t, 1, 8, f) != 8) fatal_error("Cannot read evaluation weight from %s\n", file);
+	memcpy(&c, t, 4);
+	if (c != crc || memcmp(t + 4, EVAL2_END, 4) != 0 || fgetc(f) != EOF) fatal_error("Damaged evaluation file %s (the check of the weights fails)\n", file);
+}
+
+/**
+ * @brief Convert an evaluation file of form 1 into form 2, or form 2 into form 1.
+ *
+ * The weights are copied as they are (the weights of every ply of the file, even the ones Edax does not use).
+ *
+ * @param in File to convert.
+ * @param out File to write.
+ * @return true on success.
+ */
+bool eval_convert(const char *in, const char *out)
+{
+	EvalFileHeader h;
+	FILE *f, *g;
+	short *w = NULL;
+	long long n_plies = 0, i;
+	unsigned int crc = 0;
+	bool ok = false;
+
+	f = file_open(in, "rb");
+	if (f == NULL) { error("Cannot open %s\n", in); return false; }
+	eval_file_header_read(f, in, &h);
+	if (h.format == 2) {
+		n_plies = h.n_plies;
+	} else { // the plies that are left in the file
+		long long here, end;
+#ifdef _WIN32
+		here = _ftelli64(f); _fseeki64(f, 0, SEEK_END); end = _ftelli64(f); _fseeki64(f, here, SEEK_SET);
+#else
+		here = ftello(f); fseeko(f, 0, SEEK_END); end = ftello(f); fseeko(f, here, SEEK_SET);
+#endif
+		if (here < 0 || end < here || (end - here) % (EVAL_N_PACKED * sizeof (short)) != 0 || end == here) {
+			error("%s does not hold whole plies of weights\n", in);
+			fclose(f);
+			return false;
+		}
+		n_plies = (end - here) / (EVAL_N_PACKED * sizeof (short));
+		if (n_plies > 65535) { error("%s holds too many plies\n", in); fclose(f); return false; }
+	}
+	w = (short*) malloc((size_t) n_plies * EVAL_N_PACKED * sizeof (short));
+	if (w == NULL) { error("Cannot allocate the weights of %s\n", in); fclose(f); return false; }
+	if (fread(w, sizeof (short) * EVAL_N_PACKED, (size_t) n_plies, f) != (size_t) n_plies) {
+		error("Cannot read evaluation weight from %s\n", in);
+		goto convert_end;
+	}
+	if (h.format == 2) {
+		unsigned char t[8];
+		unsigned int c;
+		crc = crc32c_bytes(0, w, (size_t) n_plies * EVAL_N_PACKED * sizeof (short));
+		if (fread(t, 1, 8, f) != 8 || (memcpy(&c, t, 4), c != crc) || memcmp(t + 4, EVAL2_END, 4) != 0 || fgetc(f) != EOF) {
+			error("Damaged evaluation file %s (the check of the weights fails)\n", in);
+			goto convert_end;
+		}
+	} else if (h.swap) {
+		for (i = 0; i < n_plies * EVAL_N_PACKED; ++i) w[i] = bswap_short(w[i]);
+	}
+
+	g = file_open(out, "wb");
+	if (g == NULL) { error("Cannot open %s\n", out); goto convert_end; }
+	if (h.format == 1) { // into form 2
+		unsigned char x[EVAL2_HEADER_SIZE] = {};
+		const unsigned short format = 2, size = EVAL2_HEADER_SIZE, plies = (unsigned short) n_plies, first_ply = 0, n_group = EVAL2_N_GROUP;
+		const unsigned int n_weights = EVAL_N_PACKED;
+		unsigned char t[8];
+		memcpy(x, EVAL2_MAGIC, 8);
+		memcpy(x + 8, &format, 2);
+		memcpy(x + 10, &size, 2);
+		memcpy(x + 16, &h.version, 4);
+		memcpy(x + 20, &h.release, 4);
+		memcpy(x + 24, &h.build, 4);
+		memcpy(x + 28, &h.date, 8);
+		memcpy(x + 36, &plies, 2);
+		memcpy(x + 38, &first_ply, 2);
+		memcpy(x + 40, &n_weights, 4);
+		memcpy(x + 44, &n_group, 2);
+		memcpy(x + 48, h.coefficient, sizeof h.coefficient);
+		eval_groups_write(x + EVAL2_GROUPS_AT);
+		crc = crc32c_bytes(0, x, size - 4);
+		memcpy(x + size - 4, &crc, 4);
+		crc = crc32c_bytes(0, w, (size_t) n_plies * EVAL_N_PACKED * sizeof (short));
+		memcpy(t, &crc, 4);
+		memcpy(t + 4, EVAL2_END, 4);
+		ok = fwrite(x, 1, size, g) == size
+		  && fwrite(w, sizeof (short) * EVAL_N_PACKED, (size_t) n_plies, g) == (size_t) n_plies
+		  && fwrite(t, 1, 8, g) == 8;
+	} else { // into form 1
+		const unsigned int header[5] = { (unsigned int) EDAX, (unsigned int) EVAL, h.version, h.release, h.build };
+		ok = fwrite(header, sizeof header, 1, g) == 1
+		  && fwrite(&h.date, sizeof h.date, 1, g) == 1
+		  && fwrite(w, sizeof (short) * EVAL_N_PACKED, (size_t) n_plies, g) == (size_t) n_plies;
+		if (memcmp(h.coefficient, EVAL_ERROR_COEFFICIENT, sizeof h.coefficient) != 0)
+			warn("%s: the error coefficients of %s are not kept (form 1 does not hold them)\n", out, in);
+	}
+	if (fclose(g) != 0) ok = false;
+	if (!ok) { error("Cannot write %s\n", out); file_remove(out); }
+
+convert_end:
+	free(w);
+	fclose(f);
+	return ok;
+}
+
 /**
  * @brief Load the evaluation function features' weights.
  *
@@ -567,10 +818,9 @@ static int set_eval_packing(short *pe, int *T, const int *kd, int l, int k, int 
  */
 void eval_open(const char* file)
 {
-	unsigned int edax_header, eval_header;
-	unsigned int version, release, build;
-	double date;
-	const int n_w = 114364;
+	EvalFileHeader header;
+	unsigned int crc = 0;
+	const int n_w = EVAL_N_PACKED;
 	int *T;
 	int ply, i, j, k;
 	int r;
@@ -651,26 +901,15 @@ void eval_open(const char* file)
 	}
 
 	// File header
-	r = fread(&edax_header, sizeof (int), 1, f);
-	r += fread(&eval_header, sizeof (int), 1, f);
-	if (r != 2 || !((edax_header == EDAX && eval_header == EVAL) || (edax_header == XADE && eval_header == LAVE))) fatal_error("%s is not an Edax evaluation file\n", file);
-	r = fread(&version, sizeof (int), 1, f);
-	r += fread(&release, sizeof (int), 1, f);
-	r += fread(&build, sizeof (int), 1, f);
-	r += fread(&date, sizeof (double), 1, f);
-	if (r != 4) fatal_error("Cannot read version info from %s\n", file);
-	if (edax_header == XADE) {
-		version = bswap_int(version);
-		release = bswap_int(release);
-		build = bswap_int(build);
-	}
+	eval_file_header_read(f, file, &header);
 	// Weights : read & unpack them
 	for (ply = 0; ply < EVAL_N_2PLY * 2; ply++) {
 		r = fread(w, sizeof (short), n_w, f);
 		if (r != n_w) fatal_error("Cannot read evaluation weight from %s\n", file);
+		if (header.format == 2) crc = crc32c_bytes(crc, w, n_w * sizeof (short));
 		if (ply < 2) continue;	// skip ply 1 & 2
 
-		if (edax_header == XADE) for (i = 0; i < n_w; ++i) w[i] = bswap_short(w[i]);
+		if (header.swap) for (i = 0; i < n_w; ++i) w[i] = bswap_short(w[i]);
 
 		pe = (Eval_weight *)((*EVAL_WEIGHT)[(ply - 2) >> 1].S0 + (ply & 1));
 		pp = *P + (ply & 1);
@@ -705,16 +944,15 @@ void eval_open(const char* file)
 		*(pe->S0) = w[EVAL_PACKED_OFS[12]];
 	}
 
+	if (header.format == 2) eval_file_check_2(f, file, &header, crc, EVAL_N_2PLY * 2, w);
 	fclose(f);
 	free(w);
 	free(P);
 
-	/*if (version == 3 && release == 2 && build == 5)*/ {
-		EVAL_A = -0.10026799, EVAL_B = 0.31027733, EVAL_C = -0.57772603;
-		EVAL_a = 0.07585621, EVAL_b = 1.16492647, EVAL_c = 5.4171698;
-	}
+	EVAL_A = header.coefficient[0], EVAL_B = header.coefficient[1], EVAL_C = header.coefficient[2];
+	EVAL_a = header.coefficient[3], EVAL_b = header.coefficient[4], EVAL_c = header.coefficient[5];
 
-	info("<Evaluation function weights version %u.%u.%u loaded>\n", version, release, build);
+	info("<Evaluation function weights version %u.%u.%u loaded>\n", header.version, header.release, header.build);
 	EVAL_FILE = file ? string_duplicate(file) : NULL;
 
 	// f = file_open("eval.bin", "wb");

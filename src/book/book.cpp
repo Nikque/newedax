@@ -579,6 +579,10 @@ typedef struct BookStream {
 	FILE *f;
 	unsigned char *buffer;
 	size_t size, n, pos;
+	size_t crc_from;               /**< first byte of the buffer not yet in crc */
+	unsigned long long crc_bytes;  /**< bytes in crc */
+	unsigned int crc;              /**< CRC-32C of the bytes read or written since book_stream_crc_start */
+	bool crc_on;
 } BookStream;
 
 #define BOOK_STREAM_SIZE (16u << 20)
@@ -589,6 +593,10 @@ static bool book_stream_open(BookStream *s, FILE *f)
 	s->f = f;
 	s->size = BOOK_STREAM_SIZE;
 	s->n = s->pos = 0;
+	s->crc_from = 0;
+	s->crc_bytes = 0;
+	s->crc = 0;
+	s->crc_on = false;
 	s->buffer = (unsigned char*) malloc(s->size);
 	return s->buffer != NULL;
 }
@@ -599,20 +607,67 @@ static void book_stream_close(BookStream *s)
 	s->buffer = NULL;
 }
 
+/** @brief Add the bytes of the buffer from crc_from to end to the CRC. */
+static void book_stream_crc_add(BookStream *s, const size_t end)
+{
+	if (s->crc_on) {
+		s->crc = crc32c_bytes(s->crc, s->buffer + s->crc_from, end - s->crc_from);
+		s->crc_bytes += end - s->crc_from;
+	}
+	s->crc_from = end;
+}
+
+/** @brief Read the next bytes of the file into the buffer (all read). @return false at the end of the file. */
+static bool book_stream_fill(BookStream *s)
+{
+	book_stream_crc_add(s, s->n);
+	s->n = fread(s->buffer, 1, s->size, s->f);
+	s->pos = s->crc_from = 0;
+	return s->n != 0;
+}
+
+/**
+ * @brief Start the CRC of the next bytes read (or written).
+ * @param writing The stream is written.
+ */
+static void book_stream_crc_start(BookStream *s, const bool writing)
+{
+	s->crc_on = true;
+	s->crc = 0;
+	s->crc_bytes = 0;
+	s->crc_from = writing ? s->n : s->pos;
+}
+
+/**
+ * @brief End the CRC.
+ * @param writing The stream is written.
+ * @return the CRC-32C of the bytes read (or written) since book_stream_crc_start (s->crc_bytes: their number).
+ */
+static unsigned int book_stream_crc_end(BookStream *s, const bool writing)
+{
+	book_stream_crc_add(s, writing ? s->n : s->pos);
+	s->crc_on = false;
+	return s->crc;
+}
+
 static bool book_stream_read(BookStream *s, void *data, size_t len)
 {
 	unsigned char *d = (unsigned char*) data;
 	while (len) {
 		size_t k;
-		if (s->pos == s->n) {
-			s->n = fread(s->buffer, 1, s->size, s->f);
-			s->pos = 0;
-			if (s->n == 0) return false;
-		}
+		if (s->pos == s->n && !book_stream_fill(s)) return false;
 		k = s->n - s->pos; if (k > len) k = len;
 		memcpy(d, s->buffer + s->pos, k);
 		s->pos += k; d += k; len -= k;
 	}
+	return true;
+}
+
+/** @brief Read one byte. @return false at the end of the stream. */
+static EDAX_FORCE_INLINE bool book_stream_byte(BookStream *s, unsigned char *c)
+{
+	if (s->pos == s->n && !book_stream_fill(s)) return false;
+	*c = s->buffer[s->pos++];
 	return true;
 }
 
@@ -628,8 +683,9 @@ static bool book_stream_write(BookStream *s, const void *data, size_t len)
 	while (len) {
 		size_t k;
 		if (s->n == s->size) {
+			book_stream_crc_add(s, s->n);
 			if (fwrite(s->buffer, 1, s->n, s->f) != s->n) return false;
-			s->n = 0;
+			s->n = s->crc_from = 0;
 		}
 		k = s->size - s->n; if (k > len) k = len;
 		memcpy(s->buffer + s->n, d, k);
@@ -640,9 +696,17 @@ static bool book_stream_write(BookStream *s, const void *data, size_t len)
 
 static bool book_stream_flush(BookStream *s)
 {
+	book_stream_crc_add(s, s->n);
 	bool ok = (s->n == 0 || fwrite(s->buffer, 1, s->n, s->f) == s->n);
-	s->n = 0;
+	s->n = s->crc_from = 0;
 	return ok;
+}
+
+/** @brief Forget the bytes read, to read again from the current place of the file. */
+static void book_stream_reset(BookStream *s)
+{
+	s->n = s->pos = s->crc_from = 0;
+	s->crc_on = false;
 }
 
 /** @return true if the moves and the level read from a book file can be those of a position. */
@@ -800,6 +864,288 @@ static bool position_write(const Position *position, const Book *book, BookStrea
 	memcpy(h + POSITION_FIXED_SIZE + sizeof (Link) * n, &position->leaf, sizeof (Link));
 
 	return book_stream_write(s, h, POSITION_FIXED_SIZE + sizeof (Link) * (n + 1));
+}
+
+/*
+ * Book files of form 2 ("NEDXBOOK", see docs/port/DESIGN-format.md):
+ * a header of BOOK2_HEADER_SIZE bytes (or more), the positions, a trailer of BOOK2_TRAILER_SIZE bytes.
+ * A position: board (16), n_link, level, value, lower, upper, leaf score, leaf move, 4 counts (LEB128), links.
+ */
+#define BOOK2_HEADER_SIZE 64
+#define BOOK2_TRAILER_SIZE 16
+#define POSITION2_FIXED_SIZE 23
+#define POSITION2_MIN_SIZE (POSITION2_FIXED_SIZE + 4)
+static const char BOOK2_MAGIC[8] = {'N', 'E', 'D', 'X', 'B', 'O', 'O', 'K'};
+static const char BOOK2_END[4] = {'B', 'E', 'N', 'D'};
+
+/** @brief Read a count (LEB128: 7 bits a byte, at most 32 bits). */
+static EDAX_FORCE_INLINE bool book_stream_count(BookStream *s, unsigned int *n)
+{
+	unsigned char c;
+	unsigned int v, shift;
+
+	if (!book_stream_byte(s, &c)) return false;
+	v = c & 0x7f;
+	for (shift = 7; c & 0x80; shift += 7) {
+		if (!book_stream_byte(s, &c)) return false;
+		if (shift == 28 && c > 0x0f) return false; // more than 32 bits
+		v |= (unsigned int) (c & 0x7f) << shift;
+	}
+	*n = v;
+	return true;
+}
+
+/**
+ * @brief Read a position of a book file of form 2.
+ *
+ * @param position Position to read in.
+ * @param s Input stream.
+ * @param book Book that will hold the position (see position_read).
+ */
+static bool position_read_2(Position *position, BookStream *s, Book *book)
+{
+	unsigned char h[POSITION2_FIXED_SIZE];
+	unsigned int n[4];
+	Link links[256];
+	int i;
+
+	if (!book_stream_read(s, h, sizeof h)) return false;
+	memcpy(&position->board.player, h, 8);
+	memcpy(&position->board.opponent, h + 8, 8);
+	position->level = h[17];
+	position->score.value = (signed char) h[18];
+	position->score.lower = (signed char) h[19];
+	position->score.upper = (signed char) h[20];
+	position->leaf.score = (signed char) h[21];
+	position->leaf.move = h[22];
+	position->state = 0;
+	for (i = 0; i < 4; ++i) if (!book_stream_count(s, n + i)) return false;
+	position->count[0] = position->count[1] = position->count[2] = position->count[3] = 0;
+	if (book) position_set_counts_n(position, book, n);
+
+	if (!book_stream_read(s, links, sizeof (Link) * h[16])) return false;
+	if (!position_read_is_sound(h[16], links, &position->leaf, position->level)) return false;
+
+	position->n_link = 0;
+	if (!position_set_links(position, links, h[16])) {
+		error("cannot allocate opening book position's moves\n");
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * @brief Write a position to a book file of form 2.
+ *
+ * @param position position to write out.
+ * @param book Book of the position (for its counts).
+ * @param s output stream.
+ */
+static bool position_write_2(const Position *position, const Book *book, BookStream *s)
+{
+	unsigned char h[POSITION2_FIXED_SIZE + 4 * 5 + 2 * 256];
+	unsigned int n[4];
+	size_t k = POSITION2_FIXED_SIZE;
+	int i;
+
+	memcpy(h, &position->board.player, 8);
+	memcpy(h + 8, &position->board.opponent, 8);
+	h[16] = position->n_link;
+	h[17] = position->level;
+	h[18] = (unsigned char) position->score.value;
+	h[19] = (unsigned char) position->score.lower;
+	h[20] = (unsigned char) position->score.upper;
+	h[21] = (unsigned char) position->leaf.score;
+	h[22] = position->leaf.move;
+	position_get_counts_n(position, book, n);
+	for (i = 0; i < 4; ++i) {
+		unsigned int v = n[i];
+		for (; v >= 0x80; v >>= 7) h[k++] = (unsigned char) (v | 0x80);
+		h[k++] = (unsigned char) v;
+	}
+	if (position->n_link) memcpy(h + k, position_links(position), sizeof (Link) * position->n_link);
+	return book_stream_write(s, h, k + sizeof (Link) * position->n_link);
+}
+
+/** @brief Read a position of a book file of form 1 or 2. */
+static EDAX_FORCE_INLINE bool position_read_form(const int format, Position *position, BookStream *s, Book *book)
+{
+	return format == 2 ? position_read_2(position, s, book) : position_read(position, s, book);
+}
+
+/** @brief Write a position to a book file of form 1 or 2. */
+static EDAX_FORCE_INLINE bool position_write_form(const int format, const Position *position, const Book *book, BookStream *s)
+{
+	return format == 2 ? position_write_2(position, book, s) : position_write(position, book, s);
+}
+
+/** Header of a book file. */
+typedef struct BookFileHeader {
+	int format;                        /**< 1: Edax 4; 2: NEDXBOOK */
+	decltype(Book::date) date;
+	decltype(Book::options) options;
+	unsigned long long n_positions;
+	long long start;                   /**< place of the first position in the file */
+} BookFileHeader;
+
+/** Results of book_file_header_read. */
+enum { BOOK_HEADER_OK, BOOK_HEADER_NOT_BOOK, BOOK_HEADER_VERSION, BOOK_HEADER_SETTINGS, BOOK_HEADER_DAMAGED };
+
+/**
+ * @brief Read the header of a book file (form 1 or 2).
+ *
+ * @param f File, at its start.
+ * @param h Header.
+ * @return BOOK_HEADER_OK, or what is wrong: not a book, another version (or unknown form 2 features),
+ * the settings cannot be read, a form 2 header that fails its check.
+ */
+static int book_file_header_read(FILE *f, BookFileHeader *h)
+{
+	unsigned char b[12];
+
+	if (fread(b, 1, 8, f) != 8) return BOOK_HEADER_NOT_BOOK;
+	if (memcmp(b, BOOK2_MAGIC, 8) == 0) {
+		unsigned short format, size;
+		unsigned int flags, crc;
+		unsigned char *x;
+		int r = BOOK_HEADER_OK;
+
+		if (fread(b + 8, 1, 4, f) != 4) return BOOK_HEADER_SETTINGS;
+		memcpy(&format, b + 8, 2);
+		memcpy(&size, b + 10, 2);
+		if (format != 2) return BOOK_HEADER_VERSION;
+		if (size < BOOK2_HEADER_SIZE) return BOOK_HEADER_DAMAGED;
+		x = (unsigned char*) malloc(size);
+		if (x == NULL) return BOOK_HEADER_SETTINGS;
+		memcpy(x, b, 12);
+		if (fread(x + 12, 1, size - 12, f) != (size_t) (size - 12)) r = BOOK_HEADER_SETTINGS;
+		else {
+			memcpy(&crc, x + size - 4, 4);
+			memcpy(&flags, x + 12, 4);
+			if (crc32c_bytes(0, x, size - 4) != crc) r = BOOK_HEADER_DAMAGED;
+			else if (flags != 0 || x[18] != 1) r = BOOK_HEADER_VERSION; // features or positions of a later form
+			else {
+				memset(&h->date, 0, sizeof h->date);
+				memcpy(&h->date.year, x + 20, 2);
+				h->date.month = (char) x[22];
+				h->date.day = (char) x[23];
+				h->date.hour = (char) x[24];
+				h->date.minute = (char) x[25];
+				h->date.second = (char) x[26];
+				memcpy(&h->options.level, x + 28, 4);
+				memcpy(&h->options.n_empties, x + 32, 4);
+				memcpy(&h->options.midgame_error, x + 36, 4);
+				memcpy(&h->options.endcut_error, x + 40, 4);
+				memcpy(&h->options.verbosity, x + 44, 4);
+				memcpy(&h->n_positions, x + 48, 8);
+				h->format = 2;
+				h->start = size;
+			}
+		}
+		free(x);
+		return r;
+	} else {
+		unsigned int header_edax, header_book, n;
+		unsigned char version, release;
+
+		memcpy(&header_edax, b, 4);
+		memcpy(&header_book, b + 4, 4);
+		if (header_edax != EDAX || header_book != BOOK) return BOOK_HEADER_NOT_BOOK;
+		if (fread(&version, 1, 1, f) != 1 || fread(&release, 1, 1, f) != 1 || version != VERSION) return BOOK_HEADER_VERSION;
+		if (fread(&h->date, sizeof h->date, 1, f) != 1 || fread(&h->options, sizeof h->options, 1, f) != 1
+		 || fread(&n, sizeof n, 1, f) != 1) return BOOK_HEADER_SETTINGS;
+		h->n_positions = n;
+		h->format = 1;
+		h->start = 8 + 2 + sizeof h->date + sizeof h->options + sizeof n;
+		return BOOK_HEADER_OK;
+	}
+}
+
+/**
+ * @brief Write the header of a book file of form 2.
+ *
+ * @param f File.
+ * @param book Book.
+ * @return true on success.
+ */
+static bool book_file_header_write_2(FILE *f, const Book *book)
+{
+	unsigned char x[BOOK2_HEADER_SIZE] = {};
+	const unsigned short format = 2, size = BOOK2_HEADER_SIZE;
+	const unsigned long long n = book->n_nodes;
+	unsigned int crc;
+
+	memcpy(x, BOOK2_MAGIC, 8);
+	memcpy(x + 8, &format, 2);
+	memcpy(x + 10, &size, 2);
+	x[16] = VERSION;
+	x[17] = RELEASE;
+	x[18] = 1; // positions as written by position_write_2
+	memcpy(x + 20, &book->date.year, 2);
+	x[22] = (unsigned char) book->date.month;
+	x[23] = (unsigned char) book->date.day;
+	x[24] = (unsigned char) book->date.hour;
+	x[25] = (unsigned char) book->date.minute;
+	x[26] = (unsigned char) book->date.second;
+	memcpy(x + 28, &book->options.level, 4);
+	memcpy(x + 32, &book->options.n_empties, 4);
+	memcpy(x + 36, &book->options.midgame_error, 4);
+	memcpy(x + 40, &book->options.endcut_error, 4);
+	memcpy(x + 44, &book->options.verbosity, 4);
+	memcpy(x + 48, &n, 8);
+	crc = crc32c_bytes(0, x, size - 4);
+	memcpy(x + size - 4, &crc, 4);
+	return fwrite(x, 1, size, f) == size;
+}
+
+/**
+ * @brief Write the trailer of a book file of form 2 (the CRC was started before the first position).
+ *
+ * @param s Output stream.
+ * @return true on success.
+ */
+static bool book_trailer_write_2(BookStream *s)
+{
+	unsigned char t[BOOK2_TRAILER_SIZE];
+	const unsigned int crc = book_stream_crc_end(s, true);
+	const unsigned long long bytes = s->crc_bytes;
+
+	memcpy(t, &bytes, 8);
+	memcpy(t + 8, &crc, 4);
+	memcpy(t + 12, BOOK2_END, 4);
+	return book_stream_write(s, t, sizeof t);
+}
+
+/**
+ * @brief Read and check the trailer of a book file of form 2 (the CRC was started before the first position).
+ *
+ * @param s Input stream.
+ * @return true if the positions read are those that were written.
+ */
+static bool book_trailer_read_2(BookStream *s)
+{
+	unsigned char t[BOOK2_TRAILER_SIZE];
+	const unsigned int crc = book_stream_crc_end(s, false);
+	const unsigned long long bytes = s->crc_bytes;
+	unsigned long long size;
+	unsigned int c;
+
+	if (!book_stream_read(s, t, sizeof t)) return false;
+	memcpy(&size, t, 8);
+	memcpy(&c, t + 8, 4);
+	return size == bytes && c == crc && memcmp(t + 12, BOOK2_END, 4) == 0;
+}
+
+/**
+ * @brief Form of the file to save a book to.
+ * @param book Book.
+ * @return 1 or 2: book-format if set, else the form of the file the book was loaded from (1 for a new book).
+ */
+static int book_save_format(const Book *book)
+{
+	if (options.book_format) return options.book_format;
+	return book->file_format ? book->file_format : 1;
 }
 
 /**
@@ -2738,6 +3084,7 @@ void book_init(Book *book)
 	book->n_nodes = 0;
 	book->failed = false;
 	book->epoch = 1;
+	book->file_format = 0;
 	book->todo_list.item = NULL;
 	book->todo_list.n = book->todo_list.size = 0;
 	book->todo_list.valid = false;
@@ -2978,17 +3325,12 @@ void book_set_loaded_file(const char *file, const bool imported)
  */
 static long long book_file_positions(const char *file)
 {
-	unsigned int header_edax, header_book, n;
-	unsigned char header_version, header_release;
+	BookFileHeader h;
 	long long count = -1;
 	FILE *f = file_open(file, "rb");
 
 	if (f) {
-		if (fread(&header_edax, sizeof header_edax, 1, f) == 1 && fread(&header_book, sizeof header_book, 1, f) == 1
-		 && fread(&header_version, 1, 1, f) == 1 && fread(&header_release, 1, 1, f) == 1
-		 && header_edax == EDAX && header_book == BOOK && header_version == VERSION
-		 && fseek(f, (long) (sizeof ((Book*) NULL)->date + sizeof ((Book*) NULL)->options), SEEK_CUR) == 0
-		 && fread(&n, sizeof n, 1, f) == 1) count = n;
+		if (book_file_header_read(f, &h) == BOOK_HEADER_OK) count = h.n_positions > (unsigned long long) LLONG_MAX ? LLONG_MAX : (long long) h.n_positions;
 		fclose(f);
 	}
 	return count;
@@ -3112,40 +3454,41 @@ bool book_load(Book *book, const char *file)
 		unsigned int used = 0;
 		int last_bucket = -1;
 		bool pooling;
-		unsigned int header_edax, header_book;
-		unsigned char header_version, header_release;
-		unsigned int i, expected;	// the position count is saved as a 32-bit unsigned int
-		int r, j;
+		BookFileHeader header;
+		unsigned int i, expected;	// the position count is at most a 32-bit unsigned int
+		int j;
 		loaded.search = book->search;
 		loaded.epoch = 1;
 
 		info("Loading book from %s...", file);
-		r = fread(&header_edax, sizeof (unsigned int), 1, f);
-		r += fread(&header_book, sizeof (unsigned int), 1, f);
-		if (r != 2 || header_edax != EDAX || header_book != BOOK) {
+		switch (book_file_header_read(f, &header)) {
+		case BOOK_HEADER_NOT_BOOK:
 			error("%s is not an edax opening book\n", file);
 			goto book_load_failed;
-		}
-
-		r = fread(&header_version, 1, 1, f);
-		r += fread(&header_release, 1, 1, f);
-		if (r != 2 || header_version != VERSION) {
+		case BOOK_HEADER_VERSION:
 			error("%s is not a compatible version\n", file);
 			goto book_load_failed;
-		}
-
-		r = fread(&loaded.date, sizeof loaded.date, 1, f);
-		r += fread(&loaded.options, sizeof loaded.options, 1, f);
-		r += fread(&expected, sizeof expected, 1, f);
-		if (r != 3) {
+		case BOOK_HEADER_SETTINGS:
 			error("Cannot read book settings from %s\n", file);
 			goto book_load_failed;
+		case BOOK_HEADER_DAMAGED:
+			error("Damaged header in %s\n", file);
+			goto book_load_failed;
 		}
+		if (header.n_positions > UINT_MAX) {
+			error("Invalid position count in %s\n", file);
+			goto book_load_failed;
+		}
+		expected = (unsigned int) header.n_positions;
+		loaded.date = header.date;
+		loaded.options = header.options;
+		loaded.file_format = (unsigned char) header.format;
 		BOUND(loaded.options.level, 0, 60, "book level"); // damaged settings: the level is an index of LEVEL[][]
 		BOUND(loaded.options.n_empties, 0, 60, "book depth (empties)"); // (a game holds 60 moves: see book_check_game)
 		{	// every position takes at least POSITION_FIXED_SIZE bytes and its leaf: reject a count the file cannot hold
-			const long long remaining = book_file_remaining(f);
-			if (remaining < 0 || (long long) expected > remaining / (long long) (POSITION_FIXED_SIZE + sizeof (Link))) {
+			const long long remaining = book_file_remaining(f) - (header.format == 2 ? BOOK2_TRAILER_SIZE : 0);
+			const long long least = header.format == 2 ? POSITION2_MIN_SIZE : POSITION_FIXED_SIZE + sizeof (Link);
+			if (remaining < 0 || (long long) expected > remaining / least) {
 				error("Invalid position count in %s\n", file);
 				goto book_load_failed;
 			}
@@ -3164,6 +3507,7 @@ bool book_load(Book *book, const char *file)
 			error("cannot allocate the book read buffer\n");
 			goto book_load_failed;
 		}
+		if (header.format == 2) book_stream_crc_start(&stream, false);
 		// A saved book lists its positions bucket by bucket: store them contiguously
 		// in one pool, exactly sized (no per-bucket block, no spare capacity).
 		// Positions out of bucket order fall back to the usual growing arrays.
@@ -3173,7 +3517,7 @@ bool book_load(Book *book, const char *file)
 		loaded.pool_size = pool ? expected : 0;
 		pooling = (pool != NULL);
 		for (i = 0; i < expected; ++i) {
-			if (!position_read(&p, &stream, &loaded)) {
+			if (!position_read_form(header.format, &p, &stream, &loaded)) {
 				error("Truncated or damaged opening book %s at position %u/%u\n", file, i, expected);
 				goto book_load_failed;
 			}
@@ -3223,6 +3567,10 @@ bool book_load(Book *book, const char *file)
 		if (pool && used < expected) { // release the unused part of the pool
 			book_pool_shrink(&loaded, used);
 			pool = (Position*) loaded.pool;
+		}
+		if (header.format == 2 && !book_trailer_read_2(&stream)) {
+			error("Damaged opening book %s (the check of the positions fails)\n", file);
+			goto book_load_failed;
 		}
 		if (ferror(f) || !book_stream_at_end(&stream) || loaded.n_nodes != expected) {
 			error("Invalid opening book size or position count in %s\n", file);
@@ -3448,6 +3796,7 @@ static void book_remove_stale_tmp(const char *file)
 static bool book_save_to(Book *book, const char *file, const bool keep_replaced)
 {
 	const bool replaced = (book_replaced_file != NULL && strcmp(file, book_replaced_file) == 0);
+	const int format = book_save_format(book);
 	unsigned int header_edax = EDAX, header_book = BOOK;
 	unsigned char header_version = VERSION, header_release = RELEASE;
 	char *tmp_file;
@@ -3469,24 +3818,30 @@ static bool book_save_to(Book *book, const char *file, const bool keep_replaced)
 	info("Saving book to %s...", file);
 	book_set_date(book);
 
-	r = fwrite(&header_edax, sizeof (unsigned int), 1, f);
-	r += fwrite(&header_book, sizeof (unsigned int), 1, f);
-	r += fwrite(&header_version, 1, 1, f);
-	r += fwrite(&header_release, 1, 1, f);
-	r += fwrite(&book->date, sizeof book->date, 1, f);
-	r += fwrite(&book->options, sizeof book->options, 1, f);
-	r += fwrite(&book->n_nodes, sizeof book->n_nodes, 1, f);
+	if (format == 2) {
+		r = book_file_header_write_2(f, book) ? 7 : 0;
+	} else {
+		r = fwrite(&header_edax, sizeof (unsigned int), 1, f);
+		r += fwrite(&header_book, sizeof (unsigned int), 1, f);
+		r += fwrite(&header_version, 1, 1, f);
+		r += fwrite(&header_release, 1, 1, f);
+		r += fwrite(&book->date, sizeof book->date, 1, f);
+		r += fwrite(&book->options, sizeof book->options, 1, f);
+		r += fwrite(&book->n_nodes, sizeof book->n_nodes, 1, f);
+	}
 
 	if (r == 7) {
 		BookStream stream;
 		if (!book_stream_open(&stream, f)) r = 0;
 		else {
+			if (format == 2) book_stream_crc_start(&stream, true);
 			foreach_position(p, a, book) {
-				if (!position_write(p, book, &stream)) {
+				if (!position_write_form(format, p, book, &stream)) {
 					r = 0;
 					break;
 				}
 			}
+			if (r == 7 && format == 2 && !book_trailer_write_2(&stream)) r = 0;
 			if (!book_stream_flush(&stream)) r = 0;
 			book_stream_close(&stream);
 		}
@@ -3537,6 +3892,7 @@ static bool book_save_to(Book *book, const char *file, const bool keep_replaced)
 	free(tmp_file);
 	if (replaced) book_set_replaced_file(NULL); // (the file now holds the book in memory)
 	book->need_saving = false;
+	book->file_format = (unsigned char) format;
 	info("done\n");
 	return true;
 }
@@ -3565,6 +3921,29 @@ bool book_save(Book *book, const char *file)
 bool book_save_to_book_file(Book *book)
 {
 	return book_save_to(book, options.book_file, true);
+}
+
+/**
+ * @brief Convert a book file: into the form of book-format, or, if it is auto, into the other form
+ * (form 1 into form 2, form 2 into form 1).
+ *
+ * @param in Book file to convert.
+ * @param out File to write.
+ * @return true on success.
+ */
+bool book_convert(const char *in, const char *out)
+{
+	Book book = {};
+	FILE *f = file_open(in, "rb");
+	bool ok;
+
+	if (f == NULL) { error("Cannot open opening book %s\n", in); return false; }
+	fclose(f);
+	if (!book_load(&book, in)) return false;
+	if (options.book_format == 0) book.file_format = (book.file_format == 2) ? 1 : 2;
+	ok = book_save(&book, out);
+	book_free(&book);
+	return ok;
 }
 
 /**
@@ -4293,42 +4672,52 @@ bool book_merge_file(Book *dest, const char *file)
 	FILE *f = file_open(file, "rb");
 	BookStream stream = {};
 	Position p, merged;
-	unsigned int header_edax = 0, header_book = 0;
-	unsigned char header[2];	// version, release
-	unsigned int i, expected = 0;	// the position count is saved as a 32-bit unsigned int
+	BookFileHeader header;
+	unsigned int i, expected = 0;	// the position count is at most a 32-bit unsigned int
 	long long n_added = 0, next;
 	int pass, k;
 	bool ok = false, use_hints = true;
 
 	if (f == NULL) { error("cannot open %s\n", file); return false; }
-	if (fread(&header_edax, 4, 1, f) != 1 || fread(&header_book, 4, 1, f) != 1 || header_edax != EDAX || header_book != BOOK
-	 || fread(header, 2, 1, f) != 1 || header[0] != VERSION) {
+	switch (book_file_header_read(f, &header)) {
+	case BOOK_HEADER_OK:
+		break;
+	case BOOK_HEADER_NOT_BOOK:
+	case BOOK_HEADER_VERSION:
 		error("%s is not a compatible edax opening book\n", file);
 		fclose(f); return false;
-	}
-	{ Book h; if (fread(&h.date, sizeof h.date, 1, f) != 1 || fread(&h.options, sizeof h.options, 1, f) != 1 || fread(&expected, sizeof expected, 1, f) != 1) {
+	case BOOK_HEADER_DAMAGED:
+		error("Damaged header in %s\n", file);
+		fclose(f); return false;
+	default:
 		error("Cannot read book settings from %s\n", file);
 		fclose(f); return false;
-	} }
+	}
+	if (header.n_positions > UINT_MAX) {
+		error("Invalid position count in %s\n", file);
+		fclose(f); return false;
+	}
+	expected = (unsigned int) header.n_positions;
 	if (!book_stream_open(&stream, f)) { fclose(f); return false; }
 
 	book_clean(dest); // no position of the destination is 'done' at the new epoch
 	merge_hint_free(); // (hints of a merge that was not followed by book_link_parallel)
 
 	for (pass = 0; pass < 2; ++pass) {
-		const long long start = 8 + 2 + sizeof dest->date + sizeof dest->options + sizeof expected;
+		const long long start = header.start;
 		if (pass) book_grow_buckets(dest, (long long) dest->n_nodes + expected); // the source is valid: prepare the destination
 #ifdef _WIN32
 		if (pass && _fseeki64(f, start, SEEK_SET) != 0) goto merge_end;
 #else
 		if (pass && fseeko(f, start, SEEK_SET) != 0) goto merge_end;
 #endif
-		stream.n = stream.pos = 0;
+		book_stream_reset(&stream);
+		if (!pass && header.format == 2) book_stream_crc_start(&stream, false);
 		bprint("%s book %s...\r", pass ? "Merging" : "Checking", file);
 		next = real_clock() + 1000;
 		for (i = 0; i < expected; ++i) {
 			if ((i & 0xffff) == 0 && i && book_progress_due(&next)) bprint("%s book %s...%u/%u positions\r", pass ? "Merging" : "Checking", file, i, expected);
-			if (!position_read(&p, &stream, NULL)) { // (position_merge does not copy the counts)
+			if (!position_read_form(header.format, &p, &stream, NULL)) { // (position_merge does not copy the counts)
 				error("Truncated or damaged opening book %s at position %u/%u\n", file, i, expected);
 				goto merge_end;
 			}
@@ -4353,6 +4742,10 @@ bool book_merge_file(Book *dest, const char *file)
 				}
 			}
 			position_free(&p);
+		}
+		if (!pass && header.format == 2 && !book_trailer_read_2(&stream)) {
+			error("Damaged opening book %s (the check of the positions fails)\n", file);
+			goto merge_end;
 		}
 		if (!pass && (ferror(f) || !book_stream_at_end(&stream))) {
 			error("Invalid opening book size or position count in %s\n", file);

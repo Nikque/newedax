@@ -14,6 +14,8 @@
 #include "core/bit.h"
 #include "util/util.h"
 
+#include <string.h>
+
 /** Table for a 32-bits-at-a-time software CRC-32C calculation.
  * This tablehas built into it the pre and post bit inversion of the CRC. */
 #ifndef crc32c_u64
@@ -513,6 +515,31 @@ unsigned int crc32c_u8(unsigned int crc, unsigned int data)
 	return	crc32c_table[0][(crc ^ data) & 0xff] ^ (crc >> 8);
 }
 #endif
+
+/**
+ * @brief CRC-32C (Castagnoli, as in iSCSI) of bytes.
+ *
+ * crc32c_bytes(crc32c_bytes(0, a, n), b, m) is the CRC of the n bytes of a followed by the m bytes of b.
+ * (The software CRC needs bit_init().)
+ *
+ * @param crc CRC of the previous bytes (0 for none).
+ * @param data Bytes.
+ * @param n Number of bytes.
+ * @return the CRC.
+ */
+unsigned int crc32c_bytes(unsigned int crc, const void *data, size_t n)
+{
+	const unsigned char *p = (const unsigned char*) data;
+	unsigned long long d;
+
+	crc = ~crc;
+	for (; n >= 8; n -= 8, p += 8) {
+		memcpy(&d, p, 8);
+		crc = (unsigned int) crc32c_u64(crc, d);
+	}
+	for (; n; --n) crc = crc32c_u8(crc, *p++);
+	return ~crc;
+}
 
 /**
  * @brief Get a random set bit index.

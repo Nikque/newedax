@@ -76,6 +76,7 @@ Options options = {
 	.level_set = false, // level given by the user (else no level cap with a time control)
 	.probcut_model = 0, // probcut model: standard
 	.book_depth = 0, // book depth: auto (the depth of the loaded book)
+	.book_format = 0, // form of the saved book: auto (the form of the loaded file)
 	.book_store_tasks = 0, // games learned at the same time: auto
 	.book_store_auto_save = true, // save the book to <book-file>.store after book store
 	.book_leaf_recalculate_rounds = 1, // passes of book leaf recalculate
@@ -119,6 +120,8 @@ void options_usage(void)
 		"  -book-file                    load opening book from this file.\n"
 		"  -book-usage <on/off>          play from the opening book.\n"
 		"  -book-depth <n|auto>          depth of the opening book at startup (auto: the depth of the loaded book).\n"
+		"  -book-format <1|2|auto>       form of the saved book files: 1 (Edax 4), 2 (smaller, checked; not read by Edax 4)\n"
+		"                                (auto: the form of the loaded file, 1 for a new book).\n"
 		"  -book-randomness <n>          play various but worse moves from the opening book.\n"
 		"  -auto-start <on/off>          automatically restart a new game.\n"
 		"  -auto-swap <on/off>           automatically Edax's color between games\n"
@@ -341,6 +344,7 @@ int options_read(const char *option, const char *value)
 		else if (string_is(option, "book-save-interval")) options.book_save_interval = option_int(option, value, options.book_save_interval);
 		else if (string_is(option, "book-deviate-save-rounds")) options.book_deviate_save_rounds = option_int(option, value, options.book_deviate_save_rounds);
 		else if (string_is(option, "book-depth")) options.book_depth = option_int_or_auto(option, value, options.book_depth, 0);	// 0 = auto
+		else if (string_is(option, "book-format")) options.book_format = option_int_or_auto(option, value, options.book_format, 0);	// 0 = auto
 		else if (string_is(option, "book-expand-tasks")) options.book_expand_tasks = option_int_or_auto(option, value, options.book_expand_tasks, 0);	// 0 = auto
 		else if (string_is(option, "book-store-tasks")) options.book_store_tasks = option_int_or_auto(option, value, options.book_store_tasks, 0);	// 0 = auto
 		else if (string_is(option, "book-merge-auto-save")) option_boolean(option, value, &options.book_merge_auto_save);
@@ -541,6 +545,7 @@ void options_bound(void)
 	if (options.book_expand_tasks != 0) BOUND(options.book_expand_tasks, 1, max_threads, "book-expand-tasks");
 	if (options.book_store_tasks != 0) BOUND(options.book_store_tasks, 1, max_threads, "book-store-tasks");
 	BOUND(options.book_depth, 0, 60, "book-depth");	// 0 = auto
+	BOUND(options.book_format, 0, 2, "book-format");	// 0 = auto
 	BOUND(options.verbosity, 0, 4, "verbosity");
 	BOUND(options.mode, 0, 3, "mode"); // (an index of the names of the modes: up to v4.5.5-nikque.15 not bounded)
 	BOUND(options.noise, 0, 60, "noise");
@@ -608,6 +613,7 @@ void options_dump(FILE *f)
 	fprintf(f, "\tbook file: %s\n", options.book_file);
 	fprintf(f, "\tbook allowed: %s\n", boolean_string[options.book_allowed]);
 	if (options.book_depth > 0) fprintf(f, "\tbook depth at startup: %d\n", options.book_depth);
+	if (options.book_format > 0) fprintf(f, "\tbook file form: %d\n", options.book_format);
 	else fprintf(f, "\tbook depth at startup: auto (the depth of the loaded book)\n");
 	fprintf(f, "\tbook randomness: %d\n", options.book_randomness);
 	fprintf(f, "\tbook timed-save interval: %d minutes\n", options.book_save_interval);
