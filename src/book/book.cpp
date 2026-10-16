@@ -150,7 +150,11 @@ static_assert(sizeof (void*) != 8 || sizeof (Position) == 40, "Position is 40 by
  * does not fit (above 65534: a few positions near the root of a large book), the 4 counts are kept on 32 bits
  * in the table of the book (book->counts), and the 16-bit counts of the position are all POSITION_COUNTS_IN_TABLE.
  * The key of the table is the (unique) board: a position keeps its entry when it moves inside the book.
+ * The entry goes with the position when it leaves the book (book_remove_at) or when its counts start again
+ * from 0 (position_fix).
  * The book file keeps the 4 counts on 32 bits (see position_read and position_write).
+ * The counts of a position are not read while they are written: the parallel negamax reads the counts of a
+ * child once the child is done (position_negamax_parallel).
  */
 
 /** 16-bit counts of a position whose counts are in the table of its book. */
@@ -2658,7 +2662,8 @@ static void position_fix(Position *position, Book *book)
 {
 	Board board;
 
-	if ((position->board.player & position->board.opponent) || 
+	if (position_counts_in_table(position)) book_counts_erase(book, &position->board); // (the counts start again from 0)
+	if ((position->board.player & position->board.opponent) ||
 	    ((position->board.player | position->board.opponent) & 0x0000001818000000ULL) != 0x0000001818000000ULL) {
 		position_free(position);
 		position_init(position);
@@ -2940,9 +2945,10 @@ static void book_detach_at(Book *book, PositionArray *a, const int i)
 	--book->stats.n_nodes;
 }
 
-/** @brief Remove a position from the book, by its place (see book_detach_at). */
+/** @brief Remove a position from the book, by its place (see book_detach_at), with its entry in the table of counts. */
 static void book_remove_at(Book *book, PositionArray *a, const int i)
 {
+	if (position_counts_in_table(a->positions + i)) book_counts_erase(book, &a->positions[i].board);
 	position_free(a->positions + i);
 	book_detach_at(book, a, i);
 }

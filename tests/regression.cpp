@@ -248,6 +248,32 @@ Board pb=b;if(e.n_empties&1){pb.player=b.opponent;pb.opponent=b.player;}for(int 
   c=g;c.initial_board.player^=1ULL<<A1;base_append(&b,&c);base_unique(&b);
   ok=b.n_games==101&&!strcmp(b.game[0].name[0],"p0")&&b.game[0].move[1]==F6&&!strcmp(b.game[1].name[0],"p1")&&b.game[1].move[1]==D6&&!board_equal(&b.game[100].initial_board,&b.game[99].initial_board);
   printf("BASE unique: %d games kept (101 expected) ok=%d\n",b.n_games,ok);base_free(&b);if(!ok)return 2;}
+ else if(!strcmp(t,"crc32c")){ /* CRC-32C of the book and evaluation files of form 2 (instruction or table: the same values), against a reference computed bit by bit */
+  auto reference=[](const unsigned char *p,size_t n){unsigned int c=0xFFFFFFFFu;for(size_t i=0;i<n;++i){c^=p[i];for(int k=0;k<8;++k)c=(c>>1)^(0x82F63B78u&(0u-(c&1)));}return ~c;};
+  unsigned char buffer[300];int bad=0;unsigned int check=crc32c_bytes(0,"123456789",9);if(check!=0xE3069283u)++bad;
+  for(int i=0;i<2000;++i){size_t n=rr()%257,o=rr()%8,m=n?rr()%(n+1):0;for(size_t k=0;k<n;++k)buffer[o+k]=(unsigned char)rr();unsigned int want=reference(buffer+o,n);if(crc32c_bytes(0,buffer+o,n)!=want||crc32c_bytes(crc32c_bytes(0,buffer+o,m),buffer+o+m,n-m)!=want)++bad;}
+  printf("CRC32C check value %08x (e3069283 expected), 2000 buffers against the bit by bit reference, differences=%d\n",check,bad);if(bad)return 2;}
+ else if(!strcmp(t,"bigcounts")){ /* game counts above 65534 (kept in the table of the book): the negamax with threads gives the counts of one thread, positions going in and out of the table; the table keeps an entry for each position whose counts are in it, and for no other board (book fix, book subtree) */
+  Search s;init_search(&s,1);Book b={0},*bp=&b;Position *p,*root;PositionArray *a;book_init(&b);b.search=&s;b.options.level=1;b.options.n_empties=40;
+  {Position q;Board ib;position_init(&q);board_init(&ib);board_unique(&ib,&q.board);q.level=1;if(book_add(&b,&q)<=0)return 2;} /* every position up to ply 8 (unique boards) */
+  int n_cur=1,n_next;Board *cur=(Board*)malloc(sizeof(Board)),*next;board_init(cur);
+  for(int ply=1;ply<=8;++ply){next=(Board*)malloc((size_t)n_cur*MAX_MOVE*sizeof(Board));n_next=0;
+   for(int i=0;i<n_cur;++i){unsigned long long m=board_get_moves(cur+i);int x;foreach_bit(x,m){Board nb,u;board_next(cur+i,x,&nb);board_unique(&nb,&u);if(book_probe(&b,&u))continue;Position q;position_init(&q);q.board=u;q.level=1;if(book_add(&b,&q)<=0)return 2;next[n_next++]=u;}}
+   free(cur);cur=next;n_cur=n_next;}
+  free(cur);foreach_position(p,a,bp)position_link(p,&b);
+  const unsigned int n=b.n_nodes;unsigned int (*ref)[4]=(unsigned int(*)[4])malloc((size_t)n*16),(*got)[4]=(unsigned int(*)[4])malloc((size_t)n*16);bool *was=(bool*)malloc(n);
+  auto counts=[&](unsigned int (*o)[4]){unsigned int k=0;foreach_position(p,a,bp)position_get_counts_n(p,&b,o[k++]);};
+  auto table_ok=[&]()->bool{size_t in=0;foreach_position(p,a,bp)if(position_counts_in_table(p)){++in;if(!b.counts||b.counts->map.find(BookCountsKey{p->board.player,p->board.opponent})==b.counts->map.end())return false;}return in==(b.counts?b.counts->map.size():0);};
+  auto leaves=[&](int r){foreach_position(p,a,bp)if(board_count_empties(&p->board)==52){bool keep=r%3==0||((board_get_hash_code(&p->board)>>r)&(r%3==1?1:3))==0;p->leaf.move=keep?(unsigned char)first_bit(board_get_moves(&p->board)):NOMOVE;p->leaf.score=keep?0:-SCORE_INF;}};
+  int differences=0,transitions=0;unsigned int root_lines=0;
+  for(int r=0;r<9;++r){leaves(r);unsigned int k=0;foreach_position(p,a,bp)was[k++]=position_counts_in_table(p);
+   options.n_task=4;book_negamax(&b);counts(got);k=0;foreach_position(p,a,bp){transitions+=was[k]!=position_counts_in_table(p);++k;}if(!table_ok())++differences;
+   options.n_task=1;book_negamax(&b);counts(ref);if(memcmp(ref,got,(size_t)n*16))++differences;if(r==0){unsigned int c[4];position_get_counts_n(book_root(&b),&b,c);root_lines=c[3];}}
+  leaves(0);root=book_root(&b);bool in=position_counts_in_table(root);root->level=61;options.n_task=4;book_fix(&b);bool fix_ok=in&&table_ok(); /* the fixed position starts again from 0 */
+  book_negamax(&b);Board b1,b2;board_init(&b2);board_next(&b2,F5,&b1);board_next(&b1,D6,&b2);
+  unsigned int before=n;book_subtree(&b,&b2);bool subtree_ok=b.n_nodes<before&&table_ok();
+  printf("BIGCOUNTS positions=%u root_lines=%u (390216 expected) transitions=%d differences=%d table_after_fix=%d table_after_subtree=%d nodes_after_subtree=%u\n",n,root_lines,transitions,differences,fix_ok,subtree_ok,b.n_nodes);
+  free(ref);free(got);free(was);book_free(&b);search_free(&s);if(root_lines!=390216||transitions==0||differences||!fix_ok||!subtree_ok)return 2;}
  else return 1;
  return 0;
 }
