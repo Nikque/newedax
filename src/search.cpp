@@ -617,7 +617,7 @@ void search_clone(Search *search, Search *master)
 	search->stability_bound = master->stability_bound;
 	spin_lock(master);
 	assert(master->n_child < MAX_THREADS);
-	master->child[master->n_child++] = search;
+	{ const int n = master->n_child; master->child[n] = search; master->n_child = n + 1; }
 	spin_unlock(master);
 	search->parent = master;
 	search->master = master->master;

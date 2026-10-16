@@ -126,7 +126,7 @@ static bool get_helper(Node *master, Node *node, Move *move)
 				task->move = move;
 				search_clone(task->search, node->search);
 				lock(node);
-					node->slave[node->n_slave++] = task->search;
+					{ const int n = node->n_slave; node->slave[n] = task->search; node->n_slave = n + 1; }
 				unlock(node);
 				task->run = true;
 				found = true;
@@ -184,7 +184,7 @@ bool node_split(Node *node, Move *move)
 			task->move = move;
 			search_clone(task->search, search);
 			lock(node);
-				node->slave[node->n_slave++] = task->search;
+				{ const int n = node->n_slave; node->slave[n] = task->search; node->n_slave = n + 1; }
 			unlock(node);
 			YBWC_STATS(atomic_add(&statistics.n_split_success, 1);)
 
@@ -334,7 +334,7 @@ static Move* node_next_move_lockless(Node *node)
 {
 	Move *move;
 	if (node->move && node->alpha < node->beta && !node->search->stop) {
-		++node->n_moves_done; --node->n_moves_todo;
+		node->n_moves_done = node->n_moves_done + 1; node->n_moves_todo = node->n_moves_todo - 1;
 		move = node->move = move_next(node->move);
 	} else {
 		move = NULL;
@@ -456,7 +456,7 @@ void task_search(Task *task)
 	spin_lock(search->parent);
 		for (i = 0; i < search->parent->n_child; ++i) {
 			if (search->parent->child[i] == search) {
-				--search->parent->n_child;
+				search->parent->n_child = search->parent->n_child - 1;
 				search->parent->child[i] = search->parent->child[search->parent->n_child];
 				break;
 			}
@@ -469,7 +469,7 @@ void task_search(Task *task)
 		task->run = false;
 		for (i = 0; i < node->n_slave; ++i) {
 			if (node->slave[i] == search) {
-				--node->n_slave;
+				node->n_slave = node->n_slave - 1;
 				node->slave[i] = node->slave[node->n_slave];
 				break;
 			}

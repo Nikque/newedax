@@ -59,6 +59,9 @@ def normal(lines, names):
                 text = text.replace(k, v)
         text = DECORATED.sub(lambda m: plain(m.group(0)), text)
         text = LABEL.sub('$L', text)
+        text = re.sub(r'\btv\d+', 'tv', text)  # temporaries of the compiler
+        text = re.sub(r'\$+sroa\$\d+', '$sroa', text)
+        text = re.sub(r'(\w)\$\d+\$', r'\1$', text)  # split local variables (name$1$)
         text = re.sub(r'\s+', ' ', text)
         out.append(text)
     return out
@@ -78,17 +81,24 @@ def main(argv):
             for d in difflib.unified_diff(x, y, 'reference', 'candidate', lineterm='', n=1):
                 print(d)
         return 0
-    same, different, only_a, only_b = [], [], [], []
+    same, mnemonics, different, only_a, only_b = [], [], [], [], []
     for name in sorted(set(a) | set(b)):
         if name not in b:
             only_a.append(name)
         elif name not in a:
             only_b.append(name)
-        elif normal(a[name], names) == normal(b[name], names):
-            same.append(name)
         else:
-            different.append((name, len(a[name]), len(b[name])))
-    print(f'functions: same {len(same)}, different {len(different)}, only in reference {len(only_a)}, only in candidate {len(only_b)}')
+            x, y = normal(a[name], names), normal(b[name], names)
+            if x == y:
+                same.append(name)
+            elif [i.split(' ')[0] for i in x] == [i.split(' ')[0] for i in y]:
+                mnemonics.append(name)  # the same instructions in the same order; other registers or operand order
+            else:
+                different.append((name, len(a[name]), len(b[name])))
+    print(f'functions: same {len(same)}, same instructions with other operands {len(mnemonics)}, '
+          f'different {len(different)}, only in reference {len(only_a)}, only in candidate {len(only_b)}')
+    for name in mnemonics:
+        print(f'  operands differ: {name}')
     for name, x, y in different:
         print(f'  differs: {name} ({x} -> {y} instructions)')
     for name in only_a:
