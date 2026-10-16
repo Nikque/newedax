@@ -35,10 +35,18 @@ ifeq ($(CC),cc)
 	CC = $(COMP)
 endif
 
+# the sources are C++: use the C++ driver of the compiler
+ifeq ($(CC),gcc)
+	CC = g++
+endif
+ifeq ($(CC),clang)
+	CC = clang++
+endif
+
 
 # gcc 4.x (x >= 7)
 ifeq ($(COMP),gcc)
-	CFLAGS = -std=c99 -pedantic -W -Wall -Wextra -pipe -D_GNU_SOURCE=1 -DUNICODE
+	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -pedantic -W -Wall -Wextra -pipe -D_GNU_SOURCE=1 -DUNICODE
 	PGO_GEN = -fprofile-generate
 	PGO_USE = -fprofile-correction -fprofile-use
 
@@ -131,7 +139,7 @@ endif
 
 #icc
 ifeq ($(COMP),icc)
-	CFLAGS = -std=c99 -Wall -Wcheck -wd2259 -D_GNU_SOURCE=1 -DUNICODE -Qoption,cpp,--unicode_source_kind,"UTF-8"
+	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -Wall -Wcheck -wd2259 -D_GNU_SOURCE=1 -DUNICODE -Qoption,cpp,--unicode_source_kind,"UTF-8"
 	PGO_GEN = -prof_gen
 	PGO_USE = -prof_use -wd11505
 
@@ -163,7 +171,7 @@ endif
 
 #clang
 ifeq ($(COMP),clang)
-	CFLAGS = -std=c99 -pedantic -W -Wall -D_GNU_SOURCE=1 -DUNICODE
+	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -pedantic -W -Wall -D_GNU_SOURCE=1 -DUNICODE
 	PGO_GEN = -fprofile-instr-generate
 	PGO_USE = -fprofile-instr-use=edax.profdata
 	PGO = llvm-profdata merge -output=edax.profdata $(BIN)/*.profraw
@@ -278,9 +286,9 @@ endif
 
 
 #SRC
-SRC= bit.c board.c move.c hash.c ybwc.c eval.c endgame.c midgame.c root.c search.c \
-book.c opening.c game.c base.c bench.c perft.c obftest.c util.c event.c histogram.c \
-stats.c options.c play.c ui.c edax.c cassio.c gtp.c ggs.c nboard.c xboard.c main.c   
+SRC= bit.cpp board.cpp move.cpp hash.cpp ybwc.cpp eval.cpp endgame.cpp midgame.cpp root.cpp search.cpp \
+book.cpp opening.cpp game.cpp base.cpp bench.cpp perft.cpp obftest.cpp util.cpp event.cpp histogram.cpp \
+stats.cpp options.cpp play.cpp ui.cpp edax.cpp cassio.cpp gtp.cpp ggs.cpp nboard.cpp xboard.cpp main.cpp   
 
 # RULES
 help:
@@ -325,36 +333,36 @@ help:
 
 build:
 	@echo "building edax..."
-	$(CC) $(CFLAGS) $(LTOFLAG) all.c -s -o $(BIN)/$(EXE) $(LIBS)
+	$(CC) $(CFLAGS) $(LTOFLAG) all.cpp -s -o $(BIN)/$(EXE) $(LIBS)
 
 # Library (libedax): Edax as a shared library with the api of libedax.h, for the programs
 # written for libedax (libedax4dart, edax_runner). They load libedax.so (linux),
 # libedax.universal.dylib (osx) or libedax-x64.dll (windows): rename the built library.
 libbuild:
 	@echo "building libedax..."
-	$(CC) $(LIB_CFLAGS) $(LTOFLAG) all.c -s -o $(BIN)/libedax-$(ARCH).$(LIB_EXT) $(LIBS)
+	$(CC) $(LIB_CFLAGS) $(LTOFLAG) all.cpp -s -o $(BIN)/libedax-$(ARCH).$(LIB_EXT) $(LIBS)
 
 source:
-	$(CC) $(CFLAGS) -S all.c
+	$(CC) $(CFLAGS) -S all.cpp
 
 pgo-build:
 	@echo "building edax with pgo..."
 	$(MAKE) clean
-	$(CC) $(CFLAGS) $(LTOFLAG) $(PGO_GEN) all.c -o $(BIN)/$(EXE) $(LIBS)
+	$(CC) $(CFLAGS) $(LTOFLAG) $(PGO_GEN) all.cpp -o $(BIN)/$(EXE) $(LIBS)
 	cd $(BIN); echo -e 'count games 10\ncount positions 9\n' | ./$(EXE) 
 	cd $(BIN); ./$(EXE) -l 60 -solve ../problem/fforum-20-39.obf
 	cd $(BIN); ./$(EXE) -l 18 -auto-store on -auto-start on -repeat 2 -auto-quit on -mode 2 -book-file book.pgo
 	rm -f ../bin/book.pgo ../bin/book.pgo.store
 	$(PGO)	
-	$(CC) $(CFLAGS) $(LTOFLAG) $(PGO_USE) all.c -s -o $(BIN)/$(EXE) $(LIBS)
+	$(CC) $(CFLAGS) $(LTOFLAG) $(PGO_USE) all.cpp -s -o $(BIN)/$(EXE) $(LIBS)
 
 pgo-rebuild:
 	@echo "rebuilding edax with pgo..."
-	$(CC) $(CFLAGS) $(LTOFLAG) $(PGO_USE) all.c -s -o $(BIN)/$(EXE) $(LIBS)
+	$(CC) $(CFLAGS) $(LTOFLAG) $(PGO_USE) all.cpp -s -o $(BIN)/$(EXE) $(LIBS)
 
 prof:
 	@echo "rebuilding edax for profiling..."
-	$(CC) $(CFLAGS) $(LTOFLAG) all.c -pg -o $(BIN)/$(EXE) $(LIBS) # -inline-level=0 -lprofiler
+	$(CC) $(CFLAGS) $(LTOFLAG) all.cpp -pg -o $(BIN)/$(EXE) $(LIBS) # -inline-level=0 -lprofiler
 
 debug:
 	make ARCH=$(ARCH) COMP=$(COMP) OS=$(OS) BUILD=debug prof
@@ -387,8 +395,8 @@ noip:
 	$(CC) -g $(CFLAGS) $(LTOFLAG) $(SRC) -o $(BIN)/$(EXE) $(LIBS)
 
 code:
-	$(CC) $(CFLAGS) $(LTOFLAG) generate_flip.c -o generate_flip
-	$(CC) $(CFLAGS) $(LTOFLAG) generate_count_flip.c -o generate_count_flip
+	$(CC) $(CFLAGS) $(LTOFLAG) generate_flip.cpp -o generate_flip
+	$(CC) $(CFLAGS) $(LTOFLAG) generate_count_flip.cpp -o generate_count_flip
 	generate_flip
 	generate_count_flip
 
