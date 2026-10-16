@@ -262,6 +262,125 @@ char* string_read_line(FILE *f)
 	return line;
 }
 
+#if defined(LIB_BUILD) && defined(_WIN32)
+/*
+ * File names in UTF-8 for the library on Windows.
+ *
+ * The programs using the library (e.g. through libedax4dart) give their file names in UTF-8, but the
+ * functions of Windows that take a char* name expect the ANSI code page. In the library, a file name is
+ * read first as UTF-8, then as ANSI (as the original libedax does).
+ */
+
+/**
+ * @brief Convert a string to wide characters.
+ * @param s String.
+ * @param code_page CP_UTF8 (an invalid string is refused) or CP_ACP.
+ * @return a new string, or NULL.
+ */
+static wchar_t* lib_to_wide(const char *s, const unsigned int code_page)
+{
+	const DWORD flags = (code_page == CP_UTF8 ? MB_ERR_INVALID_CHARS : 0);
+	wchar_t *w;
+	int n;
+
+	if (s == NULL) return NULL;
+	n = MultiByteToWideChar(code_page, flags, s, -1, NULL, 0);
+	if (n <= 0) return NULL;
+	w = (wchar_t*) malloc(n * sizeof *w);
+	if (w && MultiByteToWideChar(code_page, flags, s, -1, w, n) <= 0) {
+		free(w);
+		w = NULL;
+	}
+	return w;
+}
+
+/** code pages of a file name, in the order they are tried */
+static const unsigned int lib_code_page[2] = {CP_UTF8, CP_ACP};
+
+/** @brief MoveFileEx with file names in UTF-8 (or ANSI). */
+static BOOL lib_move_file(const char *from, const char *to, const DWORD flags)
+{
+	BOOL r = FALSE;
+	int i;
+
+	for (i = 0; i < 2 && !r; ++i) {
+		wchar_t *wfrom = lib_to_wide(from, lib_code_page[i]);
+		wchar_t *wto = lib_to_wide(to, lib_code_page[i]);
+		if (wfrom && wto) r = MoveFileExW(wfrom, wto, flags);
+		free(wfrom);
+		free(wto);
+	}
+	return r;
+}
+#endif
+
+/**
+ * @brief Open a file (fopen).
+ * @param path File name (in the library on Windows: UTF-8, or else ANSI).
+ * @param mode Mode of fopen.
+ * @return the file, or NULL.
+ */
+FILE* file_open(const char *path, const char *mode)
+{
+#if defined(LIB_BUILD) && defined(_WIN32)
+	wchar_t *wmode = lib_to_wide(mode, CP_ACP);
+	FILE *f = NULL;
+	int i;
+
+	for (i = 0; i < 2 && f == NULL && wmode != NULL; ++i) {
+		wchar_t *wpath = lib_to_wide(path, lib_code_page[i]);
+		if (wpath) {
+			f = _wfopen(wpath, wmode);
+			free(wpath);
+		}
+	}
+	free(wmode);
+	return f;
+#else
+	return fopen(path, mode);
+#endif
+}
+
+/**
+ * @brief Remove a file (remove).
+ * @param path File name (in the library on Windows: UTF-8, or else ANSI).
+ * @return 0 on success.
+ */
+int file_remove(const char *path)
+{
+#if defined(LIB_BUILD) && defined(_WIN32)
+	int r = -1, i;
+
+	for (i = 0; i < 2 && r != 0; ++i) {
+		wchar_t *wpath = lib_to_wide(path, lib_code_page[i]);
+		if (wpath) {
+			r = _wremove(wpath);
+			free(wpath);
+		}
+	}
+	return r;
+#else
+	return remove(path);
+#endif
+}
+
+/**
+ * @brief Rename a file, without replacing a file of the new name.
+ * @param from File name.
+ * @param to New name.
+ * @return true if the file was renamed.
+ */
+bool file_rename(const char *from, const char *to)
+{
+#if defined(LIB_BUILD) && defined(_WIN32)
+	return lib_move_file(from, to, 0) != 0;
+#elif defined(_WIN32)
+	return MoveFileExA(from, to, 0) != 0;
+#else
+	return rename(from, to) == 0;
+#endif
+}
+
 /**
  * @brief Replace a file by another one, that was written under another name first.
  *
@@ -273,7 +392,9 @@ char* string_read_line(FILE *f)
  */
 bool file_replace(const char *from, const char *to)
 {
-#ifdef _WIN32
+#if defined(LIB_BUILD) && defined(_WIN32)
+	return lib_move_file(from, to, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+#elif defined(_WIN32)
 	return MoveFileExA(from, to, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
 #else
 	return rename(from, to) == 0;
@@ -1038,7 +1159,7 @@ int get_cpu_number(void)
 
 	for (n = 0; n < MAX_THREADS; ++n) {
 		sprintf(file, "/sys/devices/system/cpu/cpu%d", n);
-		f = fopen(file, "r");
+		f = file_open(file, "r");
 		if (f == NULL) {
 			break;
 		}

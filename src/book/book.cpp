@@ -2981,7 +2981,7 @@ static long long book_file_positions(const char *file)
 	unsigned int header_edax, header_book, n;
 	unsigned char header_version, header_release;
 	long long count = -1;
-	FILE *f = fopen(file, "rb");
+	FILE *f = file_open(file, "rb");
 
 	if (f) {
 		if (fread(&header_edax, sizeof header_edax, 1, f) == 1 && fread(&header_book, sizeof header_book, 1, f) == 1
@@ -3011,19 +3011,15 @@ static bool book_set_aside(const char *file, const char *ext, const char *reason
 
 	if (name == NULL) return false;
 	errno = 0;
-	if ((f = fopen(file, "rb")) == NULL) { // nothing to keep, or not a file that can be read (a directory, a locked file): left as it is
+	if ((f = file_open(file, "rb")) == NULL) { // nothing to keep, or not a file that can be read (a directory, a locked file): left as it is
 		free(name);
 		return errno == ENOENT;
 	}
 	fclose(f);
 	for (i = 0; i < 100 && !ok; ++i) {
 		if (i) sprintf(name, "%s%s.%d", file, ext, i); else sprintf(name, "%s%s", file, ext);
-		if ((f = fopen(name, "rb")) != NULL) { fclose(f); continue; } // never replace a file kept before
-#ifdef _WIN32
-		if (MoveFileExA(file, name, 0)) {
-#else
-		if (rename(file, name) == 0) {
-#endif
+		if ((f = file_open(name, "rb")) != NULL) { fclose(f); continue; } // never replace a file kept before
+		if (file_rename(file, name)) {
 			warn("%s %s: it is kept as %s\n", file, reason, name);
 			ok = true;
 		}
@@ -3102,7 +3098,7 @@ bool book_load(Book *book, const char *file)
 	FILE *f;
 
 	errno = 0;
-	f = fopen(file, "rb");
+	f = file_open(file, "rb");
 	if (f == NULL && errno != ENOENT) { // the file exists (or may exist) but cannot be opened: not a new book
 		error("Cannot open opening book %s\n", file);
 		book_unread_set(file);
@@ -3290,7 +3286,7 @@ void book_load_at_startup(Book *book)
  */
 bool book_import(Book *book, const char *file)
 {
-	FILE *f = fopen(file, "r");
+	FILE *f = file_open(file, "r");
 	if (f) {
 		PositionArray *a;
 		Position *p, position;
@@ -3363,7 +3359,7 @@ void book_export(Book *book, const char *file)
 	PositionArray *a;
 	Position *p;
 
-	f = fopen(file, "w");
+	f = file_open(file, "w");
 	if (f == NULL) {
 		error("cannot open file %s", file);
 		return;
@@ -3430,7 +3426,7 @@ static void book_remove_stale_tmp(const char *file)
 			}
 			if (running) continue;
 			sprintf(path, "%.*s%s", (int) (name - file), file, found.cFileName);
-			if (remove(path) == 0) warn("%s was left by an Edax that was stopped while saving: removed\n", path);
+			if (file_remove(path) == 0) warn("%s was left by an Edax that was stopped while saving: removed\n", path);
 		} while (FindNextFileA(search, &found));
 		FindClose(search);
 	}
@@ -3468,7 +3464,7 @@ static bool book_save_to(Book *book, const char *file, const bool keep_replaced)
 #else
 	sprintf(tmp_file, "%s.tmp.%lu", file, (unsigned long) getpid());
 #endif
-	f = fopen(tmp_file, "wb");
+	f = file_open(tmp_file, "wb");
 	if (f == NULL) { error("Cannot open temporary book %s\n", tmp_file); free(tmp_file); return false; }
 	info("Saving book to %s...", file);
 	book_set_date(book);
@@ -3505,7 +3501,7 @@ static bool book_save_to(Book *book, const char *file, const bool keep_replaced)
 	if (fclose(f) != 0) r = 0;
 	if (r != 7) {
 		error("\nCannot write complete book to %s; existing book was not replaced\n", file);
-		remove(tmp_file);
+		file_remove(tmp_file);
 		free(tmp_file);
 		return false;
 	}
@@ -3513,7 +3509,7 @@ static bool book_save_to(Book *book, const char *file, const bool keep_replaced)
 	if (book_unread_file && strcmp(file, book_unread_file) == 0) {
 		if (!book_set_aside(file, ".damaged", "could not be loaded")) {
 			error("\nCannot keep the book that could not be loaded; %s was not replaced\n", file);
-			remove(tmp_file);
+			file_remove(tmp_file);
 			free(tmp_file);
 			return false;
 		}
@@ -3527,14 +3523,14 @@ static bool book_save_to(Book *book, const char *file, const bool keep_replaced)
 		snprintf(reason, sizeof reason, "holds the book in use before \"%s\"", book_replaced_by); // (book new, book load or book import)
 		if (n != 0 && n != 1 && !book_set_aside(file, ".old", reason)) {
 			error("\nCannot keep the book in use before \"%s\"; %s was not replaced\n", book_replaced_by, file);
-			remove(tmp_file);
+			file_remove(tmp_file);
 			free(tmp_file);
 			return false;
 		}
 	}
 	if (!file_replace(tmp_file, file)) {
 		error("\nCannot save book to %s; existing book was not replaced\n", file);
-		remove(tmp_file);
+		file_remove(tmp_file);
 		free(tmp_file);
 		return false;
 	}
@@ -4294,7 +4290,7 @@ void book_sort_parallel(Book *book)
  */
 bool book_merge_file(Book *dest, const char *file)
 {
-	FILE *f = fopen(file, "rb");
+	FILE *f = file_open(file, "rb");
 	BookStream stream = {0};
 	Position p, merged;
 	unsigned int header_edax = 0, header_book = 0;

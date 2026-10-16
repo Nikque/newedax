@@ -154,7 +154,7 @@ void histogram_to_ppm(const char *file, unsigned long long histogram[129][65])
 	unsigned char r[256], g[256], b[256];
 
 	// open the file
-	f = fopen(file, "w");
+	f = file_open(file, "w");
 	if (f == NULL) {
 		warn("cannot open ppm file %s\n", file);
 		return;

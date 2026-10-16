@@ -480,7 +480,7 @@ void options_parse(const char *file)
 		warn("%s: too many option files read from one another\n", file);
 		return;
 	}
-	f = fopen(file, "r");
+	f = file_open(file, "r");
 	if (f != NULL) {
 
 		int n_line = 0;

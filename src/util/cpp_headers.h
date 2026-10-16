@@ -3,12 +3,11 @@
  *
  * @brief The C++ and Boost headers used by Edax.
  *
- * all.cpp reads this file first: libedax_utf8.h (the library on Windows) replaces fopen and
- * remove by macros, which would rename std::remove and other names in the headers read after it.
- * The sources that use these headers also include this file (it is read once).
+ * all.cpp reads this file first; the sources that use these headers also include it (it is read once).
  *
  * Edax is built without exceptions: where Boost would throw, it calls boost::throw_exception, defined in
  * boost_support.cpp (it prints the error and aborts). pdqsort neither allocates memory nor throws.
+ * The containers allocate with HeapAllocator (allocator.h): no operator new, no C++ runtime to link.
  */
 
 #ifndef EDAX_CPP_HEADERS_H

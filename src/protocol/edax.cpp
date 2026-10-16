@@ -696,7 +696,7 @@ void ui_loop_edax(UI *ui)
 					next.search = book->search;
 					// (book_load() makes a new book when the file cannot be opened, and says "New book ...":
 					// that line was printed here before the warning, about a book that is dropped at once)
-					if ((exists = fopen(book_file, "rb")) == NULL) {
+					if ((exists = file_open(book_file, "rb")) == NULL) {
 						warn("Book %s was not loaded; current book retained\n", book_file);
 					} else if (fclose(exists), book_load(&next, book_file)) {
 						book_free(book);

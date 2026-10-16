@@ -602,6 +602,22 @@ int main(int argc, char **argv)
 			remove("libtest-book3.dat");
 		}
 	}
+#ifdef _WIN32
+	{	// file names in UTF-8 (the library reads a name as UTF-8, then as ANSI)
+		const char *utf8 = "libtest-\xe3\x83\x86\xe3\x82\xb9\xe3\x83\x88.dat"; // "libtest-" and 3 katakana
+		const wchar_t *wide = L"libtest-\x30c6\x30b9\x30c8.dat";
+		FILE *f;
+		edax_book_save(utf8);
+		f = _wfopen(wide, L"rb");
+		CHECK(f != NULL);
+		if (f) fclose(f);
+		edax_book_new(4, 12);
+		edax_book_load(utf8);
+		edax_book_info(&info);
+		CHECK_INT(info.n_nodes, n);
+		_wremove(wide);
+	}
+#endif
 	edax_book_export("libtest-book.txt");
 	CHECK(file_size("libtest-book.txt") > 100);
 	edax_book_new(4, 12);

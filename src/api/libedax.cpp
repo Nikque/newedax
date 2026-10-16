@@ -1544,7 +1544,7 @@ LIBEDAX_API void edax_book_load(const char *book_file)
 
 	// load an opening book (binary format) from the disc
 	next.search = book->search;
-	if (book_file == NULL || (exists = fopen(book_file, "rb")) == NULL) { // (no "New book ..." line for a file that is not there)
+	if (book_file == NULL || (exists = file_open(book_file, "rb")) == NULL) { // (no "New book ..." line for a file that is not there)
 		warn("Book %s was not loaded; current book retained\n", book_file ? book_file : "(no name)");
 	} else if (fclose(exists), book_load(&next, book_file)) {
 		book_free(book);
@@ -2334,7 +2334,7 @@ static void lib_base_extract(const char *base_file, const int n_empties, const c
 	FILE *f;
 
 	if (base_file == NULL || problem_file == NULL) return;
-	if ((f = fopen(problem_file, "a")) == NULL) { // the functions which extract do not check it
+	if ((f = file_open(problem_file, "a")) == NULL) { // the functions which extract do not check it
 		warn("Cannot open file %s\n", problem_file);
 		return;
 	}

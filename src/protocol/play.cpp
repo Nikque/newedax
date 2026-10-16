@@ -107,7 +107,7 @@ bool play_load(Play *play, const char *file)
 		sprintf(play->error_message, "Unknown game format extension: %s\n", ext);
 		return false;
 	}
-	f = fopen(file, load == game_read ? "rb" : "r");
+	f = file_open(file, load == game_read ? "rb" : "r");
 	if (f == NULL) {
 		snprintf(play->error_message, PLAY_MESSAGE_MAX_LENGTH, "Cannot open file %s\n", file); // the name can be longer than the message
 		return false;
@@ -196,7 +196,7 @@ void play_save(Play *play, const char *file)
 	else if (strcmp(ext, ".svg") == 0) save = game_export_svg;
 	else if (strcmp(ext, ".edx") == 0) save = game_write;
 	else { warn("Unknown game format extension: %s\n", ext); return; }
-	f = fopen(file, save == game_write ? "wb" : "w");
+	f = file_open(file, save == game_write ? "wb" : "w");
 	if (f == NULL) {
 		warn("Cannot open file %s\n", file);
 		return;
@@ -1499,7 +1499,7 @@ char* play_learn_parse(char *line, int *randomness)
 int play_learn_file(Play *play, const char *file)
 {
 	enum { LEARN_GROUP_MAX = MAX_THREADS };
-	FILE *f = fopen(file, "r");
+	FILE *f = file_open(file, "r");
 	const int n_group = MIN(book_store_task_count(), LEARN_GROUP_MAX);
 	char *line, *moves[LEARN_GROUP_MAX];
 	int randomness[LEARN_GROUP_MAX], status[LEARN_GROUP_MAX], number[LEARN_GROUP_MAX];

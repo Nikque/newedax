@@ -98,7 +98,7 @@ static FILE* obf_output_open(const char *file, char **tmp)
 	*tmp = (char*) malloc(strlen(file) + 5);
 	if (*tmp == NULL) return NULL;
 	sprintf(*tmp, "%s.tmp", file);
-	f = fopen(*tmp, "w");
+	f = file_open(*tmp, "w");
 	if (f == NULL) { free(*tmp); *tmp = NULL; }
 	return f;
 }
@@ -115,7 +115,7 @@ static void obf_output_close(FILE *f, const char *file, char *tmp)
 	const bool ok = (fclose(f) == 0) && file_replace(tmp, file);
 	if (!ok) {
 		warn("cannot write %s\n", file);
-		remove(tmp);
+		file_remove(tmp);
 	}
 	free(tmp);
 }
@@ -352,7 +352,7 @@ void obf_test(Search *search, const char *obf_file, const char *wrong_file)
 	options.width -= 4;
 
 	// open script file with problems
-	f = fopen(obf_file, "r");
+	f = file_open(obf_file, "r");
 	if (f == NULL) {
 		fprintf(stderr, "obf_test: cannot open Othello Position Description's file %s\n", obf_file);
 		exit(EXIT_FAILURE);
@@ -451,7 +451,7 @@ void script_to_obf(Search *search, const char *script_file, const char *obf_file
 		return;
 	}
 
-	i = fopen(script_file, "r");
+	i = file_open(script_file, "r");
 	if (i == NULL) {
 		warn("script_to_obf: cannot open script file %s\n", script_file);
 		return;
@@ -498,7 +498,7 @@ void obf_filter(const char *input_file, const char *output_file)
 	OBF obf;
 
 	// open script file with problems
-	in = fopen(input_file, "r");
+	in = file_open(input_file, "r");
 	if (in == NULL) {
 		fprintf(stderr, "obf_filter: cannot open Othello Position Description's file %s\n", input_file);
 		exit(EXIT_FAILURE);

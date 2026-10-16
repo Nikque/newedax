@@ -137,7 +137,7 @@ static void wthor_players_load(WthorBase *base, const char *file)
 
 	r = base->n_players = 0;
 
-	if ((f = fopen(file, "rb")) == NULL) {
+	if ((f = file_open(file, "rb")) == NULL) {
 		warn("Cannot open Wthor players' file %s\n", file);
 		fprintf(stderr, "Creating a new %s file\n\n", file);
 		wthor_players_init(base);
@@ -183,7 +183,7 @@ static void wthor_players_save(WthorBase *base, const char *file)
 
 	wthor_header_set(&header, 0, base->n_players, 0);
 
-	if ((f = fopen(file, "wb")) == NULL) {
+	if ((f = file_open(file, "wb")) == NULL) {
 		warn("Cannot open Wthor players' file %s\n", file);
 		return;
 	}
@@ -250,7 +250,7 @@ static void wthor_tournaments_load(WthorBase *base, const char *file)
 	r = 0;
 	base->n_tournaments = 0;
 
-	if ((f = fopen(file, "rb")) == NULL) {
+	if ((f = file_open(file, "rb")) == NULL) {
 		warn("Cannot open Wthor tournaments' file %s\n", file);
 		return;
 	}
@@ -292,7 +292,7 @@ static void wthor_tournaments_save(WthorBase *base, const char *file)
 
 	r = 0;
 
-	if ((f = fopen(file, "rw")) == NULL) {
+	if ((f = file_open(file, "rw")) == NULL) {
 		warn("Cannot open Wthor tournaments' file %s\n", file);
 		return;
 	}
@@ -345,7 +345,7 @@ bool wthor_load(WthorBase *base, const char *file)
 	path_get_dir(file, path); strcat(path, "WTHOR.JOU");
 	wthor_players_load(base, path);
 
-	if ((f = fopen(file, "rb")) != NULL) {
+	if ((f = file_open(file, "rb")) != NULL) {
 		if (wthor_header_read(&base->header, f) && base->header.board_size == 8 && (int) base->header.n_games >= 0) {
 			base->n_games = base->header.n_games;
 
@@ -402,7 +402,7 @@ bool wthor_save(WthorBase *base, const char *file)
 	path_get_dir(file, path); strcat(path, "WTHOR.JOU");
 	wthor_players_save(base, path);
 
-	if ((f = fopen(file, "wb")) != NULL) {
+	if ((f = file_open(file, "wb")) != NULL) {
 		// the header, then every game (up to v4.5.5-nikque.15 the count of the writes, at most 2, was compared
 		// with the count of the games, and any write was taken for a success)
 		wthor_header_set(&base->header, base->n_games, 0, 0);
@@ -846,8 +846,8 @@ static bool base_load_checked(Base *base, const char *file, bool *complete)
 		return false;
 	}
 
-	if (load == base_import_wthor || load == game_read_checked) f = fopen(file, "rb");
-	else f = fopen(file, "r");
+	if (load == base_import_wthor || load == game_read_checked) f = file_open(file, "rb");
+	else f = file_open(file, "r");
 	if (f == NULL) {
 		warn("Cannot open file %s\n", file);
 		return false;
@@ -918,7 +918,7 @@ bool base_save(const Base *base, const char *file)
 	else if (strcmp(ext, ".wtb") == 0) {
 		// the games of the file are kept: it must be read completely (up to v4.5.5-nikque.15 a file that could
 		// not be read was replaced, with the games that were not read)
-		if ((f = fopen(file, "rb")) != NULL) {
+		if ((f = file_open(file, "rb")) != NULL) {
 			fclose(f);
 			if (!wthor_load(&wbase, file)) {
 				warn("Cannot read all the games of %s: it was not replaced\n", file);
@@ -938,7 +938,7 @@ bool base_save(const Base *base, const char *file)
 	}
 
 	base_init(&old);
-	if ((f = fopen(file, "r")) != NULL) { // the games of the file are kept: it must be read completely
+	if ((f = file_open(file, "r")) != NULL) { // the games of the file are kept: it must be read completely
 		fclose(f);
 		base_load_checked(&old, file, &complete);
 		if (!complete) {
@@ -948,7 +948,7 @@ bool base_save(const Base *base, const char *file)
 		}
 	}
 
-	f = fopen(file, save == game_write ? "wb" : "w");
+	f = file_open(file, save == game_write ? "wb" : "w");
 	if (f == NULL) {
 		warn("Cannot open file %s\n", file);
 		base_free(&old);
@@ -991,12 +991,12 @@ bool base_replace(const Base *base, const char *file)
 	tmp_file = (char*) malloc(l + 16);
 	if (tmp_file == NULL) return false;
 	sprintf(tmp_file, "%s.saving%s", file, file + l - 4); // (the same extension: the same format)
-	remove(tmp_file);
+	file_remove(tmp_file);
 	ok = base_save(base, tmp_file);
 	if (ok && !file_replace(tmp_file, file)) ok = false;
 	if (!ok) {
 		warn("Cannot save the games to %s: it was not replaced\n", file);
-		remove(tmp_file);
+		file_remove(tmp_file);
 	}
 	free(tmp_file);
 	return ok;
@@ -1020,7 +1020,7 @@ void base_to_problem(Base *base, const int n_empties, const char *problem)
 		warn("%s: %d empties is out of range\n", problem, n_empties);
 		return;
 	}
-	f = fopen(problem, "w");
+	f = file_open(problem, "w");
 	if (f == NULL) { // (up to v4.5.5-nikque.15 a file that could not be opened stopped Edax)
 		warn("Cannot open file %s\n", problem);
 		return;
@@ -1053,7 +1053,7 @@ void base_to_FEN(Base *base, const int n_empties, const char *problem)
 		warn("%s: %d empties is out of range\n", problem, n_empties);
 		return;
 	}
-	f = fopen(problem, "w");
+	f = file_open(problem, "w");
 	if (f == NULL) { // (up to v4.5.5-nikque.15 a file that could not be opened stopped Edax)
 		warn("Cannot open file %s\n", problem);
 		return;

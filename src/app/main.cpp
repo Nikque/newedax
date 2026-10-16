@@ -108,7 +108,7 @@ int main(int argc, char **argv)
 	if (strcmp(config_file, "config.ini") == 0) {
 		// started by its name alone (found through the PATH): the folder of the executable is not known,
 		// and config.ini is only looked for in the current folder
-		FILE *f = fopen(config_file, "r");
+		FILE *f = file_open(config_file, "r");
 		if (f) fclose(f);
 		else warn("config.ini was not found in the current folder (Edax was started without its folder name): default settings are used\n");
 	}

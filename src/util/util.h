@@ -43,8 +43,15 @@ void print_scientific(double, const char*, FILE*);
 char* string_duplicate(const char*);
 long long string_to_time(const char*);
 char* string_read_line(FILE*);
-bool file_replace(const char*, const char*);
 char* string_copy_line(FILE*);
+
+/*
+ * Files (the file names of the library on Windows are in UTF-8, or else ANSI: see util.cpp)
+ */
+FILE* file_open(const char*, const char*);
+int file_remove(const char*);
+bool file_rename(const char*, const char*);
+bool file_replace(const char*, const char*);
 void string_to_lowercase(char*);
 void string_to_uppercase(char*);
 int string_to_coordinate(const char*);
@@ -481,7 +488,7 @@ typedef struct Log {
 /** @brief open a log file if allowed. */
 #define log_open(l, file) if ((l)->f == NULL && file != NULL) { \
 	lock_init(l); \
-	(l)->f = fopen(file, "w"); \
+	(l)->f = file_open(file, "w"); \
 } else (void) 0
 
 /** @brief Close an opened log file. */
