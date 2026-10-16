@@ -21,6 +21,15 @@
 #include <utility>
 #include <type_traits>
 
+/** A function the compiler must inline (a template made for a constant: no call left). */
+#if defined(_MSC_VER)
+	#define EDAX_FORCE_INLINE __forceinline
+#elif defined(__GNUC__)
+	#define EDAX_FORCE_INLINE inline __attribute__((always_inline))
+#else
+	#define EDAX_FORCE_INLINE inline
+#endif
+
 #include <boost/assert/source_location.hpp>
 #include <boost/sort/pdqsort/pdqsort.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>

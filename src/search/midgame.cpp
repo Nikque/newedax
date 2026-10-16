@@ -9,6 +9,7 @@
  * @version 4.5
  */
 
+#include "util/cpp_headers.h"
 #include "search/search.h"
 
 #include "core/bit.h"
@@ -250,6 +251,48 @@ int search_eval_1(Search *search, int alpha, int beta, unsigned long long moves)
  * @param moves Next turn legal moves.
  * @return An evaluated best score.
  */
+#if (defined(hasSSE2) || defined(__ARM_NEON)) && !defined(ANDROID)
+/**
+ * @brief The moves of search_eval_2(), with the parity of the empty squares as a constant.
+ *
+ * search_eval_2() calls the one of its parity: the loop does not keep the parity across the calls of
+ * search_eval_1(), nor test it at each move (eval_update_sse_parity()).
+ *
+ * @param search Search (its board and features are those after each move on return).
+ * @param alpha Lower bound.
+ * @param beta Upper bound.
+ * @param moves Legal moves (not empty).
+ * @param eval0 Features before the moves.
+ * @param board0 Board before the moves.
+ * @return the best score.
+ */
+template <int PARITY>
+static EDAX_FORCE_INLINE int search_eval_2_moves(Search *search, int alpha, const int beta, unsigned long long moves, const Eval *eval0, const V2DI board0)
+{
+	int x = NOMOVE, bestscore = -SCORE_INF, score;
+	unsigned long long flipped;
+
+	do {
+		do {
+			x = search->empties[x].next;
+		} while (!(moves & x_to_bit(x)));
+
+		moves &= ~x_to_bit(x);
+		flipped = vboard_next(board0, x, &search->board);
+		eval_update_sse_parity(x, flipped, &search->eval, eval0, PARITY);
+		score = search_eval_1(search, alpha, beta, board_get_moves(&search->board));
+
+		if (score > bestscore) {
+			bestscore = score;
+			if (bestscore >= beta) break;
+			else if (bestscore > alpha) alpha = bestscore;
+		}
+	} while (moves);
+
+	return bestscore;
+}
+#endif
+
 int search_eval_2(Search *search, int alpha, int beta, unsigned long long moves)
 {
 	int x, bestscore, score;
@@ -270,6 +313,11 @@ int search_eval_2(Search *search, int alpha, int beta, unsigned long long moves)
 		eval0.n_empties = search->eval.n_empties--;
 		board0.board = search->board;
 		x = NOMOVE;
+#if (defined(hasSSE2) || defined(__ARM_NEON)) && !defined(ANDROID)
+		(void) x; (void) flipped; (void) score;
+		if (eval0.n_empties & 1) bestscore = search_eval_2_moves<1>(search, alpha, beta, moves, &eval0, board0);
+		else bestscore = search_eval_2_moves<0>(search, alpha, beta, moves, &eval0, board0);
+#else
 		do {
 			do {
 				x = search->empties[x].next;
@@ -288,6 +336,7 @@ int search_eval_2(Search *search, int alpha, int beta, unsigned long long moves)
 				else if (bestscore > alpha) alpha = bestscore;
 			}
 		} while (moves);
+#endif
 		search->eval.feature = eval0.feature;
 		search->eval.n_empties = eval0.n_empties;
 		search->board = board0.board;

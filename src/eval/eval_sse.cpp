@@ -24,14 +24,20 @@
 
 #if defined(hasSSE2) || defined(__ARM_NEON) || defined(USE_MSVC_X86)
 
-void eval_update_sse(int x, unsigned long long f, Eval *eval_out, const Eval *eval_in)
+/**
+ * @brief Update the features after a move, with the parity of the empty squares given.
+ *
+ * eval_update_sse() with parity = eval_in->n_empties & 1. A loop over the moves of a position computes the
+ * parity once (search_eval_2): the compiler then keeps fewer values across the calls of the loop.
+ */
+static inline void eval_update_sse_parity(int x, unsigned long long f, Eval *eval_out, const Eval *eval_in, const int parity)
 {
   #ifdef __AVX2__
 	__m256i	f0 = eval_in->feature.v16[0];
 	__m256i	f1 = eval_in->feature.v16[1];
 	__m256i	f2 = eval_in->feature.v16[2];
 
-	if (eval_in->n_empties & 1) {
+	if (parity) {
 		f0 = _mm256_sub_epi16(f0, EVAL_FEATURE[x].v16[0]);
 		f1 = _mm256_sub_epi16(f1, EVAL_FEATURE[x].v16[1]);
 		f2 = _mm256_sub_epi16(f2, EVAL_FEATURE[x].v16[2]);
@@ -66,7 +72,7 @@ void eval_update_sse(int x, unsigned long long f, Eval *eval_out, const Eval *ev
 	__m128i	f4 = eval_in->feature.v8[4];
 	__m128i	f5 = eval_in->feature.v8[5];
 
-	if (eval_in->n_empties & 1) {
+	if (parity) {
 		f0 = _mm_sub_epi16(f0, EVAL_FEATURE[x].v8[0]);
 		f1 = _mm_sub_epi16(f1, EVAL_FEATURE[x].v8[1]);
 		f2 = _mm_sub_epi16(f2, EVAL_FEATURE[x].v8[2]);
@@ -108,6 +114,11 @@ void eval_update_sse(int x, unsigned long long f, Eval *eval_out, const Eval *ev
 	eval_out->feature.v8[4] = f4;
 	eval_out->feature.v8[5] = f5;
   #endif
+}
+
+void eval_update_sse(int x, unsigned long long f, Eval *eval_out, const Eval *eval_in)
+{
+	eval_update_sse_parity(x, f, eval_out, eval_in, eval_in->n_empties & 1);
 }
 
 #else	// SSE dispatch (Eval may not be aligned)
