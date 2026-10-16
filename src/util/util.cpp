@@ -543,15 +543,9 @@ char* string_to_word(char *s)
  */
 bool string_to_boolean(const char *s)
 {
-	if (strcmp(s, "false") == 0
-	||  strcmp(s, "off") == 0
-	||  strcmp(s, "no") == 0
-	||  strcmp(s, "0") == 0) return false;
+	if (string_is(s, "false", "off", "no", "0")) return false;
 
-	if (strcmp(s, "true") == 0
-	||  strcmp(s, "on") == 0
-	||  strcmp(s, "yes") == 0
-	||  strcmp(s, "1") == 0) return true;
+	if (string_is(s, "true", "on", "yes", "1")) return true;
 
 	errno = EINVAL;
 	return false;
@@ -950,7 +944,7 @@ char* parse_command(const char *string, char *cmd, char *param, const unsigned i
 {
 	string = parse_word(string, cmd, size);
 	string_to_lowercase(cmd);
-	if (strcmp(cmd, "set") == 0) {
+	if (string_is(cmd, "set")) {
 		string = parse_word(string, cmd, size);
 		string_to_lowercase(cmd);
 	}

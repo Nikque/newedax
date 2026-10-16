@@ -591,7 +591,7 @@ static bool ggs_match_on(GGSMatchOn *match, Text *text)
 	ggs_match_type_set(match->match_type, word);
 
 	line = parse_word(line, word, WORD_SIZE);
-	match->match_type->is_rated = (strcmp(word, "R") == 0) ? 1 : 0;
+	match->match_type->is_rated = (string_is(word, "R")) ? 1 : 0;
 
 	return true;
 }
@@ -856,7 +856,7 @@ static int ggs_admin(GGSAdmin *admin, Text *text)
 static bool ggs_ready(Text *text)
 {
 	const char *line = text->line[0];
-	return strcmp(line, "READY") == 0;
+	return string_is(line, "READY");
 }
 
 /**
@@ -870,7 +870,7 @@ static bool ggs_ready(Text *text)
 static bool ggs_alert(Text *text)
 {
 	const char *line = text->line[0];
-	return strcmp(line, "ALERT") == 0;
+	return string_is(line, "ALERT");
 }
 
 /**
@@ -884,7 +884,7 @@ static bool ggs_alert(Text *text)
 static bool ggs_login(Text *text)
 {
 	const char *line = text->line[0];
-	return strcmp(line, ": Enter login (yours, or one you'd like to use).") == 0;
+	return string_is(line, ": Enter login (yours, or one you'd like to use).");
 }
 
 /**
@@ -898,7 +898,7 @@ static bool ggs_login(Text *text)
 static bool ggs_password(Text *text)
 {
 	const char *line = text->line[0];
-	return strcmp(line, ": Enter your password.") == 0;
+	return string_is(line, ": Enter your password.");
 }
 
 /**
@@ -1478,12 +1478,12 @@ void ui_loop_ggs(UI *ui) {
 		/* look for a user event */
 		if (ui_event_peek(ui, &cmd, &param)) {
 			/* stop the search */
-			if (strcmp(cmd, "stop") == 0) { 
+			if (string_is(cmd, "stop")) { 
 				if (ui->play[0].state == IS_THINKING) play_stop(ui->play);
 				else if (ui->play[1].state == IS_THINKING) play_stop(ui->play + 1);
 
 			/* repeat a cmd <n> times */			
-			} else if (strcmp(cmd, "loop") == 0) { 
+			} else if (string_is(cmd, "loop")) { 
 				free(client->loop->cmd);
 				errno = 0;
 				client->loop->cmd = string_duplicate(parse_int(param, &client->loop->i));
@@ -1495,7 +1495,7 @@ void ui_loop_ggs(UI *ui) {
 				}
 
 			/* exit from ggs */
-			} else if (strcmp(cmd, "quit") == 0 || strcmp(cmd, "q") == 0) { 
+			} else if (string_is(cmd, "quit", "q")) { 
 				ggs_client_send(client, "tell .%s Bye bye!\n", client->me);
 				ggs_client_send(client, "quit\n");
 				free(cmd); free(param);
@@ -1615,7 +1615,7 @@ void ui_loop_ggs(UI *ui) {
 			printf("[received GGS_SAIO_DELAY]\n");
 			free(client->once->cmd); client->once->cmd = NULL;
 			if (cmd != NULL && param != NULL) {
-				if (strcmp(cmd, "loop") == 0) {
+				if (string_is(cmd, "loop")) {
 					client->once->cmd = string_duplicate(client->loop->cmd);
 				} else {
 					client->once->cmd = (char*) malloc(strlen(cmd) + strlen(param) + 3);

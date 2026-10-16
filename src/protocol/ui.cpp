@@ -41,37 +41,37 @@ static bool stdin_is_file(void)
  */
 bool ui_switch(UI *ui, const char *ui_type)
 {
-	if (strcmp(ui_type, "edax") == 0) {
+	if (string_is(ui_type, "edax")) {
 		ui->type = UI_EDAX;
 		ui->init = ui_init_edax;
 		ui->free = ui_free_edax;
 		ui->loop = ui_loop_edax;
 		return true;
-	} else if (strcmp(ui_type, "gtp") == 0) {
+	} else if (string_is(ui_type, "gtp")) {
 		ui->type = UI_GTP;
 		ui->init = ui_init_gtp;
 		ui->free = ui_free_gtp;
 		ui->loop = ui_loop_gtp;
 		return true;
-	} else if (strcmp(ui_type, "nboard") == 0) {
+	} else if (string_is(ui_type, "nboard")) {
 		ui->type = UI_NBOARD;
 		ui->init = ui_init_nboard;
 		ui->free = ui_free_nboard;
 		ui->loop = ui_loop_nboard;
 		return true;
-	} else if (strcmp(ui_type, "xboard") == 0) {
+	} else if (string_is(ui_type, "xboard")) {
 		ui->type = UI_XBOARD;
 		ui->init = ui_init_xboard;
 		ui->free = ui_free_xboard;
 		ui->loop = ui_loop_xboard;
 		return true;
-	} else if (strcmp(ui_type, "ggs") == 0) {
+	} else if (string_is(ui_type, "ggs")) {
 		ui->type = UI_GGS;
 		ui->init = ui_init_ggs;
 		ui->free = ui_free_ggs;
 		ui->loop = ui_loop_ggs;
 		return true;
-	} else if (strcmp(ui_type, "cassio") == 0) {
+	} else if (string_is(ui_type, "cassio")) {
 		ui->type = UI_CASSIO;
 		return true;
 	}
@@ -122,17 +122,17 @@ static void ui_read_input(UI *ui)
 		if (ui->type == UI_GTP) gtp_preprocess(buffer);
 		parse_word(buffer, cmd, 5);
 		string_to_lowercase(cmd);
-		if (strcmp(cmd, "stop") == 0) {
+		if (string_is(cmd, "stop")) {
 			event_clear_messages(event);
 			info("<stop>\n");
 			play_stop(play);
 			if (ui->type == UI_GGS) play_stop(play + 1);
-		} else if (ui->type == UI_NBOARD && strcmp(cmd, "ping") == 0) {
+		} else if (ui->type == UI_NBOARD && string_is(cmd, "ping")) {
 			play_stop(play);
-		} else if (ui->type == UI_XBOARD && strcmp(cmd, "?") == 0) {
+		} else if (ui->type == UI_XBOARD && string_is(cmd, "?")) {
 			play_stop(play);
 		} else {
-			if (strcmp(cmd, "quit") == 0 || strcmp(cmd, "q") == 0) {
+			if (string_is(cmd, "quit", "q")) {
 				// Commands read from a file are all read at once: there, quit is done in its turn, after the
 				// commands before it. Typed (or sent through a pipe), it stops the search and quits at once.
 				if (!(ui->type == UI_EDAX && stdin_is_file())) {

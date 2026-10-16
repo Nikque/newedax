@@ -45,6 +45,18 @@ long long string_to_time(const char*);
 char* string_read_line(FILE*);
 char* string_copy_line(FILE*);
 
+/**
+ * @brief Tell if a string is one of some words.
+ * @param s String.
+ * @param words Words.
+ * @return true if s is one of the words.
+ */
+template <class... Words>
+static inline bool string_is(const char *s, const Words... words)
+{
+	return ((strcmp(s, words) == 0) || ...);
+}
+
 /*
  * Files (the file names of the library on Windows are in UTF-8, or else ANSI: see util.cpp)
  */

@@ -681,7 +681,7 @@ void game_import_ggf(Game* game, FILE* f)
 
 	game_init(game);
 	while (game_parse_ggf(f, tag, value) != PARSE_END_OF_FILE && strcmp(tag, "(;") != 0) ;
-	if (strcmp(tag, "(;") == 0) {
+	if (string_is(tag, "(;")) {
 		while (game_parse_ggf(f, tag, value) == PARSE_OK) {
 			if (strcmp(tag,";)")==0) {
 				if (!game_check(game)) {
@@ -690,21 +690,21 @@ void game_import_ggf(Game* game, FILE* f)
 				return;
 			}
 			if (strcmp(tag,"GM") == 0 && strcmp(value, "othello") != 0) break;
-			if (strcmp(tag, "BO") == 0) {
+			if (string_is(tag, "BO")) {
 				if (value[0] != '8') break;
 				game_set_initial_board(game, value + 2, board_set);
-			} else if (strcmp(tag, "PB") == 0) {
+			} else if (string_is(tag, "PB")) {
 				memcpy(game->name[BLACK], value, 31);
 				game->name[BLACK][31] = '\0';
-			} else if (strcmp(tag, "DT") == 0) {
+			} else if (string_is(tag, "DT")) {
 				int v[6]; // hack for windows that does not support %hhd in sscanf
 				sscanf(value, "%d.%d.%d_%d:%d:%d", v, v + 1, v + 2, v + 3, v + 4, v + 5);
 				game->date.year = v[0]; game->date.month = v[1]; game->date.day = v[2];
 				game->date.hour = v[3]; game->date.minute = v[4]; game->date.second = v[5];
-		} else if (strcmp(tag, "PW") == 0) {
+		} else if (string_is(tag, "PW")) {
 				memcpy(game->name[WHITE], value, 31);
 				game->name[WHITE][31] = '\0';
-			} else if (i < 60 && (strcmp(tag, "B") == 0 || strcmp(tag, "W") == 0)) {
+			} else if (i < 60 && (string_is(tag, "B", "W"))) {
 				if (strncmp("pa", value, 2) == 0) continue;
 				game->move[i] = string_to_coordinate(value);
 				game->hash = crc32c_u8(game->hash, game->move[i]);
@@ -768,25 +768,25 @@ int parse_ggf(Game *game, const char *string)
 
 	while ((next = parse_tag(s, tag, value)) != s && strcmp(tag, "(;") != 0) s = next;
 
-	if (strcmp(tag, "(;") == 0) {
+	if (string_is(tag, "(;")) {
 		s = next;
 		while ((next = parse_tag(s, tag, value)) != s && strcmp(tag, ";)") != 0) {
 			s = next;
 
-			if (strcmp(tag, "GM") == 0 && strcmp(value, "othello") != 0) {
+			if (string_is(tag, "GM") && strcmp(value, "othello") != 0) {
 				return -1;
-			} else if (strcmp(tag, "BO") == 0) {
+			} else if (string_is(tag, "BO")) {
 				if (value[0] != '8') {
 					return -1;
 				}
 				game_set_initial_board(game, value + 2, board_set);
-			} else if (strcmp(tag, "PB") == 0) {
+			} else if (string_is(tag, "PB")) {
 				memcpy(game->name[BLACK], value, 31);
 				game->name[BLACK][31] = '\0';
-			} else if (strcmp(tag, "PW") == 0) {
+			} else if (string_is(tag, "PW")) {
 				memcpy(game->name[WHITE], value, 31);
 				game->name[WHITE][31] = '\0';
-			} else if (i < 60 && (strcmp(tag, "B") == 0 || strcmp(tag, "W") == 0)) {
+			} else if (i < 60 && (string_is(tag, "B", "W"))) {
 				lastmove = string_to_coordinate(value);
 				if (lastmove != PASS)
 					game->move[i++] = lastmove;
@@ -933,7 +933,7 @@ void game_import_sgf(Game *game, FILE *f)
 
 	game_parse_sgf(f, tag, value);
 	game_init(game);
-	if (strcmp(tag, "(") == 0) {
+	if (string_is(tag, "(")) {
 		while (game_parse_sgf(f, tag, value)) {
 			if (strcmp(tag,"(") == 0) level++;
 			if (strcmp(tag,")") == 0) {
@@ -943,15 +943,15 @@ void game_import_sgf(Game *game, FILE *f)
 				}
 				return;
 			}
-			if (strcmp(tag, "GM") == 0 && strcmp(value, "2") != 0) break;
-			if (strcmp(tag, "SZ") == 0 && strcmp(value, "8") != 0) break;
-			if (strcmp(tag, "PB") == 0) {
+			if (string_is(tag, "GM") && strcmp(value, "2") != 0) break;
+			if (string_is(tag, "SZ") && strcmp(value, "8") != 0) break;
+			if (string_is(tag, "PB")) {
 				memcpy(game->name[BLACK], value, 31);
 				game->name[BLACK][31] = '\0';
-			} else if (strcmp(tag, "PW") == 0) {
+			} else if (string_is(tag, "PW")) {
 				memcpy(game->name[WHITE], value, 31);
 				game->name[WHITE][31] = '\0';
-			} else if (i < 60 && (strcmp(tag,"B") == 0 || strcmp(tag, "W") == 0)) {
+			} else if (i < 60 && (strcmp(tag,"B") == 0 || string_is(tag, "W"))) {
 				const int x = string_to_coordinate(value);
 				if (x != PASS) { // (a pass, that game_save_sgf() writes as B[PA], is not a move of the game)
 					game->move[i] = (char) x;
@@ -1149,22 +1149,22 @@ bool game_import_pgn_checked(Game *game, FILE *f)
 					state = STATE_END_VALUE;
 					info_value[j] = '\0';
 					j = 0;					
-					if (strcmp(info_tag, "black") == 0) {
+					if (string_is(info_tag, "black")) {
 						memcpy(game->name[BLACK], info_value, 31);
 						game->name[BLACK][31] = '\0';
-					} else if (strcmp(info_tag, "white") == 0) {
+					} else if (string_is(info_tag, "white")) {
 						memcpy(game->name[WHITE], info_value, 31);
 						game->name[WHITE][31] = '\0';
-					} else if (strcmp(info_tag, "date") == 0) {
+					} else if (string_is(info_tag, "date")) {
 						if (sscanf(info_value, "%d.%d.%d", value, value + 1, value + 2) == 3) {
 							game->date.year = value[0]; game->date.month = value[1]; game->date.day = value[2];
 						}
-					} else if (strcmp(info_tag, "time") == 0) {
+					} else if (string_is(info_tag, "time")) {
 						if (sscanf(info_value, "%d:%d:%d", value, value + 1, value + 2) == 3 ||
 							sscanf(info_value, "%d.%d.%d", value, value + 1, value + 2) == 3) {
 							game->date.hour = value[0]; game->date.minute = value[1]; game->date.second = value[2];
 						}
-					} else if (strcmp(info_tag, "fen") == 0) {
+					} else if (string_is(info_tag, "fen")) {
 						game_set_initial_board(game, info_value, board_from_FEN);
 					}
 					break;

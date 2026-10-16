@@ -835,12 +835,12 @@ static bool base_load_checked(Base *base, const char *file, bool *complete)
 	l = strlen(file);
 	if (l < 4) { warn("Unknown game format extension: %s\n", file); return false; }
 	strcpy(ext, file + l - 4); string_to_lowercase(ext);
-	if (strcmp(ext, ".txt") == 0) load = game_import_text_checked;
-	else if (strcmp(ext, ".ggf") == 0) load = base_import_ggf;
-	else if (strcmp(ext, ".sgf") == 0) load = base_import_sgf;
-	else if (strcmp(ext, ".pgn") == 0) load = game_import_pgn_checked;
-	else if (strcmp(ext, ".wtb") == 0) load = base_import_wthor;
-	else if (strcmp(ext, ".edx") == 0) load = game_read_checked;
+	if (string_is(ext, ".txt")) load = game_import_text_checked;
+	else if (string_is(ext, ".ggf")) load = base_import_ggf;
+	else if (string_is(ext, ".sgf")) load = base_import_sgf;
+	else if (string_is(ext, ".pgn")) load = game_import_pgn_checked;
+	else if (string_is(ext, ".wtb")) load = base_import_wthor;
+	else if (string_is(ext, ".edx")) load = game_read_checked;
 	else {
 		warn("Unknown game format extension: %s\n", ext);
 		return false;
@@ -911,11 +911,11 @@ bool base_save(const Base *base, const char *file)
 	l = strlen(file);
 	if (l < 4) { warn("Unknown game format extension: %s\n", file); return false; }
 	strcpy(ext, file + l - 4); string_to_lowercase(ext);
-	if (strcmp(ext, ".txt") == 0) save = game_export_text;
-	else if (strcmp(ext, ".ggf") == 0) save = game_export_ggf;
-	else if (strcmp(ext, ".sgf") == 0) save = game_export_sgf;
-	else if (strcmp(ext, ".pgn") == 0) save = game_export_pgn;
-	else if (strcmp(ext, ".wtb") == 0) {
+	if (string_is(ext, ".txt")) save = game_export_text;
+	else if (string_is(ext, ".ggf")) save = game_export_ggf;
+	else if (string_is(ext, ".sgf")) save = game_export_sgf;
+	else if (string_is(ext, ".pgn")) save = game_export_pgn;
+	else if (string_is(ext, ".wtb")) {
 		// the games of the file are kept: it must be read completely (up to v4.5.5-nikque.15 a file that could
 		// not be read was replaced, with the games that were not read)
 		if ((f = file_open(file, "rb")) != NULL) {
@@ -931,7 +931,7 @@ bool base_save(const Base *base, const char *file)
 		ok = base_to_wthor(base, &wbase) && wthor_save(&wbase, file);
 		wthor_free(&wbase);
 		return ok;
-	} else if (strcmp(ext, ".edx") == 0) save = game_write;
+	} else if (string_is(ext, ".edx")) save = game_write;
 	else {
 		warn("Unknown game format extension: %s\n", ext);
 		return false;

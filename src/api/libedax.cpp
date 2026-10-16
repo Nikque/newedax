@@ -533,7 +533,7 @@ LIBEDAX_API void libedax_initialize(int argc, char **argv)
 		const char *arg = argv[i];
 		if (arg == NULL) continue;
 		while (*arg == '-') ++arg;
-		if (strcmp(arg, "v") == 0 || strcmp(arg, "version") == 0) version();
+		if (string_is(arg, "v", "version")) version();
 		else if ((r = options_read(arg, i + 1 < argc ? argv[i + 1] : NULL)) > 0) i += r - 1;
 		else warn("unknown or incomplete option \"%s\" ignored\n", argv[i]);
 	}

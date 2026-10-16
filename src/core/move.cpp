@@ -140,14 +140,14 @@ void tune_move_evaluate(Search *search, const char *filename, const char *w_name
 	unsigned long long n_nodes, t;
 	int i, *w;
 
-	if (strcmp(w_name, "w_eval") == 0) w = &w_eval;
-	else if (strcmp(w_name, "w_mobility") == 0) w = &w_mobility;
-	else if (strcmp(w_name, "w_corner_stability") == 0) w = &w_corner_stability;
-	else if (strcmp(w_name, "w_edge_stability") == 0) w = &w_edge_stability;
-	else if (strcmp(w_name, "w_potential_mobility") == 0) w = &w_potential_mobility;
-	else if (strcmp(w_name, "w_low_parity") == 0) w = &w_low_parity;
-	else if (strcmp(w_name, "w_mid_parity") == 0) w = &w_mid_parity;
-	else if (strcmp(w_name, "w_high_parity") == 0) w = &w_high_parity;
+	if (string_is(w_name, "w_eval")) w = &w_eval;
+	else if (string_is(w_name, "w_mobility")) w = &w_mobility;
+	else if (string_is(w_name, "w_corner_stability")) w = &w_corner_stability;
+	else if (string_is(w_name, "w_edge_stability")) w = &w_edge_stability;
+	else if (string_is(w_name, "w_potential_mobility")) w = &w_potential_mobility;
+	else if (string_is(w_name, "w_low_parity")) w = &w_low_parity;
+	else if (string_is(w_name, "w_mid_parity")) w = &w_mid_parity;
+	else if (string_is(w_name, "w_high_parity")) w = &w_high_parity;
 	else {
 		warn("unknown parameter %s\n", w_name);
 		return;

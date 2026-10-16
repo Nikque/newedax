@@ -103,12 +103,12 @@ static void engine_get_input(Engine *engine)
 
 	buffer = parse_word(buffer_with_garbage, protocol, 32);
 
-	if (strcmp(protocol, "ENGINE-PROTOCOL") == 0) {
+	if (string_is(protocol, "ENGINE-PROTOCOL")) {
 		buffer = string_duplicate(buffer);
 		parse_word(buffer, cmd, 32);
 		string_to_lowercase(cmd);
 		// stop or quit: Interrupt immediately the current search & remove unprocessed messages.
-		if (strcmp(cmd, "stop") == 0) {
+		if (string_is(cmd, "stop")) {
 			free(buffer); // (not queued: up to v4.5.5-nikque.15 it was not freed)
 			event_clear_messages(event);
 			if (engine->is_searching) {
@@ -116,7 +116,7 @@ static void engine_get_input(Engine *engine)
 			} else {
 				engine_send("ready."); 
 			}
-		} else if (strcmp(cmd, "get-search-infos") == 0) {
+		} else if (string_is(cmd, "get-search-infos")) {
 			free(buffer); // (not queued)
 			if (engine->is_searching) {
 				engine_send("node %lld, time %.3f", search_count_nodes(engine->search), 0.001 * search_time(engine->search));
@@ -124,7 +124,7 @@ static void engine_get_input(Engine *engine)
 				engine_send("ready."); 
 			}
 		} else {
-			if (strcmp(cmd, "quit") == 0) {
+			if (string_is(cmd, "quit")) {
 				engine_stop(engine->search);
 				event_clear_messages(event);
 				event->loop = false;
@@ -713,18 +713,18 @@ void engine_loop(void)
 
 		if (cmd == NULL || *cmd == '\0') {
 
-		} else if (strcmp(cmd, "init") == 0) {
+		} else if (string_is(cmd, "init")) {
 			engine_send("ready."); 
 
-		} else if (strcmp(cmd, "get-version") == 0) {
+		} else if (string_is(cmd, "get-version")) {
 			engine_send("version: Edax %s", VERSION_STRING);
 			engine_send("ready."); 
 
-		} else if (strcmp(cmd, "new-position") == 0) {
+		} else if (string_is(cmd, "new-position")) {
 			engine->last_position.n = 0;
 			engine_send("ready.");
 
-		} else if (strcmp(cmd, "feed-hash") == 0) {
+		} else if (string_is(cmd, "feed-hash")) {
 			int depth = 21, precision = 73, player;
 			double lower = -SCORE_INF, upper = SCORE_INF;
 			Board board;
@@ -756,10 +756,10 @@ void engine_loop(void)
 				}
 			}
 			
-		} else if (strcmp(cmd, "empty-hash") == 0) {
+		} else if (string_is(cmd, "empty-hash")) {
 			engine_empty_hash(engine);
 			
-		} else if (strcmp(cmd, "quit") == 0 || strcmp(cmd, "eof") == 0) {
+		} else if (string_is(cmd, "quit", "eof")) {
 			thread_join(engine->event->thread); // (the input loop ends after quit or the end of the input)
 			engine_free(engine->search);
 			event_free(engine->event);
@@ -769,7 +769,7 @@ void engine_loop(void)
 			engine_send("bye bye.");
 			return;
 
-		} else if (strcmp(cmd, "midgame-search") == 0) {
+		} else if (string_is(cmd, "midgame-search")) {
 			double alpha = -SCORE_INF, beta = SCORE_INF;
 			int player, depth = 60, precision = 100;
 			Board board;
@@ -798,7 +798,7 @@ void engine_loop(void)
 			}
 			engine_send("ready."); 
 
-		} else if (strcmp(cmd, "endgame-search") == 0) {
+		} else if (string_is(cmd, "endgame-search")) {
 			int alpha = -SCORE_INF, beta = SCORE_INF;
 			int player, precision = 100;
 			Board board;

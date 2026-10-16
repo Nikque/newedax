@@ -128,16 +128,16 @@ void ui_loop_nboard(UI *ui)
 
 		if (*cmd == '\0') {
 
-		} else if (strcmp(cmd, "nboard") == 0) {
+		} else if (string_is(cmd, "nboard")) {
 			if (strcmp(param, "1") != 0) nboard_fail("Edax expected \"nboard 1\" protocol");
 
-		} else if (strcmp(cmd, "depth") == 0) {
+		} else if (string_is(cmd, "depth")) {
 			options.level = string_to_int(param, 21);
 			BOUND(options.level, 0, 60, "level");
 			options.level_set = true;
 			nboard_send("set myname Edax%d", options.level);
 
-		} else if (strcmp(cmd, "game") == 0) {
+		} else if (string_is(cmd, "game")) {
 			Game game;
 			int lastmove = parse_ggf(&game, param);
 			if (lastmove >= 0) {
@@ -149,30 +149,30 @@ void ui_loop_nboard(UI *ui)
 				nboard_fail("Cannot parse game \"%s\"", param);
 			}
 
-		} else if (strcmp(cmd, "move") == 0) {
+		} else if (string_is(cmd, "move")) {
 			if (!play_user_move(play, param)) {
 				nboard_fail("Cannot parse move \"%s\"", param);
 			}
-		} else if (strcmp(cmd, "hint") == 0) {
+		} else if (string_is(cmd, "hint")) {
 
 			nboard_send("status Edax is thinking");
 			play_hint(play, string_to_int(param, MAX_MOVE));
 			nboard_send("status Edax is waiting");
 
-		} else if (strcmp(cmd, "go") == 0) {
+		} else if (string_is(cmd, "go")) {
 			nboard_send("status Edax is thinking");
 			play_go(play, false);
 			nboard_send_move(&play->result);
 			nboard_send("status Edax is waiting");
 
-		} else if (strcmp(cmd, "quit") == 0 || strcmp(cmd, "eof") == 0) {
+		} else if (string_is(cmd, "quit", "eof")) {
 			free(cmd); free(param);			
 			return;
 
-		} else if (strcmp(cmd, "ping") == 0) {
+		} else if (string_is(cmd, "ping")) {
 			nboard_send("pong %s", param);
 
-		} else if (strcmp(cmd, "learn") == 0) {
+		} else if (string_is(cmd, "learn")) {
 			nboard_send("status Edax is learning");
 			play_store(play);
 			nboard_send("status Edax is waiting");

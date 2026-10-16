@@ -365,74 +365,74 @@ void ui_loop_edax(UI *ui)
 			if (*cmd == '\0' || *cmd == '#') {
 			
 			// help
-			} else if (strcmp(cmd, "help") == 0 || strcmp(cmd, "?") == 0) {
-				if (*param == '\0' || strcmp(param, "options") == 0) help_options();
-				if (*param == '\0' || strcmp(param, "commands") == 0) help_commands();
-				if (*param == '\0' || strcmp(param, "book") == 0) help_book();
-				if (*param == '\0' || strcmp(param, "base") == 0) help_base();
-				if (*param == '\0' || strcmp(param, "test") == 0) help_test(); 
+			} else if (string_is(cmd, "help", "?")) {
+				if (*param == '\0' || string_is(param, "options")) help_options();
+				if (*param == '\0' || string_is(param, "commands")) help_commands();
+				if (*param == '\0' || string_is(param, "book")) help_book();
+				if (*param == '\0' || string_is(param, "base")) help_base();
+				if (*param == '\0' || string_is(param, "test")) help_test(); 
 
 			// new game from standard position
-			} else if (strcmp(cmd, "i") == 0 || strcmp(cmd, "init") == 0) {
+			} else if (string_is(cmd, "i", "init")) {
 				board_init(&play->initial_board);
 				play->initial_player = BLACK;
 				play_force_init(play, "F5");
 				play_new(play);
 
 			// new game from personnalized position
-			} else if ((strcmp(cmd, "n") == 0 || strcmp(cmd, "new") == 0) && *param == '\0') {
+			} else if ((string_is(cmd, "n", "new")) && *param == '\0') {
 				play_new(play);
 
 			// open a saved game
-			} else if (strcmp(cmd, "o") == 0 || strcmp(cmd, "open") == 0 || strcmp(cmd, "load") == 0) {
+			} else if (string_is(cmd, "o", "open", "load")) {
 				if (!play_load(play, param)) warn("%s", play->error_message); // (a load that failed used to say nothing here; the "loadsgf" of GTP gives this message)
 
 			// save a game
-			} else if (strcmp(cmd, "s") == 0 || strcmp(cmd, "save") == 0) {
+			} else if (string_is(cmd, "s", "save")) {
 				play_save(play, param);
 
 			// quit
-			} else if (strcmp(cmd, "quit") == 0 || strcmp(cmd, "q") == 0 || strcmp(cmd, "exit") == 0) {
+			} else if (string_is(cmd, "quit", "q", "exit")) {
 				free(cmd); free(param);
 				return;
 
-			} else if (!options.auto_quit && (strcmp(cmd, "eof") == 0 && (ui->mode != 2 || play_is_game_over(play)))){
+			} else if (!options.auto_quit && (string_is(cmd, "eof") && (ui->mode != 2 || play_is_game_over(play)))){
 				free(cmd); free(param);
 				return;
 
 			// undo last move
-			} else if (strcmp(cmd, "u") == 0 || strcmp(cmd, "undo") == 0) {
+			} else if (string_is(cmd, "u", "undo")) {
 				play_undo(play);
 				if (ui->mode == 0 || ui->mode == 1) play_undo(play);
 
 			// redo last move
-			} else if (strcmp(cmd, "r") == 0 || strcmp(cmd, "redo") == 0) {
+			} else if (string_is(cmd, "r", "redo")) {
 				play_redo(play);
 				if (ui->mode == 0 || ui->mode == 1) play_redo(play);
 
 			// mode
-			} else if (strcmp(cmd, "m") == 0 || strcmp(cmd, "mode") == 0) {
+			} else if (string_is(cmd, "m", "mode")) {
 				ui->mode = string_to_int(param, 3);
 				BOUND(ui->mode, 0, 3, "mode");
 
 			// analyze a game
-			} else if (strcmp(cmd, "a") == 0 || strcmp(cmd, "analyze") == 0 || strcmp(cmd, "analyse") == 0) {
+			} else if (string_is(cmd, "a", "analyze", "analyse")) {
 				play_analyze(play, string_to_int(param, play->n_game));
 
 			// set a new initial position
-			} else if (strcmp(cmd, "setboard") == 0) {
+			} else if (string_is(cmd, "setboard")) {
 				play_set_board(play, param);
 
 			// vertical mirror
-			} else if (strcmp(cmd, "vmirror") == 0) {
+			} else if (string_is(cmd, "vmirror")) {
 				play_symetry(play, 2);
 
 			// horizontal mirror
-			} else if (strcmp(cmd, "hmirror") == 0) {
+			} else if (string_is(cmd, "hmirror")) {
 				play_symetry(play, 1);
 
 			// rotate
-			} else if (strcmp(cmd, "rotate") == 0) {
+			} else if (string_is(cmd, "rotate")) {
 				int angle = string_to_int(param, 90) % 360;
 				if (angle < 0) angle += 360;
 				switch (angle) {
@@ -451,7 +451,7 @@ void ui_loop_edax(UI *ui)
 				}
 
 			// direct symetry...
-			} else if (strcmp(cmd, "symetry") == 0) {
+			} else if (string_is(cmd, "symetry")) {
 				int sym = string_to_int(param, 1);
 				if (sym < 0 || sym >= 16) warn("symetry parameter should be a number between 0 and 15\n");
 				else {
@@ -460,17 +460,17 @@ void ui_loop_edax(UI *ui)
 				}
 
 			// play a serie of moves
-			} else if (strcmp(cmd, "play") == 0) {
+			} else if (string_is(cmd, "play")) {
 				string_to_lowercase(param);
 				play_game(play, param);
 
 			// force edax to play an opening
-			} else if (strcmp(cmd, "force") == 0) {
+			} else if (string_is(cmd, "force")) {
 				string_to_lowercase(param);
 				play_force_init(play, param);
 
 			// solve a set of problems
-			} else if (strcmp(cmd, "solve") == 0) {
+			} else if (string_is(cmd, "solve")) {
 				char problem_file[FILENAME_MAX + 1], *hard_file;
 				hard_file = parse_word(param, problem_file, FILENAME_MAX);
 				parse_word(hard_file, hard_file, FILENAME_MAX);
@@ -478,21 +478,21 @@ void ui_loop_edax(UI *ui)
 				search_set_observer(&play->search, edax_observer);
 
 			// convert a set of problems in a .script file to a .obf file
-			} else if (strcmp(cmd, "script-to-obf") == 0) {
+			} else if (string_is(cmd, "script-to-obf")) {
 				char script_file[FILENAME_MAX + 1], *obf_file;
 				obf_file = parse_word(param, script_file, FILENAME_MAX);
 				parse_word(obf_file, obf_file, FILENAME_MAX);
 				script_to_obf(&play->search, script_file, obf_file);
 				search_set_observer(&play->search, edax_observer);
 
-			} else if (strcmp(cmd, "select-hard") == 0) {
+			} else if (string_is(cmd, "select-hard")) {
 				char full_file[FILENAME_MAX + 1], *hard_file;
 				hard_file = parse_word(param, full_file, FILENAME_MAX);
 				parse_word(hard_file, hard_file, FILENAME_MAX);
 				obf_filter(full_file, hard_file);
 
 			// game/position enumeration
-			} else if (strcmp(cmd, "count") == 0) {
+			} else if (string_is(cmd, "count")) {
 				char count_cmd[16], *count_param;
 				int depth = 10, size = 8;
 
@@ -500,37 +500,37 @@ void ui_loop_edax(UI *ui)
 				count_param = parse_int(count_param, &depth); BOUND(depth, 1, 90, "max-ply");
 				/* if (count_param) */ parse_int(count_param, &size); BOUND(size, 6, 8, "board-size");
 
-				if (strcmp(count_cmd, "games") == 0) { // game enumeration
+				if (string_is(count_cmd, "games")) { // game enumeration
 					quick_count_games(&play->board, depth, size);
-				} else if (strcmp(count_cmd, "positions") == 0) { // position enumeration
+				} else if (string_is(count_cmd, "positions")) { // position enumeration
 					count_positions(&play->board, depth, size);
-				} else if (strcmp(count_cmd, "shapes") == 0) { // shape enumeration
+				} else if (string_is(count_cmd, "shapes")) { // shape enumeration
 					count_shapes(&play->board, depth, size);
 				} else {
 					warn("Unknown count command: \"%s %s\"\n", cmd, param);
 				}
 
-			} else if (strcmp(cmd, "perft") == 0) {
+			} else if (string_is(cmd, "perft")) {
 				int depth = 14;
 				depth = string_to_int(param, 10); BOUND(depth, 1, 90, "max-ply");
 				count_games(&play->board, depth);
 			
 			// game/position enumeration
-			} else if (strcmp(cmd, "estimate") == 0) {
+			} else if (string_is(cmd, "estimate")) {
 				int n = 1000;
 				n = string_to_int(param, 10); BOUND(n, 1, 2000000000, "max-trials");
 
 				estimate_games(&play->board, n);
 	
 			// seek highest mobility
-			} else if (strcmp(cmd, "mobility") == 0) {
+			} else if (string_is(cmd, "mobility")) {
 				int t = 3600; // 1 hour
 				t = string_to_int(param, 10); BOUND(t, 1, 3600*24*365*10, "max time");
 
 				seek_highest_mobility(&play->board, t);
 
 			// seek a position
-			} else if (strcmp(cmd, "seek") == 0) {
+			} else if (string_is(cmd, "seek")) {
 				Board target;
 				Line solution;
 				
@@ -544,31 +544,31 @@ void ui_loop_edax(UI *ui)
 				}
 			
 			// microbench (a serie of low level tests).
-			} else if (strcmp(cmd, "microbench") == 0) {
+			} else if (string_is(cmd, "microbench")) {
 				bench();
 
 			// bench (a serie of low level tests).
-			} else if (strcmp(cmd, "bench") == 0) {
+			} else if (string_is(cmd, "bench")) {
 				int n = string_to_int(param, -1); BOUND(n, -1, 100, "n_problems");
 				obf_speed(&play->search, n);
 
 			// wtest test the engine against wthor theoretical scores
-			} else if (strcmp(cmd, "wtest") == 0) {
+			} else if (string_is(cmd, "wtest")) {
 				wthor_test(param, &play->search);
 
 			// make wthor games played by "Edax (Delorme)" as "Etudes" tournament.
-			} else if (strcmp(cmd, "edaxify") == 0) {
+			} else if (string_is(cmd, "edaxify")) {
 				wthor_edaxify(param);
 
 			// wtest test the engine against wthor theoretical scores
-			} else if (strcmp(cmd, "weval") == 0) {
+			} else if (string_is(cmd, "weval")) {
 				wthor_eval(param, &play->search, histogram);
 				histogram_print(histogram);
 				histogram_stats(histogram);
 				histogram_to_ppm("weval.ppm", histogram);
 
 			// go think!
-			} else if (strcmp(cmd, "go") == 0) {
+			} else if (string_is(cmd, "go")) {
 				if (play_is_game_over(play)) printf("\n*** Game Over ***\n");
 				else {
 					play_go(play, true);
@@ -576,16 +576,16 @@ void ui_loop_edax(UI *ui)
 				}
 
 			// hint for [n] moves
-			} else if (strcmp(cmd, "hint") == 0) {
+			} else if (string_is(cmd, "hint")) {
 				int n = string_to_int(param, 1); BOUND(n, 1, 60, "n_moves");
 				play_hint(play, n);
 
 			// stop thinking
-			} else if (strcmp(cmd, "stop") == 0) {
+			} else if (string_is(cmd, "stop")) {
 				ui->mode = 3;
 
 			// stop thinking
-			} else if (strcmp(cmd, "version") == 0 || strcmp(cmd, "v") == 0) {
+			} else if (string_is(cmd, "version", "v")) {
 				version();
 
 			// user move
@@ -593,16 +593,16 @@ void ui_loop_edax(UI *ui)
 				printf("\nYou play "); move_print(play_get_last_move(play)->x, 0, stdout); putchar('\n');
 
 			// debug pv
-			} else if (strcmp(cmd, "debug-pv") == 0) {
+			} else if (string_is(cmd, "debug-pv")) {
 				Move move;
 				if (parse_move(param, &play->board, &move) != param) {
 					search_set_board(&play->search, &play->board, play->player);
 					pv_debug(&play->search, &move, stdout);
 				}
-			} else if (strcmp(cmd, "options") == 0) {
+			} else if (string_is(cmd, "options")) {
 					options_dump(stdout);
 #ifdef __unix__
-			} else if (strcmp(cmd, "resources") == 0) {
+			} else if (string_is(cmd, "resources")) {
 				struct rusage u;
 				long long t;
 	 			getrusage(RUSAGE_SELF, &u);
@@ -619,21 +619,21 @@ void ui_loop_edax(UI *ui)
 				printf("number of unvoluntary context switch: %ld\n\n", u.ru_nivcsw); 
 #endif		
 			// opening name
-			} else if (strcmp(cmd, "opening") == 0) {
+			} else if (string_is(cmd, "opening")) {
 				const char *name;
 				name = play_show_opening_name(play, opening_get_english_name);
 				if (name == NULL) name = "?";
 				puts(name);  
 
 			// opening name in french
-			} else if (strcmp(cmd, "ouverture") == 0) {
+			} else if (string_is(cmd, "ouverture")) {
 				const char *name;
 				name = play_show_opening_name(play, opening_get_french_name);
 				if (name == NULL) name = "?";
 				puts(name); 
 
 			// opening book commands
-			} else if (strcmp(cmd, "book") == 0 || strcmp(cmd, "b") == 0) {
+			} else if (string_is(cmd, "book", "b")) {
 				char book_cmd[FILENAME_MAX + 1], *book_param;
 				int val_1, val_2;
 				Book *book = play->book;
@@ -646,7 +646,7 @@ void ui_loop_edax(UI *ui)
 				string_to_lowercase(book_cmd); // "book Deviate 5 5" as "book deviate 5 5" (the arguments, as file names, are kept as typed)
 				// "book leaf recalculate 5 5", "book leaf expand 5 5": two words, read as the command "leaf recalculate", "leaf expand"
 				// (a word never holds a space: the names with a hyphen of v4.5.5-nikque.13, as book leaf-recalculate, are unknown commands)
-				if (strcmp(book_cmd, "leaf") == 0) {
+				if (string_is(book_cmd, "leaf")) {
 					char word[32];
 					book_param = parse_word(book_param, word, sizeof word - 1);
 					string_to_lowercase(word);
@@ -654,30 +654,30 @@ void ui_loop_edax(UI *ui)
 				}
 
 				// store the last played game
-				if (strcmp(book_cmd, "store") == 0) {
+				if (string_is(book_cmd, "store")) {
 					play_store(play);
 
 				// turn book usage on
-				} else if (strcmp(book_cmd, "on") == 0) { // learn
+				} else if (string_is(book_cmd, "on")) { // learn
 					options.book_allowed = true;
 
 				// turn book usage off
-				} else if (strcmp(book_cmd, "off") == 0) { // learn
+				} else if (string_is(book_cmd, "off")) { // learn
 					options.book_allowed = false;
 
 				// set book randomness
-				} else if (strcmp(book_cmd, "randomness") == 0) { // learn
+				} else if (string_is(book_cmd, "randomness")) { // learn
 					val_1 = 0; book_param = parse_int(book_param, &val_1);
 					options.book_randomness = val_1;
 
 				// set book depth (until which to learn)
-				} else if (strcmp(book_cmd, "depth") == 0) { // learn
+				} else if (string_is(book_cmd, "depth")) { // learn
 					val_1 = 36; book_param = parse_int(book_param, &val_1);
 					BOUND(val_1, 1, 61, "book depth"); // (up to v4.5.5-nikque.15 any depth: a game of 60 moves was read beyond its moves)
 					book->options.n_empties = 61 - val_1;
 
 				// create a new empty book
-				} else if (strcmp(book_cmd, "new") == 0) {
+				} else if (string_is(book_cmd, "new")) {
 					val_1 = 21; book_param = parse_int(book_param, &val_1);
 					val_2 = 36;	book_param = parse_int(book_param, &val_2);
 					if (val_1 < 0 || val_1 > 60) { // such a level would read outside the table of the levels
@@ -689,7 +689,7 @@ void ui_loop_edax(UI *ui)
 					}
 
 				// load an opening book (binary format) from the disc
-				} else if (strcmp(book_cmd, "load") == 0 || strcmp(book_cmd, "open") == 0) {
+				} else if (string_is(book_cmd, "load", "open")) {
 					Book next = {0};
 					FILE *exists;
 					parse_word(book_param, book_file, FILENAME_MAX);
@@ -708,7 +708,7 @@ void ui_loop_edax(UI *ui)
 					}
 
 				// save an opening book (binary format) to the disc
-				} else if (strcmp(book_cmd, "save") == 0) {
+				} else if (string_is(book_cmd, "save")) {
 					parse_word(book_param, book_file, FILENAME_MAX);
 					if (*book_file == '\0') {
 						// without a file name: the book file of the settings (up to v4.5.5-nikque.12: an error, nothing was saved)
@@ -716,7 +716,7 @@ void ui_loop_edax(UI *ui)
 					} else book_save(book, book_file);
 
 				// import an opening book (text format)
-				} else if (strcmp(book_cmd, "import") == 0) {
+				} else if (string_is(book_cmd, "import")) {
 					Book next = {0};
 					parse_word(book_param, book_file, FILENAME_MAX);
 					next.search = book->search;
@@ -733,12 +733,12 @@ void ui_loop_edax(UI *ui)
 					}
 
 				// export an opening book (text format)
-				} else if (strcmp(book_cmd, "export") == 0) {
+				} else if (string_is(book_cmd, "export")) {
 					parse_word(book_param, book_file, FILENAME_MAX);
 					book_export(book, book_file);
 
 				// merge an opening book to the current one
-				} else if (strcmp(book_cmd, "merge") == 0) {
+				} else if (string_is(book_cmd, "merge")) {
 					parse_word(book_param, book_file, FILENAME_MAX);
 					if (book_merge_file(book, book_file)) { // the source book is streamed, not loaded
 						book_link_parallel(book); // rebuild links before validating imported positions
@@ -759,19 +759,19 @@ void ui_loop_edax(UI *ui)
 					} else warn("Book %s was not merged\n", book_file);
 
 				// fix an opening book
-				} else if (strcmp(book_cmd, "fix") == 0) {
+				} else if (string_is(book_cmd, "fix")) {
 					book_fix(book); // do nothing (or edax is buggy)
 					book_link(book); // links nodes
 					book_negamax(book); // negamax nodes
 					book_sort(book); // sort moves
 
 				// negamax an opening book
-				} else if (strcmp(book_cmd, "negamax") == 0) {
+				} else if (string_is(book_cmd, "negamax")) {
 					book_negamax(book); // negamax nodes
 					book_sort(book); // sort moves
 
 				// check and correct solved positions of the book
-				} else if (strcmp(book_cmd, "correct") == 0) {
+				} else if (string_is(book_cmd, "correct")) {
 					book_correct_solved(book); // do nothing (or edax is buggy)
 					book_fix(book); // do nothing (or edax is buggy)
 					book_link(book); // links nodes
@@ -779,7 +779,7 @@ void ui_loop_edax(UI *ui)
 					book_sort(book); // sort moves
 
 				// prune an opening book
-				} else if (strcmp(book_cmd, "prune") == 0) {
+				} else if (string_is(book_cmd, "prune")) {
 					book_prune(book); // remove unreachable lines.
 					book_fix(book); // do nothing (or edax is buggy)
 					book_link(book); // links nodes
@@ -787,7 +787,7 @@ void ui_loop_edax(UI *ui)
 					book_sort(book); // sort moves
 
 				// subtree an opening book
-				} else if (strcmp(book_cmd, "subtree") == 0) {
+				} else if (string_is(book_cmd, "subtree")) {
 					book_subtree(book, &play->board); // remove unreachable lines.
 					book_fix(book); // do nothing (or edax is buggy)
 #ifdef BOOK_TEST_SUBTREE_LINK_OLD
@@ -800,30 +800,30 @@ void ui_loop_edax(UI *ui)
 					book_sort(book); // sort moves
 
 				// show the current position as stored in the book
-				} else if (strcmp(book_cmd, "show") == 0) {
+				} else if (string_is(book_cmd, "show")) {
 					book_show(book, &play->board);
 
 				// show book general information
-				} else if (strcmp(book_cmd, "info") == 0) {
+				} else if (string_is(book_cmd, "info")) {
 					book_info(book);
 
 				// show book general information
-				} else if (strcmp(book_cmd, "stats") == 0) {
+				} else if (string_is(book_cmd, "stats")) {
 					book_stats(book);
 
 
 				// set book verbosity
-				} else if (strcmp(book_cmd, "verbose") == 0) {
+				} else if (string_is(book_cmd, "verbose")) {
 					parse_int(book_param, &book->options.verbosity);
 					book->search->options.verbosity = book->options.verbosity;
 
 				// analyze a game from the opening book point of view
-				} else if (strcmp(book_cmd, "a") == 0 || strcmp(book_cmd, "analyze") == 0 || strcmp(book_cmd, "analyse") == 0) {
+				} else if (string_is(book_cmd, "a", "analyze", "analyse")) {
 					val_1 = string_to_int(book_param, play->n_game); BOUND(val_1, 1, play->n_game, "depth");
 					play_book_analyze(play, val_1);
 
 				// add positions from a game database
-				} else if (strcmp(book_cmd, "add") == 0) {
+				} else if (string_is(book_cmd, "add")) {
 					Base base;
 					parse_word(book_param, book_file, FILENAME_MAX);
 					base_init(&base);
@@ -832,12 +832,12 @@ void ui_loop_edax(UI *ui)
 					base_free(&base);
 
 				// play the games of a file (first moves, then edax vs edax) and store them
-				} else if (strcmp(book_cmd, "learn") == 0) {
+				} else if (string_is(book_cmd, "learn")) {
 					parse_word(book_param, book_file, FILENAME_MAX);
 					play_learn_file(play, book_file);
 
 				// check positions from a game database
-				} else if (strcmp(book_cmd, "check") == 0) {
+				} else if (string_is(book_cmd, "check")) {
 					Base base;
 					parse_word(book_param, book_file, FILENAME_MAX);
 					base_init(&base);
@@ -846,13 +846,13 @@ void ui_loop_edax(UI *ui)
 					base_free(&base);
 
 				// extract positions
-				} else if (strcmp(book_cmd, "problem") == 0) {
+				} else if (string_is(book_cmd, "problem")) {
 					val_1 = 24; book_param = parse_int(book_param, &val_1); BOUND(val_1, 0, 60, "number of empties");
 					val_2 = 10; book_param = parse_int(book_param, &val_2); BOUND(val_2, 1, 1000000, "number of positions");
 					book_extract_positions(book, val_1, val_2);
 					
 				// extract pv to a game database
-				} else if (strcmp(book_cmd, "extract") == 0) {
+				} else if (string_is(book_cmd, "extract")) {
 					Base base;
 					parse_word(book_param, book_file, FILENAME_MAX);
 					base_init(&base);
@@ -861,37 +861,37 @@ void ui_loop_edax(UI *ui)
 					base_free(&base);
 
 				// add position using the "deviate algorithm"
-				} else if (strcmp(book_cmd, "deviate") == 0) {
+				} else if (string_is(book_cmd, "deviate")) {
 					val_1 = 2; book_param = parse_int(book_param, &val_1); BOUND(val_1, -129, 129, "relative error");
 					val_2 = 4; book_param = parse_int(book_param, &val_2); BOUND(val_2, 0, 65, "absolute error");
 					book_deviate(book, &play->board, val_1, val_2);
 
 				// add positions while limiting per-move and cumulative errors
-				} else if (strcmp(book_cmd, "deviate2") == 0) {
+				} else if (string_is(book_cmd, "deviate2")) {
 					val_1 = 2; book_param = parse_int(book_param, &val_1); BOUND(val_1, 0, 129, "per-move loss");
 					val_2 = 4; book_param = parse_int(book_param, &val_2); BOUND(val_2, 0, 7740, "cumulative loss");
 					book_deviate2(book, &play->board, val_1, val_2);
 
-				} else if (strcmp(book_cmd, "deviate3") == 0) {
+				} else if (string_is(book_cmd, "deviate3")) {
 					val_1 = 2; book_param = parse_int(book_param, &val_1); BOUND(val_1, 0, 129, "per-move loss");
 					val_2 = 4; book_param = parse_int(book_param, &val_2); BOUND(val_2, 0, 7740, "cumulative loss");
 					book_deviate3(book, &play->board, val_1, val_2);
 
 				// search again the leaves that book deviate (1, 3) or book deviate2 (2, 4) reaches:
 				// the leaves it would expand (1, 2), or the leaves of all the positions of its walk (3, 4)
-				} else if (strcmp(book_cmd, "leaf recalculate") == 0 || strcmp(book_cmd, "leaf recalculate3") == 0) {
+				} else if (string_is(book_cmd, "leaf recalculate", "leaf recalculate3")) {
 					val_1 = 2; book_param = parse_int(book_param, &val_1); BOUND(val_1, -129, 129, "relative error");
 					val_2 = 4; book_param = parse_int(book_param, &val_2); BOUND(val_2, 0, 65, "absolute error");
 					book_leaf_recalculate(book, &play->board, book_cmd[16] == '3' ? 3 : 1, val_1, val_2);
 
-				} else if (strcmp(book_cmd, "leaf recalculate2") == 0 || strcmp(book_cmd, "leaf recalculate4") == 0) {
+				} else if (string_is(book_cmd, "leaf recalculate2", "leaf recalculate4")) {
 					val_1 = 2; book_param = parse_int(book_param, &val_1); BOUND(val_1, 0, 129, "per-move loss");
 					val_2 = 4; book_param = parse_int(book_param, &val_2); BOUND(val_2, 0, 7740, "cumulative loss");
 					book_leaf_recalculate(book, &play->board, book_cmd[16] == '4' ? 4 : 2, val_1, val_2);
 
 				// expand the leaves better than every link of their position: of the whole book, or with a per-move
 				// and a cumulative loss limit, of the positions of a deviate3 walk
-				} else if (strcmp(book_cmd, "leaf expand") == 0) {
+				} else if (string_is(book_cmd, "leaf expand")) {
 					char *limits = parse_skip_spaces(book_param);
 					if (starts_with_number(limits)) { // (the limits are numbers, signed or not: another word is ignored, as by the other commands)
 						val_1 = 2; book_param = parse_int(limits, &val_1); BOUND(val_1, 0, 129, "per-move loss");
@@ -903,21 +903,21 @@ void ui_loop_edax(UI *ui)
 
 #ifdef BOOK_TEST_PICK_COUNT
 				// test builds: count what book fill 2 / fill2 2 / leaf expand would start from, without and with limits
-				} else if (strcmp(book_cmd, "pick-count") == 0) {
+				} else if (string_is(book_cmd, "pick-count")) {
 					val_1 = 5; book_param = parse_int(book_param, &val_1); BOUND(val_1, 0, 129, "per-move loss");
 					val_2 = 5; book_param = parse_int(book_param, &val_2); BOUND(val_2, 0, 7740, "cumulative loss");
 					book_test_pick_count(book, &play->board, val_1, val_2);
 #endif
 
 				// add position using the "enhance algorithm"
-				} else if (strcmp(book_cmd, "enhance") == 0) {
+				} else if (string_is(book_cmd, "enhance")) {
 					val_1 = 2; book_param = parse_int(book_param, &val_1); BOUND(val_1, 0, 129, "midgame error");
 					val_2 = 4; book_param = parse_int(book_param, &val_2); BOUND(val_2, 0, 129, "endcut error");
 					book_enhance(book, &play->board, val_1, val_2);
 
 				// add position by filling hole in the book
 				// (fill2: from the leaves only; with a per-move and a cumulative loss limit: from the positions of a deviate3 walk)
-				} else if (strcmp(book_cmd, "fill") == 0 || strcmp(book_cmd, "fill2") == 0) {
+				} else if (string_is(book_cmd, "fill", "fill2")) {
 					const bool leaf_only = (book_cmd[4] == '2');
 					char *limits;
 					int total_loss;
@@ -934,15 +934,15 @@ void ui_loop_edax(UI *ui)
 					}
 
 				// add positions by expanding positions with no-link
-				} else if (strcmp(book_cmd, "play") == 0) {
+				} else if (string_is(book_cmd, "play")) {
 					book_play(book);
 
 				// add positions by expanding positions with no-link
-				} else if (strcmp(book_cmd, "deepen") == 0) {
+				} else if (string_is(book_cmd, "deepen")) {
 					book_deepen(book);
 
 				// add book positions to the hash table
-				} else if (strcmp(book_cmd, "feed-hash") == 0) {
+				} else if (string_is(book_cmd, "feed-hash")) {
 					book_feed_hash(book, &play->board, &play->search);
 
 				// wrong command ?
@@ -958,7 +958,7 @@ void ui_loop_edax(UI *ui)
 				play_no_stop(play, false);
 
 			/* base TODO: add more actions... */
-			} else if (strcmp(cmd, "base") == 0) {
+			} else if (string_is(cmd, "base")) {
 				char base_file[FILENAME_MAX + 1];
 				char base_cmd[512], *base_param;
 				Base base;
@@ -970,7 +970,7 @@ void ui_loop_edax(UI *ui)
 				base_param = parse_word(base_param, base_file, FILENAME_MAX);
 
 				// extract problem from a game base
-				if (strcmp(base_cmd, "problem") == 0) {
+				if (string_is(base_cmd, "problem")) {
 					char problem_file[FILENAME_MAX + 1];
 					int n_empties = 24;
 					base_param = parse_int(base_param, &n_empties);
@@ -980,7 +980,7 @@ void ui_loop_edax(UI *ui)
 					base_to_problem(&base, n_empties, problem_file);
 
 				// extract FEN 
-				} else if (strcmp(base_cmd, "tofen") == 0) {
+				} else if (string_is(base_cmd, "tofen")) {
 					char problem_file[FILENAME_MAX + 1];
 					int n_empties = 24;
 					base_param = parse_int(base_param, &n_empties);
@@ -990,7 +990,7 @@ void ui_loop_edax(UI *ui)
 					base_to_FEN(&base, n_empties, problem_file);
 	
 				// correct erroneous games
-				} else if (strcmp(base_cmd, "correct") == 0) {
+				} else if (string_is(base_cmd, "correct")) {
 					int n_empties = 24;
 					base_param = parse_int(base_param, &n_empties);
 
@@ -1000,7 +1000,7 @@ void ui_loop_edax(UI *ui)
 					}
 
 				// check erroneous games
-				} else if (strcmp(base_cmd, "check") == 0) {
+				} else if (string_is(base_cmd, "check")) {
 					int n_empties = 24;
 					base_param = parse_int(base_param, &n_empties);
 
@@ -1008,27 +1008,27 @@ void ui_loop_edax(UI *ui)
 					base_analyze(&base, &play->search, n_empties, false);
 
 				// terminate unfinished base
-				} else if (strcmp(base_cmd, "complete") == 0) {
+				} else if (string_is(base_cmd, "complete")) {
 					if (base_load(&base, base_file)) { // a file which was not loaded (or not completely) is kept as it is
 						base_complete(&base, &play->search);
 						base_replace(&base, base_file); // (the file is replaced once the games are saved to another file)
 					}
 
 				// convert a base to another format
-				} else if (strcmp(base_cmd, "convert") == 0) {
+				} else if (string_is(base_cmd, "convert")) {
 					base_load(&base, base_file);
 					base_param = parse_word(base_param, base_file, FILENAME_MAX);
 					base_save(&base, base_file);
 
 				// make a base unique by removing identical games
-				} else if (strcmp(base_cmd, "unique") == 0) {
+				} else if (string_is(base_cmd, "unique")) {
 					base_load(&base, base_file);
 					base_param = parse_word(base_param, base_file, FILENAME_MAX);
 					base_unique(&base);
 					base_save(&base, base_file);
 
 				// compare two game bases
-				} else if (strcmp(base_cmd, "compare") == 0) {
+				} else if (string_is(base_cmd, "compare")) {
 					char base_file_2[FILENAME_MAX + 1];
 					base_param = parse_word(base_param, base_file_2, FILENAME_MAX);
 					base_compare(base_file, base_file_2);
@@ -1056,7 +1056,7 @@ void ui_loop_edax(UI *ui)
 				}
 
 			/* switch to another protocol */
-			} else if (strcmp(cmd, "nboard") == 0 && strcmp(param, "1") == 0) {
+			} else if (string_is(cmd, "nboard") && string_is(param, "1")) {
 				free(cmd); free(param);
 				play_stop_pondering(play);
 				ui->free(ui);
@@ -1065,7 +1065,7 @@ void ui_loop_edax(UI *ui)
 				ui->loop(ui);
 				return;
 
-			} else if (strcmp(cmd, "xboard") == 0) {
+			} else if (string_is(cmd, "xboard")) {
 				free(cmd); free(param);
 				play_stop_pondering(play);
 				ui->free(ui);
@@ -1074,7 +1074,7 @@ void ui_loop_edax(UI *ui)
 				ui->loop(ui);
 				return;
 
-			} else if (strcmp(cmd, "engine-protocol") == 0 && strcmp(param, "init") == 0) {
+			} else if (string_is(cmd, "engine-protocol") && string_is(param, "init")) {
 				free(cmd); free(param);
 				play_stop_pondering(play);
 				ui->free(ui);
@@ -1082,7 +1082,7 @@ void ui_loop_edax(UI *ui)
 				engine_loop();
 				return;
 
-			} else if (strcmp(cmd, "protocol_version") == 0) {
+			} else if (string_is(cmd, "protocol_version")) {
 				free(cmd); free(param);
 				play_stop_pondering(play);
 				ui->free(ui);
@@ -1094,7 +1094,7 @@ void ui_loop_edax(UI *ui)
 
 #ifdef TUNE_EDAX
 			/* edax tuning */
-			} else if (strcmp(cmd, "tune") == 0) {
+			} else if (string_is(cmd, "tune")) {
 				char problem[FILENAME_MAX];
 				char *w_name;
 				play_stop_pondering(play);

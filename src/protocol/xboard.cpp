@@ -382,40 +382,40 @@ static void xboard_loop_analyze(UI *ui)
 		ui_event_wait(ui, &cmd, &param);
 		log_print(xboard_log, "xboard (analyze)> %s %s\n", cmd, param);
 
-		if (strcmp(cmd, ".") == 0) {
+		if (string_is(cmd, ".")) {
 			spin_lock(search->result);
 			xboard_send("stat01: %d %lld %d %d %d\n",
 				search_time(search) / 10, search_count_nodes(search), search->depth, search->result->n_moves_left, search->result->n_moves);
 			spin_unlock(search->result);
 
-		} else if (strcmp(cmd, "hint") == 0) {
+		} else if (string_is(cmd, "hint")) {
 			xboard_hint(play);			
 
-		} else if (strcmp(cmd, "bk") == 0) {
+		} else if (string_is(cmd, "bk")) {
 			xboard_book(play);			
 
-		} else if (strcmp(cmd, "new") == 0) {
+		} else if (string_is(cmd, "new")) {
 			xboard_stop_analyzing(play);
 			play_new(play);
 			xboard_analyze(play);
 			
-		} else if (strcmp(cmd, "undo") == 0) {
+		} else if (string_is(cmd, "undo")) {
 			xboard_stop_analyzing(play);
 			play_undo(play);
 			xboard_analyze(play);
 
-		} else if ((strcmp(cmd, "setboard") == 0)) {
+		} else if ((string_is(cmd, "setboard"))) {
 			xboard_stop_analyzing(play);
 			if (!play_set_board_from_FEN(play, param)) xboard_error("(bad FEN): %s\n", param);
 			xboard_analyze(play);
 
-		} else if (strcmp(cmd, "exit") == 0) {
+		} else if (string_is(cmd, "exit")) {
 			xboard_stop_analyzing(play);
 			free(cmd); free(param);
 			ui_loop_xboard(ui);
 			return;
 
-		} else if (strcmp(cmd, "quit") == 0 || strcmp(cmd, "eof") == 0) { // (the end of the input: nothing else will come)
+		} else if (string_is(cmd, "quit", "eof")) { // (the end of the input: nothing else will come)
 			xboard_stop_analyzing(play);
 			free(cmd); free(param);
 			return;
@@ -425,7 +425,7 @@ static void xboard_loop_analyze(UI *ui)
 			if (play_user_move(play, cmd)) {
 
 			/* illegal cmd/move */
-			} else if (play_is_game_over(play) && strcmp(cmd, "@@@@") == 0) {
+			} else if (play_is_game_over(play) && string_is(cmd, "@@@@")) {
 					// Tolerate a pass when the game is over...
 			} else {
 				xboard_send("Illegal move: %s %s\n", cmd, param);
@@ -473,10 +473,10 @@ void ui_loop_xboard(UI *ui)
 			if (*cmd == '\0' || *cmd == '#') {
 
 			// xboard
-			} else if (strcmp(cmd, "xboard") == 0) {
+			} else if (string_is(cmd, "xboard")) {
 			
 			// protover 2
-			} else if (strcmp(cmd, "protover") == 0) {
+			} else if (string_is(cmd, "protover")) {
 				int version = string_to_int(param, 1);
 				if (version >= 2) {
 					xboard_send("feature "
@@ -497,25 +497,25 @@ void ui_loop_xboard(UI *ui)
 				}
 
 			// accepted features
-			} else if (strcmp(cmd, "accepted") == 0) {
+			} else if (string_is(cmd, "accepted")) {
 
 			// accepted features
-			} else if (strcmp(cmd, "debug") == 0) {
+			} else if (string_is(cmd, "debug")) {
 				play_print(play, stdout);
 
 			// rejected features
-			} else if (strcmp(cmd, "rejected") == 0) {
+			} else if (string_is(cmd, "rejected")) {
 				char feature[16], *value;
 				value = parse_word(param, feature, 15);
 				// fatal error if reversi variant is rejected
-				if (strcmp(feature, "variants") == 0 && strcmp(value, "reversi") == 0) {
+				if (string_is(feature, "variants") && string_is(value, "reversi")) {
 					free(cmd), free(param);
 					xboard_error("(Reversi only is supported)");
 					return;
 				}
 
 			// new
-			} else if (strcmp(cmd, "new") == 0 ) {
+			} else if (string_is(cmd, "new") ) {
 				options.level = 60;
 				play->initial_player = board_from_FEN(&play->initial_board, "8/8/8/3Pp3/3pP3/8/8/8 w - - 0 1");
 				play_new(play);
@@ -523,11 +523,11 @@ void ui_loop_xboard(UI *ui)
 				if (alien_variant) xboard_setup(play);
 
 			// variant
-			} else if (strcmp(cmd, "variant") == 0 ) {
+			} else if (string_is(cmd, "variant") ) {
 				string_to_lowercase(param);
-				if (strcmp(param, "alien") == 0) {
+				if (string_is(param, "alien")) {
 					alien_variant = true;
-				} else if (strcmp(param, "reversi") == 0) {
+				} else if (string_is(param, "reversi")) {
 					alien_variant = false;
 				} else {
 					xboard_error("(Unsupported variant) '%s'", param);
@@ -535,43 +535,43 @@ void ui_loop_xboard(UI *ui)
 				xboard_setup(play);
 
 			// quit
-			} else if (strcmp(cmd, "quit") == 0 || strcmp(cmd, "eof") == 0 || strcmp(cmd, "q") == 0) {
+			} else if (string_is(cmd, "quit", "eof", "q")) {
 				xboard_send("%d games played in %.2f s. %llu nodes searched\n", stats.n_games, 0.001 * stats.time, stats.n_nodes);
 				free(cmd); free(param);
 				if (log_is_open(xboard_log)) statistics_print(xboard_log->f);
 				return;
 
 			// random command
-			} else if ((strcmp(cmd, "random") == 0)) {
+			} else if ((string_is(cmd, "random"))) {
 				// ignored command;
 			
 			// random command
-			} else if ((strcmp(cmd, "force") == 0)) {
+			} else if ((string_is(cmd, "force"))) {
 				play_stop_pondering(play);
 				if (edax_turn != EMPTY) last_edax_turn = edax_turn; // (a second "force" kept EMPTY, an index out of the clocks, up to v4.5.5-nikque.15)
 				edax_turn = EMPTY;
 
 			// go think!
-			} else if (strcmp(cmd, "go") == 0) {
+			} else if (string_is(cmd, "go")) {
 				edax_turn = play->player;
 				xboard_go(ui, &stats, increment);
 
 			// playother
-			} else if (strcmp(cmd, "playother") == 0) {
+			} else if (string_is(cmd, "playother")) {
 				edax_turn = play->player;
 				play_ponder(play);
 
 			// white turn (obsolete in protocol version 2)
-			} else if (strcmp(cmd, "white") == 0) {
+			} else if (string_is(cmd, "white")) {
 				xboard_error("(unknown command): %s %s", cmd, param);
 
 			// black turn (obsolete in protocol version 2)
-			} else if (strcmp(cmd, "black") == 0) {
+			} else if (string_is(cmd, "black")) {
 				xboard_error("(unknown command): %s %s", cmd, param);
 
 			// time control
 			// TODO: enhance all time support
-			} else if (strcmp(cmd, "level") == 0) {
+			} else if (string_is(cmd, "level")) {
 				int mps, base, inc, m, s;
 				char *next;
 				
@@ -596,49 +596,49 @@ void ui_loop_xboard(UI *ui)
 				}
 				
 			// time control
-			} else if (strcmp(cmd, "st") == 0) {
+			} else if (string_is(cmd, "st")) {
 				options.time = string_to_time(param);
 				options.play_type = EDAX_TIME_PER_MOVE;
 				log_print(xboard_log, "edax setup> time per move = %.2f s.\n", 0.001 * options.time);
 
 			// depth level
-			} else if (strcmp(cmd, "sd") == 0) {
+			} else if (string_is(cmd, "sd")) {
 				options.level = string_to_int(param, 60);
 				BOUND(options.level, 0, 60, "level");
 				options.level_set = true;
 				log_print(xboard_log, "edax setup> fixed level = %d\n", options.level);
 
 			// nps
-			} else if ((strcmp(cmd, "nps") == 0)) {
+			} else if ((string_is(cmd, "nps"))) {
 				options.nps = 0.001 * string_to_real(param, options.nps);
 
 			// time
-			} else if ((strcmp(cmd, "time") == 0)) {
+			} else if ((string_is(cmd, "time"))) {
 				int t;
 				t = string_to_int(param, 100); 
 				if (t > 6000) t -= 1000; else if (t > 1000) t -= 100; // keep a margin
 				play->time[edax_turn == EMPTY ? last_edax_turn : edax_turn].left = t * 10; // 100% of available time...
 
-			} else if ((strcmp(cmd, "otim") == 0)) {
+			} else if ((string_is(cmd, "otim"))) {
 				int t;
 				t = string_to_int(param, 100);
 				if (t > 6000) t -= 1000; else if (t > 1000) t -= 100; // keep a margin
 				play->time[edax_turn == EMPTY ? !last_edax_turn : !edax_turn].left = t * 10; // 100% of available time...
 
 			// interrupt thinking
-			} else if (strcmp(cmd, "?") == 0) {
+			} else if (string_is(cmd, "?")) {
 				// processed in the event loop
 
 			// ping
-			} else if ((strcmp(cmd, "ping") == 0)) {
+			} else if ((string_is(cmd, "ping"))) {
 				xboard_send("pong %s\n", param);
 
 			// draw
-			} else if ((strcmp(cmd, "draw") == 0)) {
+			} else if ((string_is(cmd, "draw"))) {
 				// never accept draw... terminating a solved game should take no time
 		
 			// result		
-			} else if ((strcmp(cmd, "result") == 0)) {
+			} else if ((string_is(cmd, "result"))) {
 				++stats.n_games;
 				if (options.auto_store) {
 					long t = real_clock();
@@ -649,61 +649,61 @@ void ui_loop_xboard(UI *ui)
 				}
 			
 			// setboard
-			} else if ((strcmp(cmd, "setboard") == 0)) {
+			} else if ((string_is(cmd, "setboard"))) {
 				if (!play_set_board_from_FEN(play, param)) xboard_error("(bad FEN): %s\n", param);
 				xboard_check_game_over(play);
 
-			} else if ((strcmp(cmd, "edit") == 0)) {
+			} else if ((string_is(cmd, "edit"))) {
 				xboard_error("(unknown command): %s %s", cmd, param);
 
-			} else if ((strcmp(cmd, "hint") == 0)) {
+			} else if ((string_is(cmd, "hint"))) {
 				xboard_hint(play);
 
-			} else if ((strcmp(cmd, "bk") == 0)) {
+			} else if ((string_is(cmd, "bk"))) {
 				xboard_book(play);		
 
-			} else if ((strcmp(cmd, "undo") == 0)) {
+			} else if ((string_is(cmd, "undo"))) {
 				play_undo(play);
 			
-			} else if ((strcmp(cmd, "remove") == 0)) {
+			} else if ((string_is(cmd, "remove"))) {
 				play_undo(play);
 				play_undo(play);
 
-			} else if ((strcmp(cmd, "hard") == 0)) {
+			} else if ((string_is(cmd, "hard"))) {
 				options.can_ponder = true;
 				if (edax_turn != play->player) play_ponder(play);
 
-			} else if ((strcmp(cmd, "easy") == 0)) {
+			} else if ((string_is(cmd, "easy"))) {
 				options.can_ponder = false;
 				play_stop_pondering(play);
 
-			} else if ((strcmp(cmd, "post") == 0)) {
+			} else if ((string_is(cmd, "post"))) {
 				options.verbosity = 2;
 
-			} else if ((strcmp(cmd, "nopost") == 0)) {
+			} else if ((string_is(cmd, "nopost"))) {
 				options.verbosity = 0;
 
-			} else if ((strcmp(cmd, "analyze") == 0)) {
+			} else if ((string_is(cmd, "analyze"))) {
 				free(cmd); free(param);
 				xboard_loop_analyze(ui);
 				return;
 
-			} else if ((strcmp(cmd, "name") == 0)) {
+			} else if ((string_is(cmd, "name"))) {
 				xboard_send("Hello %s!\n", param);
 
-			} else if ((strcmp(cmd, "rating") == 0)) {
+			} else if ((string_is(cmd, "rating"))) {
 
-			} else if ((strcmp(cmd, "ics") == 0)) {
+			} else if ((string_is(cmd, "ics"))) {
 
-			} else if ((strcmp(cmd, "computer") == 0)) {
+			} else if ((string_is(cmd, "computer"))) {
 
-			} else if ((strcmp(cmd, "pause") == 0)) {
+			} else if ((string_is(cmd, "pause"))) {
 				xboard_error("(unknown command): %s %s", cmd, param);
 
-			} else if ((strcmp(cmd, "resume") == 0)) {
+			} else if ((string_is(cmd, "resume"))) {
 				xboard_error("(unknown command): %s %s", cmd, param);
 
-			} else if ((strcmp(cmd, "memory") == 0)) {
+			} else if ((string_is(cmd, "memory"))) {
 				int size = string_to_int(param, 100);
 				
 				for (options.hash_table_size = 10; hash_size(options.hash_table_size + 1) < size; ++options.hash_table_size) ;
@@ -713,7 +713,7 @@ void ui_loop_xboard(UI *ui)
 				play_stop_pondering(play);
 				search_resize_hashtable(&play->search);
 			
-			} else if ((strcmp(cmd, "cores") == 0)) {
+			} else if ((string_is(cmd, "cores"))) {
 				options.n_task = string_to_int(param, 1);
 				BOUND(options.n_task, 1, MIN(get_cpu_number(), MAX_THREADS), "cores");
 				log_print(xboard_log, "edax setup> cores: %d\n", options.n_task);
@@ -722,14 +722,14 @@ void ui_loop_xboard(UI *ui)
 					search_set_task_number(&play->search, options.n_task);
 				}
 
-			} else if ((strcmp(cmd, "egtpath") == 0)) {
+			} else if ((string_is(cmd, "egtpath"))) {
 				xboard_error("(unknown command): %s %s", cmd, param);
 				
-			} else if ((strcmp(cmd, "option") == 0)) {
+			} else if ((string_is(cmd, "option"))) {
 				xboard_error("(unknown command): %s %s", cmd, param);
 
 			// move
-			} else if (strcmp(cmd, "usermove") == 0) {
+			} else if (string_is(cmd, "usermove")) {
 				if (!play_user_move(play, param)) {
 					xboard_send("Illegal move %s\n", param);
 				}
@@ -742,7 +742,7 @@ void ui_loop_xboard(UI *ui)
 
 			/* illegal cmd/move */
 			} else {
-				if (play_is_game_over(play) && strcmp(cmd, "@@@@") == 0) {
+				if (play_is_game_over(play) && string_is(cmd, "@@@@")) {
 					// Tolerate a pass when the game is over...
 				} else {
 					xboard_send("Illegal move: %s %s\n", cmd, param);

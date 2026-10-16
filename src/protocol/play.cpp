@@ -98,11 +98,11 @@ bool play_load(Play *play, const char *file)
 		return false;
 	}
 	strcpy(ext, file + l - 4); string_to_lowercase(ext);
-	if (strcmp(ext, ".txt") == 0) load = game_import_text;
-	else if (strcmp(ext, ".ggf") == 0) load = game_import_ggf;
-	else if (strcmp(ext, ".sgf") == 0) load = game_import_sgf;
-	else if (strcmp(ext, ".pgn") == 0) load = game_import_pgn;
-	else if (strcmp(ext, ".edx") == 0) load = game_read;
+	if (string_is(ext, ".txt")) load = game_import_text;
+	else if (string_is(ext, ".ggf")) load = game_import_ggf;
+	else if (string_is(ext, ".sgf")) load = game_import_sgf;
+	else if (string_is(ext, ".pgn")) load = game_import_pgn;
+	else if (string_is(ext, ".edx")) load = game_read;
 	else {
 		sprintf(play->error_message, "Unknown game format extension: %s\n", ext);
 		return false;
@@ -188,13 +188,13 @@ void play_save(Play *play, const char *file)
 	l = strlen(file);
 	if (l < 4) { warn("Unknown game format extension: %s\n", file); return; }
 	strcpy(ext, file + l - 4); string_to_lowercase(ext);
-	if (strcmp(ext, ".txt") == 0) save = game_export_text;
-	else if (strcmp(ext, ".ggf") == 0) save = game_export_ggf;
-	else if (strcmp(ext, ".sgf") == 0) save = NULL;
-	else if (strcmp(ext, ".pgn") == 0) save = game_export_pgn;
-	else if (strcmp(ext, ".eps") == 0) save = game_export_eps;
-	else if (strcmp(ext, ".svg") == 0) save = game_export_svg;
-	else if (strcmp(ext, ".edx") == 0) save = game_write;
+	if (string_is(ext, ".txt")) save = game_export_text;
+	else if (string_is(ext, ".ggf")) save = game_export_ggf;
+	else if (string_is(ext, ".sgf")) save = NULL;
+	else if (string_is(ext, ".pgn")) save = game_export_pgn;
+	else if (string_is(ext, ".eps")) save = game_export_eps;
+	else if (string_is(ext, ".svg")) save = game_export_svg;
+	else if (string_is(ext, ".edx")) save = game_write;
 	else { warn("Unknown game format extension: %s\n", ext); return; }
 	f = file_open(file, save == game_write ? "wb" : "w");
 	if (f == NULL) {
@@ -202,7 +202,7 @@ void play_save(Play *play, const char *file)
 		return;
 	}
 
-	if (strcmp(ext, ".sgf") == 0) game_save_sgf(&game, f, true);
+	if (string_is(ext, ".sgf")) game_save_sgf(&game, f, true);
 	else save(&game, f);
 
 	fclose(f);

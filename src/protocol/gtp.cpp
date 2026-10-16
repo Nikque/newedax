@@ -71,13 +71,13 @@ static char *gtp_parse_color(char *s, int *color)
 
 	s = parse_word(s, word, 7);
 
-	if (strcmp(word, "black") == 0) {
+	if (string_is(word, "black")) {
 		*color = BLACK;
-	} else if (strcmp(word, "b") == 0) {
+	} else if (string_is(word, "b")) {
 		*color = BLACK;
-	} else if (strcmp(word, "white") == 0) {
+	} else if (string_is(word, "white")) {
 		*color = WHITE;
-	} else if (strcmp(word, "w") == 0) {
+	} else if (string_is(word, "w")) {
 		*color = WHITE;
 	} else {
 		*color = EMPTY;
@@ -155,63 +155,45 @@ void ui_loop_gtp(UI *ui)
 
 		if (*cmd == '\0') {
 
-		} else if (strcmp(cmd, "protocol_version") == 0) {
+		} else if (string_is(cmd, "protocol_version")) {
 			gtp_send("2", id, has_id);
 
-		} else if (strcmp(cmd, "name") == 0) {
+		} else if (string_is(cmd, "name")) {
 			gtp_send("Edax", id, has_id);
 
-		} else if (strcmp(cmd, "version") == 0) {
+		} else if (string_is(cmd, "version")) {
 			gtp_send(VERSION_STRING, id, has_id);
 
-		} else if (strcmp(cmd, "known_command") == 0) {
-			if (strcmp(param, "protocol_version") == 0 ||
-				strcmp(param, "name") == 0 ||
-				strcmp(param, "version") == 0 ||
-				strcmp(param, "known_command") == 0 ||
-				strcmp(param, "list_commands") == 0 ||
-				strcmp(param, "quit") == 0 ||
-				strcmp(param, "boardsize") == 0 ||
-				strcmp(param, "clear_board") == 0 ||
-				strcmp(param, "komi") == 0 ||
-				strcmp(param, "play") == 0 ||
-				strcmp(param, "genmove") == 0 ||
-				strcmp(param, "undo") == 0 ||
-				strcmp(param, "time_settings") == 0 ||
-				strcmp(param, "time_left") == 0 ||
-				strcmp(param, "set_game") == 0 ||
-				strcmp(param, "list_games") == 0 ||
-				strcmp(param, "loadsgf") == 0 ||
-				strcmp(param, "reg_genmove") == 0 ||
-				strcmp(param, "showboard") == 0) gtp_send("true", id, has_id);
+		} else if (string_is(cmd, "known_command")) {
+			if (string_is(param, "protocol_version", "name", "version", "known_command", "list_commands", "quit", "boardsize", "clear_board", "komi", "play", "genmove", "undo", "time_settings", "time_left", "set_game", "list_games", "loadsgf", "reg_genmove", "showboard")) gtp_send("true", id, has_id);
 			else gtp_send("false", id, has_id);
 
-		} else if (strcmp(cmd, "list_commands") == 0) {
+		} else if (string_is(cmd, "list_commands")) {
 			gtp_send("protocol_version\nname\nversion\nknown_command\nlist_commands\n"
 				"quit\nboardsize\nclear_board\nkomi\nplay\ngenmove\nundo\n"
 				"time_settings\ntime_left\nset_game\nlist_games\n"
 				"loadsgf\nreg_genmove\nshowboard", id, has_id);
 
-		} else if (strcmp(cmd, "quit") == 0 || strcmp(cmd, "eof") == 0) {
+		} else if (string_is(cmd, "quit", "eof")) {
 			gtp_send("", id, has_id);
 			free(cmd); free(param);
 			return;
 
-		} else if (strcmp(cmd, "boardsize") == 0) {
+		} else if (string_is(cmd, "boardsize")) {
 			size = string_to_int(param, 0);
 			if (size != 8) gtp_fail("unacceptable size", id, has_id);
 			else gtp_send("", id, has_id);
 
-		} else if (strcmp(cmd, "clear_board") == 0) {
+		} else if (string_is(cmd, "clear_board")) {
 			play_new(play);
 			gtp_send("", id, has_id);
 
-		} else if (strcmp(cmd, "komi") == 0) {
+		} else if (string_is(cmd, "komi")) {
 			komi = string_to_int(param, 0);
 			gtp_send("", id, has_id);
 			(void) komi; // do nothing of it....
 
-		} else if (strcmp(cmd, "play") == 0) {
+		} else if (string_is(cmd, "play")) {
 			move = gtp_parse_color(param, &color);
 			if (color == EMPTY) {
 				gtp_fail("syntax error (wrong or missing color)", id, has_id);
@@ -231,7 +213,7 @@ void ui_loop_gtp(UI *ui)
 				gtp_fail("illegal move", id, has_id);
 			}
 
-		} else if (strcmp(cmd, "genmove") == 0) {
+		} else if (string_is(cmd, "genmove")) {
 			char m[4];
 			gtp_parse_color(param, &color);
 			if (color == EMPTY) {
@@ -250,7 +232,7 @@ void ui_loop_gtp(UI *ui)
 			else gtp_send(move_to_string(play_get_last_move(play)->x, WHITE, m), id, has_id);
 
 		// optional GTP commands but needed or supported by Quarry
-		} else if (strcmp(cmd, "undo") == 0) {
+		} else if (string_is(cmd, "undo")) {
 			if (play->i_game <= 0) {
 				gtp_fail("cannot undo", id, has_id);
 			} else {
@@ -258,7 +240,7 @@ void ui_loop_gtp(UI *ui)
 				gtp_send("", id, has_id);
 			}
 
-		} else if (strcmp(cmd, "time_settings") == 0) {
+		} else if (string_is(cmd, "time_settings")) {
 			char *s;
 			s = parse_int(param, &main_time);
 			s = parse_int(s, &byo_yomi_time);
@@ -271,7 +253,7 @@ void ui_loop_gtp(UI *ui)
 			options.time = 1000 * main_time;
 			gtp_send("", id, has_id);
 
-		} else if (strcmp(cmd, "time_left") == 0) {
+		} else if (string_is(cmd, "time_left")) {
 			char *s;
 			double t = 0.0;
 			int n = 0;
@@ -291,22 +273,22 @@ void ui_loop_gtp(UI *ui)
 			}
 			gtp_send("", id, has_id);
 
-		} else if (strcmp(cmd, "set_game") == 0) {
-			if (strcmp(param, "Othello") == 0) gtp_send("", id, has_id);
+		} else if (string_is(cmd, "set_game")) {
+			if (string_is(param, "Othello")) gtp_send("", id, has_id);
 			else gtp_fail("unsupported game", id, has_id);
 
-		} else if (strcmp(cmd, "list_games") == 0) {
+		} else if (string_is(cmd, "list_games")) {
 			gtp_send("Othello", id, has_id);
 
 		// regression subset
-		} else if (strcmp(cmd, "loadsgf") == 0) {
+		} else if (string_is(cmd, "loadsgf")) {
 			if (play_load(play, param)) {
 				gtp_send("", id, has_id);
 			} else {
 				gtp_fail(play->error_message, id, has_id);
 			}
 
-		} else if (strcmp(cmd, "reg_genmove") == 0) {
+		} else if (string_is(cmd, "reg_genmove")) {
 			char m[4];
 			gtp_parse_color(param, &color);
 			if (color == EMPTY) {
@@ -325,7 +307,7 @@ void ui_loop_gtp(UI *ui)
 			else gtp_send(move_to_string(play->result.move, WHITE, m), id, has_id);
 
 		// optional commands
-		} else if (strcmp(cmd, "showboard") == 0) {
+		} else if (string_is(cmd, "showboard")) {
 			printf("= ");
 			if (has_id) printf("%d\n", id);
 			board_print(&play->board, play->player, stdout);

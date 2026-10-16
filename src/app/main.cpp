@@ -105,7 +105,7 @@ int main(int argc, char **argv)
 	options_parse_defaults("edax.ini");
 	get_config_file_path(argv[0], config_file);
 	options_parse_defaults(config_file);
-	if (strcmp(config_file, "config.ini") == 0) {
+	if (string_is(config_file, "config.ini")) {
 		// started by its name alone (found through the PATH): the folder of the executable is not known,
 		// and config.ini is only looked for in the current folder
 		FILE *f = file_open(config_file, "r");
@@ -125,13 +125,13 @@ int main(int argc, char **argv)
 	for (i = 1; i < argc; i++) {
 		char *arg = argv[i];
 		while (*arg == '-') ++arg;
-		if (strcmp(arg, "v") == 0 || strcmp(arg, "version") == 0) version();
+		if (string_is(arg, "v", "version")) version();
 		else if (ui_switch(ui, arg)) ;
 		else if ((r = (options_read(arg, argv[i + 1]))) > 0) i += r - 1;
-		else if (strcmp(arg, "solve") == 0 && argv[i + 1]) problem_file = argv[++i];
-		else if (strcmp(arg, "wtest") == 0 && argv[i + 1]) wthor_file = argv[++i];
-		else if (strcmp(arg, "bench") == 0 && argv[i + 1]) n_bench = atoi(argv[++i]);
-		else if (strcmp(arg, "count") == 0 && argv[i + 1]) {
+		else if (string_is(arg, "solve") && argv[i + 1]) problem_file = argv[++i];
+		else if (string_is(arg, "wtest") && argv[i + 1]) wthor_file = argv[++i];
+		else if (string_is(arg, "bench") && argv[i + 1]) n_bench = atoi(argv[++i]);
+		else if (string_is(arg, "count") && argv[i + 1]) {
 			count_type = argv[++i];
 			if (argv[i + 1]) level = string_to_int(argv[++i], 0);
 			if (argv[i + 1] && strcmp(argv[i + 1], "6x6") == 0) {
@@ -167,9 +167,9 @@ int main(int argc, char **argv)
 	} else if (count_type){
 		Board board;
 		board_init(&board);
-		if (strcmp(count_type, "games") == 0) quick_count_games(&board, level, size);
-		else if (strcmp(count_type, "positions") == 0) count_positions(&board, level, size);
-		else if (strcmp(count_type, "shapes") == 0) count_shapes(&board, level, size);
+		if (string_is(count_type, "games")) quick_count_games(&board, level, size);
+		else if (string_is(count_type, "positions")) count_positions(&board, level, size);
+		else if (string_is(count_type, "shapes")) count_shapes(&board, level, size);
 
 	} else if (ui->type == UI_CASSIO) {
 		engine_loop();
