@@ -317,7 +317,7 @@ static void features(const Config *c, uint64_t P, uint64_t O, unsigned int *f)
 // ---------------- data ----------------
 static Source src[8];
 static int n_src;
-struct Data { int n, cap; Rec *r; float *c, *t; };	// t: training target (label, or mixed with the teacher)
+struct Data { int n, cap; Rec *r; float *c, *t; double *te; };	// t: training target (label, or mixed with the teacher); te: the teacher's evaluation of a test position
 static Data train[64], test[64][8];
 static int plies[64], n_plies;
 
@@ -384,6 +384,27 @@ static void push(Data *d, const Rec *r, float c)
 	d->r[d->n] = *r; d->c[d->n] = c; d->t[d->n] = r->v; ++d->n;
 }
 
+// Places of the hot code (MSVC). The code sections .text$a<n> come first in the code, in the order of their names:
+//   .text$a1  the scalar features and features() (3,728 bytes, from the start of the code)
+//   .text$a2  pad a (368 bytes): what follows starts a 4 KiB page
+//   .text$a3  apply_base and its OpenMP loop, from the start of a page (the loop over the records took 4 to 6 % more
+//             cycles at other places of the page, the same machine code, on an AMD Ryzen 9 9950X: docs/port/EVTOOLS-3.md)
+//   .text$a4  pad b (48 bytes)
+//   .text$a5  run_config and its OpenMP loops (the first one at 0 in its 64-byte line, as before the sections)
+//   .text$a6  pad c (48 bytes)
+//   .text$a7  load (at 48 in its 64-byte line, as before the sections)
+// A pad of n nops takes n + 9 bytes (with the store and "ret 0") rounded up to 16. A change of the size of the code
+// before a pad moves what follows it: build-evtools.ps1 checks these places in the link map of evsearch. The pads are
+// called by main when argc < 0 (never), so that the linker keeps them.
+#ifdef _MSC_VER
+#define EVS_NOP8 __nop(); __nop(); __nop(); __nop(); __nop(); __nop(); __nop(); __nop();
+#define EVS_NOP64 EVS_NOP8 EVS_NOP8 EVS_NOP8 EVS_NOP8 EVS_NOP8 EVS_NOP8 EVS_NOP8 EVS_NOP8
+#pragma code_seg(".text$a2")
+static EVTOOL_NOINLINE void hot_pad_a(int *x) { EVS_NOP64 EVS_NOP64 EVS_NOP64 EVS_NOP64 EVS_NOP64 EVS_NOP8 EVS_NOP8 EVS_NOP8 *x = 1; }	// 344 nops: 368 bytes
+#pragma code_seg(".text$a4")
+static EVTOOL_NOINLINE void hot_pad_b(int *x) { EVS_NOP8 EVS_NOP8 EVS_NOP8 EVS_NOP8 *x = 2; }	// 32 nops: 48 bytes
+#pragma code_seg(".text$a3")
+#endif
 // -base dir:cfg : screening mode. The weights of configuration cfg (dumped in dir: cfg.pat, cfg_<ply>.w, patterns only)
 // are a fixed base evaluation; training targets and test labels become the residuals (label - base), so that each
 // configuration of the -configs file is fitted alone on what the base does not explain.
@@ -432,6 +453,9 @@ static void apply_base(int pi, int ply)
 	free(bn); free(bo); free(bs); free(w);
 }
 
+#ifdef _MSC_VER
+#pragma code_seg()
+#endif
 // the teacher's evaluation of a position: the 46 features, and the mobility weights of eval2 (outside the loops that call it)
 static EVTOOL_NOINLINE double teacher_value(uint64_t P, uint64_t O)
 {
@@ -456,6 +480,26 @@ static void apply_teacher(Data *d)
 static int window = 0;
 static double decay = 0.5;
 
+// the teacher's evaluation of the test positions, once (run_config uses it for each configuration); the arrays c and t
+// of a test set are not used: their room is given back first
+static void teacher_test(int pi)
+{
+	if (!teacher) return;
+	for (int d = 0; d < n_src; ++d) {
+		Data *T = &test[pi][d];
+		int k;
+		free(T->c); free(T->t); T->c = T->t = nullptr;
+		T->te = (double *) xmalloc((size_t) (T->n > 0 ? T->n : 1) * sizeof *T->te);
+		#pragma omp parallel for schedule(static)
+		for (k = 0; k < T->n; ++k) T->te[k] = teacher_value(T->r[k].P, T->r[k].O);
+	}
+}
+
+#ifdef _MSC_VER
+#pragma code_seg(".text$a6")
+static EVTOOL_NOINLINE void hot_pad_c(int *x) { EVS_NOP8 EVS_NOP8 EVS_NOP8 EVS_NOP8 *x = 3; }	// 32 nops: 48 bytes (see the places of the hot code above apply_base)
+#pragma code_seg(".text$a7")
+#endif
 static void load(int pi, int ply)
 {
 	for (int j = -window; j <= window; ++j) {
@@ -486,11 +530,17 @@ static void load(int pi, int ply)
 	}
 }
 
+#ifdef _MSC_VER
+#pragma code_seg()
+#endif
 // ---------------- training ----------------
 static int nt = 24, iter = 30;
 static const char *dumpdir;	// -dump dir: write the trained weights (dir/<config>_<ply>.w, doubles) and instances (dir/<config>.pat)
 static double lambda = 300, lambda_prior = -1;	// -lambda-prior: L2 strength for the weights that have a prior (default: lambda; 1e30 freezes them)
 
+#ifdef _MSC_VER
+#pragma code_seg(".text$a5")
+#endif
 static void run_config(const Config *c, int pi, double *mse)
 {
 	const Data *D = train + pi;
@@ -594,7 +644,7 @@ static void run_config(const Config *c, int pi, double *mse)
 			for (int j = 0; j < nf; ++j) pr += w[f[j]];
 			se += (pr - T->r[k].v) * (pr - T->r[k].v);
 			if (teacher) {	// distance to the teacher's evaluation
-				const double te = teacher_value(T->r[k].P, T->r[k].O);
+				const double te = T->te[k];
 				st += (pr - te) * (pr - te);
 			}
 		}
@@ -606,6 +656,9 @@ static void run_config(const Config *c, int pi, double *mse)
 	free(tq); free(td);
 }
 
+#ifdef _MSC_VER
+#pragma code_seg()
+#endif
 int main(int argc, char **argv)
 {
 	const char *libf = nullptr, *conff = nullptr;
@@ -641,12 +694,15 @@ int main(int argc, char **argv)
 		else if (!strcmp(argv[i], "-alpha")) alpha = atof(value(i));
 		else if (!strcmp(argv[i], "-prior")) { et_init(); prior = et_read(value(i)); }
 	}
+#ifdef _MSC_VER
+	if (argc < 0) { hot_pad_a(&argc); hot_pad_b(&argc); hot_pad_c(&argc); }
+#endif
 	if (nt < 1) die("bad -threads");
 	omp_set_num_threads(nt);
 	read_lib(libf);
 	if (conff == nullptr) die("missing -configs");
 	FILE *f = xfopen(conff, "r");
-	for (int pi = 0; pi < n_plies; ++pi) { load(pi, plies[pi]); apply_teacher(train + pi); if (base_cfg[0]) apply_base(pi, plies[pi]); }
+	for (int pi = 0; pi < n_plies; ++pi) { load(pi, plies[pi]); apply_teacher(train + pi); teacher_test(pi); if (base_cfg[0]) apply_base(pi, plies[pi]); }
 	fprintf(stderr, "%d patterns; data loaded\n", n_lib);
 	char line[4096], copy[4096];
 	while (fgets(line, sizeof line, f)) {

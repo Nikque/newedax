@@ -33,12 +33,26 @@ foreach ($t in $list) {
 	$obj = Join-Path $Out "obj-$t"
 	New-Item -ItemType Directory -Force $obj | Out-Null
 	$cl = "cl $o $Extra /I`"$here`" `"$src`" $libs /Fo`"$obj\\`" /Fe`"$Out\$t.exe`""
+	$map = "$Out\$t.map"	# evsearch: the link map, to check the places of its hot code
+	if ($t -eq 'evsearch') { if ($env:LINK -match '/MAP:(\S+)') { $map = $Matches[1] } else { $cl += " /link /MAP:`"$map`"" } }
 	$p = Start-Process cmd.exe -ArgumentList '/c', "call `"$vsdev`" -arch=x64 -host_arch=x64 >nul && $cl" -NoNewWindow -PassThru -RedirectStandardOutput "$Out\$t.log"
 	try { $p.ProcessorAffinity = [IntPtr](1L -shl $Cpu) } catch {}
 	$p.WaitForExit()
-	$warn = @(Get-Content "$Out\$t.log" | Select-String ' (error|warning) ' | Where-Object { $_.Line -notmatch 'C4805' })
+	$warn = @(Get-Content "$Out\$t.log" | Select-String ' (error|warning) ' | Where-Object { $_.Line -notmatch 'C4805' } | ForEach-Object { $_.Line })
+	if ($t -eq 'evsearch' -and $p.ExitCode -eq 0) {	# the places of the hot code ("Places of the hot code" in evsearch.cpp)
+		$lines = if (Test-Path $map) { Get-Content $map } else { @() }
+		foreach ($w in @(@('?apply_base$omp$1@', 4096, 0), @('?features@', 64, 48), @('?run_config$omp$1@', 64, 0), @('?load@', 64, 48))) {
+			$addr = $null
+			foreach ($l in $lines) {
+				$f = $l.Trim() -split '\s+'
+				if ($f.Count -ge 3 -and $f[0].StartsWith('0001:') -and $f[1].StartsWith($w[0])) { $addr = [Convert]::ToUInt64($f[2], 16); break }
+			}
+			if ($null -eq $addr) { $warn += "warning: evsearch: $($w[0]) not found in $map" }
+			elseif (($addr % $w[1]) -ne $w[2]) { $warn += "warning: evsearch: $($w[0]) at $('{0:x}' -f $addr), not at $($w[2]) modulo $($w[1]) (the pads of the places of the hot code in evsearch.cpp)" }
+		}
+	}
 	"build $t exit $($p.ExitCode) warnings/errors $($warn.Count)"
-	$warn | Select-Object -First 8 | ForEach-Object { "  $($_.Line.Trim())" }
+	$warn | Select-Object -First 8 | ForEach-Object { "  $($_.Trim())" }
 	if ($p.ExitCode -ne 0) { $failed++ }
 }
 "failed: $failed"
