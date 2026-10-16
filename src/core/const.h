@@ -12,17 +12,17 @@
 #define EDAX_CONST_H
 
 /** maximal number of threads */
-#define MAX_THREADS 64
+constexpr int MAX_THREADS = 64;
 
 /** maximal number of moves */
-#define MAX_MOVE 34	// 33 in reachable positions (https://eukaryote.hateblo.jp/entry/2023/05/23/145945), 34 at most in any position (https://eukaryote.hateblo.jp/entry/2020/04/13/150458)
+constexpr int MAX_MOVE = 34; // 33 in reachable positions (https://eukaryote.hateblo.jp/entry/2023/05/23/145945), 34 at most in any position (https://eukaryote.hateblo.jp/entry/2020/04/13/150458)
 
 /** size of the board */
-#define BOARD_SIZE 64
+constexpr int BOARD_SIZE = 64;
 
 /** size of the game including passing moves. We use here an arbitrary big
  enough value */
-#define GAME_SIZE 80
+constexpr int GAME_SIZE = 80;
 
 /** constants for square coordinates */
 enum {
@@ -46,22 +46,22 @@ enum {
 };
 
 /** infinite score: a huge value unreachable as a score and fitting in a char */
-#define SCORE_INF 127
+constexpr int SCORE_INF = 127;
 
 /** minimal score */
-#define SCORE_MIN -64
+constexpr int SCORE_MIN = -64;
 
 /** maximal score */
-#define SCORE_MAX 64
+constexpr int SCORE_MAX = 64;
 
 /** maximal time (1 millenium) */
-#define TIME_MAX 31557600000000LL
+constexpr long long TIME_MAX = 31557600000000LL;
 
 /** 1 hour */
-#define HOUR 3600000LL
+constexpr long long HOUR = 3600000LL;
 
 /** observers */
-#define MAX_OBSERVER 2
+constexpr int MAX_OBSERVER = 2;
 
 /** constants for search interruption */
 typedef enum Stop {
@@ -82,15 +82,15 @@ enum {
 };
 typedef	unsigned char	NodeType;
 
-#define VERSION 4
-#define RELEASE 5
+constexpr int VERSION = 4;
+constexpr int RELEASE = 5;
 #define VERSION_STRING "4.5.5"
 #define EDAX_NAME "Edax 4.5.5"
-#define BOOK 0x424f4f4b
-#define EDAX 0x45444158
-#define EVAL 0x4556414c
-#define XADE 0x58414445
-#define LAVE 0x4c415645
+constexpr int BOOK = 0x424f4f4b;
+constexpr int EDAX = 0x45444158;
+constexpr int EVAL = 0x4556414c;
+constexpr int XADE = 0x58414445;
+constexpr int LAVE = 0x4c415645;
 
 /**
  * Edax state.

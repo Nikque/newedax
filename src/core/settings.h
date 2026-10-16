@@ -72,19 +72,19 @@
 #endif
 
 /** transposition cutoff usage. */
-#define USE_TC true
+constexpr bool USE_TC = true;
 
 /** stability cutoff usage. */
-#define USE_SC true
+constexpr bool USE_SC = true;
 
 /** enhanced transposition cutoff usage. */
-#define USE_ETC true
+constexpr bool USE_ETC = true;
 
 /** probcut usage. */
-#define USE_PROBCUT true
+constexpr bool USE_PROBCUT = true;
 
 /** Use recursive probcut */
-#define USE_RECURSIVE_PROBCUT true
+constexpr bool USE_RECURSIVE_PROBCUT = true;
 
 /** limit recursive probcut level */
 #define LIMIT_RECURSIVE_PROBCUT(x) x
@@ -104,10 +104,10 @@
 #endif
 
 /** Internal Iterative Deepening. */
-#define USE_IID false
+constexpr bool USE_IID = false;
 
 /** Use previous search result */
-#define USE_PREVIOUS_SEARCH true
+constexpr bool USE_PREVIOUS_SEARCH = true;
 
 /** Allow type puning */
 #ifndef USE_TYPE_PUNING
@@ -117,19 +117,19 @@
 #endif
 
 /** Hash-n-way. */
-#define HASH_N_WAY 4
+constexpr int HASH_N_WAY = 4;
 
 /** hash align */
-#define HASH_ALIGNED 1
+constexpr int HASH_ALIGNED = 1;
 
 /** Thread local hash size per thread (in number of bits) */
-#define THREAD_LOCAL_HASH_SIZE 10
+constexpr int THREAD_LOCAL_HASH_SIZE = 10;
 
 /** PV extension (solve PV alone sooner) */
-#define USE_PV_EXTENSION true
+constexpr bool USE_PV_EXTENSION = true;
 
 /** Swith from endgame to shallow search (faster but less node efficient) at this depth. */
-#define DEPTH_TO_SHALLOW_SEARCH 6
+constexpr int DEPTH_TO_SHALLOW_SEARCH = 6;
 
 /** Use lock-free thread local hash (before DEPTH_TO_SHALLOW_SEARCH) */
 #define DEPTH_TO_USE_LOCAL_HASH 10
