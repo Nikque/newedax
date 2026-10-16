@@ -1,0 +1,122 @@
+# new edax：C++ への移植の記録（段階0・1、2026-10-16）
+
+設計は `DESIGN-cpp1.md`（第2版）。この資料は、その段階0・1で行ったことと結果の記録。
+
+- 区別：**確かめた**（このセッションで実行した）／**記録にある**（以前の資料）／**見立て**（推測）。
+- CPU の使い方の決まり：ビルドまでと、fforum-20-39 を1スレッドで解く程度の短い試験だけ。すべて1論理CPU（affinity 1）、優先度「通常」。
+
+## 1. 段階0：準備
+
+| 項目 | 内容 |
+|---|---|
+| フォルダ | 作業フォルダー（`newedax\` リポジトリ、`baseline\`、`runs\`、`third_party\`） |
+| リポジトリ | `newedax`。v4.5.5-nikque.17 の作業コピーから履歴ごと複製し、`80e054e` から `main` を作った。リモートなし。作者 `Nikque <Nikque@users.noreply.github.com>`。`core.safecrlf false`（改行の警告を出さない） |
+| Boost | 1.92.0（`archives.boost.io`、`boost_1_92_0.tar.gz`、235,384,471 バイト、SHA-256 `c4a3b310ddd2472416e091067166b0713be97c63f38c212c484ada022fd296ce` が配布元の値と一致）。`third_party\boost_1_92_0` にヘッダー（`boost\`）と `LICENSE_1_0.txt` だけを展開（184MB）。まだビルドには入れていない |
+| 基準 | `baseline\`：`edax-repro.exe`（14 suite の C 版、SHA-256 `b2d85931…`、ソースは `80e054e` と同じ）、`release17-windows\`（配布版5種の fforum-20-39 の1スレッドの出力、Cassio、API 試験、`配布Windows検証.json`）、`verify_windows_release17.py`、`repro-suites\`（`run.py`・`compare*.py`・`suites.json`・`build.cmd`）、nikque.17 の検証報告と SHA256SUMS |
+
+基準の値（記録にある）：配布版の5種（x64-v4・v3・x64・x86-sse・x86）とも、`-n 1 -solve fforum-20-39.obf` で 20 問、合計 **77,639,567 ノード**、問題ごとの深さ・評価値・ノード数・読み筋が同じ。DLL 3種の API 試験は 204 件・失敗 0。Cassio は各7条件が通る。
+
+## 2. 段階1：commit
+
+| commit | 内容 |
+|---|---|
+| `a465896` | C のまま、C++ で通らない所を直す（文字列の配列の大きさ、`void*` からの変換、`register`、`include\stdbool.h` を C だけに、`libedax_utf8.h` で `<io.h>` を先に読む、Android でアフィニティのコードを使わない）。`tools/port/compare_solve.py` |
+| `f6e9200` | `src/*.c` → `*.cpp`、`tests/regression.c` → `.cpp`。MSVC は `/std:c++23preview /Zc:__cplusplus /EHs-c- /D _HAS_EXCEPTIONS=0 /GR-`、gcc・clang は `-std=c++23 -fno-exceptions -fno-rtti`（`Makefile` は `COMP=gcc`・`clang` で `g++`・`clang++` を使う）、Android は `LOCAL_CPPFLAGS`。`tools/port/build-msvc.cmd` |
+| `8dbae28` | libedax：昔の libedax と同じ名前で出す5つの関数（`bit_count`・`first_bit`・`last_bit`・`get_moves`・`can_move`）を C の名前で出す。MSVC では `can_move` を int（0か1）で返す（C 版の MSVC の `bool` は 4 バイト） |
+| `60beb99` | `tests/regression.cpp` を C++ でビルドできるように（型変換だけ）。`tools/port/compare_asm.py`・`run_regression.py` |
+| `eaeee50` | `EVAL_FEATURE`・`EVAL_FEATURE_all_opponent` の宣言を `eval.h` に（Android の 32ビット ARM のリンク、3.9）。`tests/build-libedax-test.cmd` が前回の `libtest-*` を消す（3.4）。`build-msvc.cmd` の `=` の扱い。`tools/port/compare_disasm.py` |
+| `e317c29` | 手順書に Boost のヘッダーの場所（`BOOST_DIR`、既定は `..\..\third_party\boost_1_92_0`）。`tests/boost_check.cpp`（3.11） |
+
+`tests/libedax_test.c` と `tests/libedax_example.c` は C のまま（C の API を確かめるため）。
+
+## 3. 確かめたこと
+
+### 3.1 Android の分岐
+
+NDK r27d のプリプロセッサーで、C 版（`-x c -std=gnu17`）の Android は `thread_set_cpu` で「何もしない」分岐に入ることを確かめた。C++ では `_GNU_SOURCE` が自動で定義され、`CPU_SET` の分岐に入って `pthread_setaffinity_np`（bionic にない）でエラーになっていた。`thread_set_cpu` と `thread_cpu_bound` の条件に `!defined(__ANDROID__)` を足した（C 版と同じ分岐）。
+
+### 3.2 fforum-20-39、1スレッド（MSVC、PGO なし、`/O2 /GL`）
+
+| ビルド | 実行ファイルの大きさ | 結果 |
+|---|---|---|
+| C（`a465896`、x64 AVX-512） | 792,064 | 20 問すべて記録と同じ（77,639,567） |
+| C++（x64 AVX-512） | 789,504 | 同じ |
+| C++（x64） | 813,056 | 同じ |
+| C++（x64 AVX2） | 807,424 | 同じ |
+| C++（x86 SSE、32ビット） | 681,984 | 同じ |
+| C++（x86 IA32、32ビット） | 714,240 | 同じ |
+| C++（x86 AVX2、32ビット。CRC のインライン化の誤りが出た構成） | 708,096 | 同じ |
+
+比べ方：`tools/port/compare_solve.py`（問題ごとの深さ・評価値・ノード数・読み筋と合計）。道具が違いを見逃さないことは、記録の1か所を書き換えた写しで確かめた。基準の C 版（`edax-repro.exe`、同じフラグ）は 793,088 バイト。
+
+### 3.3 Cassio の7条件
+
+C++ の x64 AVX-512・x64 AVX2・x86 SSE・x86 IA32 と C 版で、すべて通った（実行ファイルの隣に `data\eval.dat` が要る。最初は置かずに流して全部失敗した。C 版でも同じだったので、置き方の問題）。
+
+### 3.4 libedax（MSVC x64、`tests/build-libedax-test.cmd`）
+
+- 最初のビルドは、5つの関数が C++ の名前になってリンクで失敗した（`8dbae28` で修正）。
+- 修正後：C でコンパイルした `libedax_test.c` が C++ の DLL で **204 件・失敗 0**。
+- エクスポート：`dumpbin /exports` で、配布版 `libedax-x64.dll` と同じ **110 個**、名前の差なし、装飾された名前なし。
+- 2回目の実行で1件失敗した（`libedax_test.c` 730 行、`base unique` の出力の大きさ）。前回の実行の `libtest-unique.txt` が残っていて、`base_save` は既存のファイルの棋譜を残す仕様（`base.cpp` 939 行）なので、4局になっていた。出力を消すと 204 件・失敗 0。移植とは関係ない試験の手順の不具合で、`.cmd` が毎回 `libtest-*` を消すように直した（`eaeee50`）。直した `.cmd` で 204 件・失敗 0。
+
+### 3.5 警告（C++ で新しく出たもの。動作は C と同じ）
+
+- `game.cpp` 276・1776（C4805）：`int` の `player` に `bool` を `^=`。`bool` は 0 か 1 で、C と同じ計算。
+- `flip_carry_sse_32.cpp` 1044 など（C4838、32ビットだけ）：`~0x08...` の符号つきの定数を `unsigned` の初期化に使う縮小変換。ビットの並びは同じ。
+- `board_mmx.cpp` 160（C4799、EMMS）：関数の中で `_mm_empty()` を呼んでいる。C 版でも出るかは未確認。
+
+### 3.6 機械語の比較（設計 5.4。MSVC x64 AVX-512、`/O2`、`/GL` なし、`/FAs`）
+
+`tools/port/compare_asm.py` で、C 版（`a465896`）と C++ 版の関数ごとの命令を比べた（名前の装飾・ラベル番号・ソースの注釈は除く）。
+
+- 関数 897 個のうち、同じ 379、違う 515。C++ だけにあるのは `strchr`・`strrchr`・`strstr`（C++ の標準ヘッダーの const つきの包み）。
+- 違いの多くは、`bool` の幅（`test eax, eax` → `test al, al`、同じ速さの命令）と、使うレジスターの選び方。`NWS_endgame` の違いは `bool` の幅の1か所だけだった。
+- **遅くなり得る所**：`search_eval_2`（評価の中心）で、C++ 版はループの中で `n_empties & 1` をメモリから読み直す命令が1つ増えた（304 → 307 命令）。配布用の PGO のビルドでも同じになるかは未確認。
+- ほかの探索の関数の命令の数は ±5 以内（`NWS_midgame` 569 → 568、`PVS_midgame` 496 → 497 など）。
+- 機械語が違う以上、速さが同じとは言い切れない。**実測（申請が必要）で確かめる。**
+
+同じ比較を、リンク時最適化（`/GL`、`/LTCG`、PDB つき）の実行ファイルの逆アセンブル（`dumpbin /disasm`）でも行った（`tools/port/compare_disasm.py`）。関数 1,224 個のうち同じ 811、違う 413。`search_eval_2` の読み直しの1命令は、この版でも残っていた（293 → 296 命令）。原因は、ループをまたいで残す値（`eval0.n_empties & 1`）を置くレジスターの割り当ての違い（C++ 版は1つをスタックに置く）。1回の繰り返しで、約300命令の `search_eval_1` の呼び出しに対して読み込みが1つ増える。影響は小さい見込み（見立て）だが、遅くなり得る所として実測で確かめる。
+
+### 3.7 `bool` の大きさ（設計 3.1 の再掲）
+
+Windows（MSVC）では、C 版の `bool` が 4 バイト、C++ 版が 1 バイト。`Node` は 208 → 200 バイト（32ビットは 152 → 136）、`Task` と `Book` は 8 バイト小さい。公開の型の大きさと位置は同じ。
+
+### 3.8 回帰試験（`tests/regression.cpp`、MSVC x64 AVX-512 `/O1`）
+
+- C++ でのビルドには、試験のソースに型変換を足す必要があった（`malloc` などの戻り値、`options.book_file` に入れる文字列定数）。ケースの中身は変えていない（`60beb99`）。
+- `reproducible`（記録では 97 秒）を除く 43 ケースを、C 版（`a465896` の `tests/regression.c`）と C++ 版で1論理CPU・60秒の上限で流した（`tools/port/run_regression.py`）：**両方とも 43 ケースすべて終了コード 0**、合わせて 20 秒。
+- 出力の違い：エラー表示の中のソースのパス（`book.c` → `book.cpp`）、一時ファイルの名前のプロセス番号、`enhance` の局面数。`enhance` は C 版でも 6 回で 11〜14 と毎回変わる（level 0 の探索が時計で種を取る乱数で手を並べるため。記録にある既知の動作）。
+
+### 3.9 Android（NDK r27d、`ndk-build`、armeabi-v7a と arm64-v8a）
+
+- 1回目：32ビット ARM の本体のリンクで失敗した。`eval_sse.cpp`（NEON 用に別の翻訳単位でコンパイルされる）が `eval.cpp` の `const` の大域の表 `EVAL_FEATURE`・`EVAL_FEATURE_all_opponent` を `extern` で参照していたが、**C++ では、先に `extern` の宣言のない名前空間の `const` の変数は、ほかの翻訳単位から見えない**（C では見える）。宣言を `eval.h` に移して、C と同じ扱いにした。
+- 警告 25 件：すべて「C++20 で非推奨の、`volatile` の変数への `++`・`--`」（`n_nodes` などの数え上げ。midgame・endgame・ybwc・move・search・root・event）。動作は C と同じ。段階3で書き方を直す候補。
+- 2回目（`eaeee50`）：両方の ABI でビルドが通った。armeabi-v7a 384,748 バイト（C 版の配布物 384,788 より −40）、arm64-v8a 565,128 バイト（565,056 より +72）。警告は ABI ごとに同じ 25 件。端末がないので実行はしていない。
+- 修正の後、Windows の x64 AVX-512・x86 SSE を作り直し、fforum-20-39 の20問が記録と同じ、API 試験 204 件・失敗 0 を確かめた（x64 AVX-512 の大きさは修正前と同じ 789,504）。
+
+### 3.11 Boost 1.92（`tests/boost_check.cpp`）
+
+- `unordered_flat_map`・`static_vector`・`endian` を、`BOOST_NO_EXCEPTIONS` と、異常終了する `boost::throw_exception` で使う小さな試験。Edax の本体には入れていない。
+- MSVC 19.44 の x64・x86（`/std:c++23preview /EHs-c- /D _HAS_EXCEPTIONS=0 /GR-`）：ビルドして実行し、終了コード 0、値も正しい。
+- NDK r27d clang 18 の arm64-v8a・armeabi-v7a（`-std=c++23 -fno-exceptions -fno-rtti`、libc++ を静的にリンク）：コンパイルとリンクが通った（実行はしていない）。大きさは 462,136・310,852 バイト。**本体で標準ライブラリを使い始めると、Android の実行ファイルが大きくなる**（報告の対象）。
+- 手順書の `nmake /n`・`make -n` で、Boost の場所が命令に入ることを確かめた。
+
+## 4. まだのこと
+
+- Linux（WSL に gcc 13 が入ってから）、32ビット Linux。macOS は最後。
+- Android の実行（端末がない）。
+- PGO のビルド（PGO の学習の実行は申請が要る）と、配布物と同じ作り方での機械語・大きさの比較。
+- 14 suite の book のバイト比較（申請が要る。1論理CPUで約2時間の記録）。
+- 速さとメモリの実測（申請が要る）。`search_eval_2`（3.6）を含む。
+- `tests/regression.cpp` の `reproducible`（長い）。
+- README・RELEASE-NOTES の `.c` の記述（段階1では変えていない）。
+
+### 4.1 申請したい試験（CPU を使う。時間は見込み）
+
+| # | 試験 | CPU | 時間の見込み |
+|---|---|---|---|
+| A | 14 suite の book（C++ 版を基準と同じ `/O2 /GL /arch:AVX512` でビルド。`R1`＝`-n 32 -book-seed 1 -book-reproducible on` と `Dn1`＝`-n 1` 既定の 28 回）を記録（`repro-runs\S-*-R1`・`S-*-Dn1`）と `compare_suites.py` で比べる | 1論理CPU | 約 45 分（記録：同じ条件の 70 回が約 1 時間 50 分） |
+| B | `tests/regression.cpp` の `reproducible` | 1論理CPU | 約 2 分（記録 97 秒） |
+| C | Windows の PGO のビルド 5 種（学習の実行：fforum-20-39 を level 60 で1スレッド、level 18 の自己対局 4 局） | 1論理CPU | 約 15〜30 分 |
+| D | 速さとメモリ（C 版と交互に、静かな時間に）：fforum-20-39 1スレッド・32スレッド、fforum-40-59 32スレッド、中盤 30 局面 level 18・21、suite F（deviate 系）、最大メモリ | 全CPU（静かなとき） | 約 1 時間 |
