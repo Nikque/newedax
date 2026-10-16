@@ -349,14 +349,18 @@ static void prior_weights(const Config *c, int ply, double *w0, char *cov)
 	}
 }
 
+// more room for the records of a data set (outside push, which is called for each record)
+static EVTOOL_NOINLINE void data_grow(Data *d)
+{
+	d->cap = grow(d->cap, 1 << 16);
+	d->r = (Rec *) xrealloc(d->r, d->cap * sizeof *d->r);
+	d->c = (float *) xrealloc(d->c, d->cap * sizeof *d->c);
+	d->t = (float *) xrealloc(d->t, d->cap * sizeof *d->t);
+}
+
 static void push(Data *d, const Rec *r, float c)
 {
-	if (d->n == d->cap) {
-		d->cap = grow(d->cap, 1 << 16);
-		d->r = (Rec *) xrealloc(d->r, d->cap * sizeof *d->r);
-		d->c = (float *) xrealloc(d->c, d->cap * sizeof *d->c);
-		d->t = (float *) xrealloc(d->t, d->cap * sizeof *d->t);
-	}
+	if (d->n == d->cap) data_grow(d);
 	d->r[d->n] = *r; d->c[d->n] = c; d->t[d->n] = r->v; ++d->n;
 }
 

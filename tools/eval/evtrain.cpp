@@ -30,14 +30,18 @@ struct Set {
 	float *y, *c;
 };
 
+// more room for the samples of a set (outside set_push, which is called for each sample)
+static EVTOOL_NOINLINE void set_grow(Set *s)
+{
+	s->cap = grow(s->cap, 1 << 20);
+	s->idx = (unsigned int *) xrealloc(s->idx, (size_t) s->cap * ET_NF * sizeof *s->idx);
+	s->y = (float *) xrealloc(s->y, (size_t) s->cap * sizeof *s->y);
+	s->c = (float *) xrealloc(s->c, (size_t) s->cap * sizeof *s->c);
+}
+
 static void set_push(Set *s, const Rec *r, float c)
 {
-	if (s->n == s->cap) {
-		s->cap = grow(s->cap, 1 << 20);
-		s->idx = (unsigned int *) xrealloc(s->idx, (size_t) s->cap * ET_NF * sizeof *s->idx);
-		s->y = (float *) xrealloc(s->y, (size_t) s->cap * sizeof *s->y);
-		s->c = (float *) xrealloc(s->c, (size_t) s->cap * sizeof *s->c);
-	}
+	if (s->n == s->cap) set_grow(s);
 	int f[ET_NF];
 	et_features(r->P, r->O, f);
 	for (int i = 0; i < ET_NF; ++i) s->idx[(size_t) s->n * ET_NF + i] = (unsigned int) f[i];

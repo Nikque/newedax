@@ -17,6 +17,12 @@
 #include <intrin.h>
 #endif
 
+#ifdef _MSC_VER
+	#define EVTOOL_NOINLINE __declspec(noinline)
+#else
+	#define EVTOOL_NOINLINE __attribute__((noinline))
+#endif
+
 namespace evtool {
 
 /** print a message to stderr and exit with 1 */
