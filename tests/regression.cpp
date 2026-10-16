@@ -23,7 +23,7 @@ static void core(int tasks){Search s;init_search(&s,tasks);unsigned long long ch
  printf("PASS core tasks=%d games=300 flip_checks=%llu symmetries=all8 exact_positions=%d empties=1..12 pass_events=%d\n",tasks,checks,exact,passes);search_free(&s);}
 int main(int argc,char **argv){if(argc<2)return 1;setbuf(stdout,NULL);bit_init();edge_stability_init();const char *t=argv[1];
  if(!strcmp(t,"bool")){bool b=false;options_read("book-usage","abcdef");printf("value=%d\n",b);}
- else if(!strcmp(t,"short")){Base b;base_init(&b);char *p=malloc(2);p[0]='x';p[1]=0;base_load(&b,p);free(p);base_free(&b);}
+ else if(!strcmp(t,"short")){Base b;base_init(&b);char *p=(char*)malloc(2);p[0]='x';p[1]=0;base_load(&b,p);free(p);base_free(&b);}
  else if(!strcmp(t,"ggf")){Game g;FILE *f=tmpfile();fputs("(;GM[Othello]PB[",f);for(int i=0;i<1000;++i)fputc('a',f);fputs("];)",f);rewind(f);game_import_ggf(&g,f);fclose(f);}
  else if(!strcmp(t,"edx")){Game g;Base b,c;remove("audit-roundtrip.edx");game_init(&g);g.move[0]=26;g.date.month=10;base_init(&b);base_init(&c);base_append(&b,&g);base_save(&b,"audit-roundtrip.edx");base_load(&c,"audit-roundtrip.edx");printf("EDX roundtrip expected_games=1 actual=%d expected_firstmove=26 actual=%d\n",c.n_games,c.n_games?c.game[0].move[0]:-1);if(c.n_games!=1||c.game[0].move[0]!=26)return 2;base_free(&b);base_free(&c);}
  else if(!strcmp(t,"savefail")){Book b={0};book_init(&b);int ok=book_save(&b,"audit-directory-does-not-exist/book.dat");book_free(&b);printf("BOOK save to missing directory accepted=%d\n",ok);if(ok)return 2;}
@@ -60,11 +60,11 @@ int main(int argc,char **argv){if(argc<2)return 1;setbuf(stdout,NULL);bit_init()
   Board after;board_next(&start,F5,&after);book_probe(&b,&after)->score.value=5;int stale_score=!position_links_current(&c,&b);position_free(&c);book_free(&b);
   printf("REPRODUCIBLE links check: fresh=%d new_position=%d relinked=%d new_score=%d\n",fresh,stale_new,relinked,stale_score);if(!fresh||!stale_new||!relinked||!stale_score)return 2;
   /* the same book with 4 threads (expansions applied in the order of the list) and with 1 (one after the other) */
-  options_read("book-reproducible","on");options.book_file="audit-repro.dat";
+  options_read("book-reproducible","on");options.book_file=(char*)"audit-repro.dat";
   const char *out[3]={"audit-repro-4a.dat","audit-repro-4b.dat","audit-repro-1.dat"};const int tasks[3]={4,4,1};unsigned char *bytes[3];long size[3];
   /* (a shallow book: positions down to 52 empties, 8 moves; with 36 empties the book grew to hundreds of MB) */
   for(int k=0;k<3;++k){options.n_task=tasks[k];book_new(&b,2,52);book_deviate(&b,&start,2,4);if(!book_save(&b,out[k]))return 2;printf("REPRODUCIBLE n_task=%d positions=%d\n",tasks[k],b.n_nodes);book_free(&b);
-   FILE *f=fopen(out[k],"rb");if(!f)return 2;fseek(f,0,SEEK_END);size[k]=ftell(f);rewind(f);bytes[k]=malloc(size[k]);if(fread(bytes[k],1,size[k],f)!=(size_t)size[k])return 2;fclose(f);remove(out[k]);}
+   FILE *f=fopen(out[k],"rb");if(!f)return 2;fseek(f,0,SEEK_END);size[k]=ftell(f);rewind(f);bytes[k]=(unsigned char*)malloc(size[k]);if(fread(bytes[k],1,size[k],f)!=(size_t)size[k])return 2;fclose(f);remove(out[k]);}
   remove("audit-repro.dat.dev");
   for(int k=1;k<3;++k){int same=size[k]==size[0]&&!memcmp(bytes[k],bytes[0],10)&&!memcmp(bytes[k]+18,bytes[0]+18,size[0]-18);
    printf("REPRODUCIBLE %s against %s: same except the date=%d (%ld, %ld bytes)\n",out[k],out[0],same,size[k],size[0]);if(!same)return 2;}
@@ -85,9 +85,9 @@ int main(int argc,char **argv){if(argc<2)return 1;setbuf(stdout,NULL);bit_init()
   /* the reference: one after the other */
   position_expand(book_probe(b+1,&x),b+1);position_expand(book_probe(b+1,&x0),b+1);
   /* the same expansions, applied in their order after being searched in the other order */
-  ExpandShared sh;memset(&sh,0,sizeof sh);sh.book=b;sh.action="Expand test";sh.tmp_file="audit-expandredo.tmp";sh.t=real_clock();sh.n_slot=4;sh.slot=calloc(4,sizeof *sh.slot);for(int i=0;i<4;++i)sh.slot[i].index=-1;
+  ExpandShared sh;memset(&sh,0,sizeof sh);sh.book=b;sh.action="Expand test";sh.tmp_file="audit-expandredo.tmp";sh.t=real_clock();sh.n_slot=4;sh.slot=(ExpandSlot*)calloc(4,sizeof *sh.slot);for(int i=0;i<4;++i)sh.slot[i].index=-1;
   lock_init(&sh);condition_init(&sh);
-  b[0].todo_list.item=malloc(2*sizeof *b[0].todo_list.item);b[0].todo_list.n=b[0].todo_list.size=2;b[0].todo_list.valid=true;
+  b[0].todo_list.item=(decltype(b[0].todo_list.item))malloc(2*sizeof *b[0].todo_list.item);b[0].todo_list.n=b[0].todo_list.size=2;b[0].todo_list.valid=true;
   b[0].todo_list.item[0]=position_key(b,book_probe(b,&x));b[0].todo_list.item[1]=position_key(b,book_probe(b,&x0));
   Search *search=book_search(b);ExpandSlot *e0=sh.slot,*e1=sh.slot+1;
   for(int i=0;i<2;++i){ExpandSlot *e=sh.slot+i;e->index=i;e->skip=false;e->ready=false;if(!book_expand_take(&sh,book_position(b,b[0].todo_list.item[i]),&e->parent,&e->child))return 2;}sh.next=2;
@@ -108,12 +108,12 @@ int main(int argc,char **argv){if(argc<2)return 1;setbuf(stdout,NULL);bit_init()
   puts("PASS expandredo: an expansion whose links changed is searched again, and the book is the one of position_expand");
  }
  else if(!strcmp(t,"analyze")){Search s;init_search(&s,1);Game g;game_init(&g);g.initial_board=late_board(4);printf("ANALYZE custom initial empty=%d moves=0\n",board_count_empties(&g.initial_board));fflush(stdout);game_analyze(&g,&s,4,false);search_free(&s);}
- else if(!strcmp(t,"enhance")){Search s;init_search(&s,1);Book b={0};b.search=&s;book_init(&b);b.options.level=0;b.options.n_empties=58;options.book_file="audit-enhance.dat";Board start;board_init(&start);book_add_board(&b,&start);book_enhance(&b,&start,64,64);printf("ENHANCE nodes_after=%d\n",b.n_nodes);book_clean(&b);position_negamax(book_probe(&b,&start),&b);book_clean(&b);position_enhance(book_probe(&b,&start),&b);int pending=0;Position *p;PositionArray *a;Book *bp=&b;foreach_position(p,a,bp)pending+=position_is_todo(p,bp);printf("ENHANCE pending_after_finished=%d\n",pending);book_free(&b);search_free(&s);}
+ else if(!strcmp(t,"enhance")){Search s;init_search(&s,1);Book b={0};b.search=&s;book_init(&b);b.options.level=0;b.options.n_empties=58;options.book_file=(char*)"audit-enhance.dat";Board start;board_init(&start);book_add_board(&b,&start);book_enhance(&b,&start,64,64);printf("ENHANCE nodes_after=%d\n",b.n_nodes);book_clean(&b);position_negamax(book_probe(&b,&start),&b);book_clean(&b);position_enhance(book_probe(&b,&start),&b);int pending=0;Position *p;PositionArray *a;Book *bp=&b;foreach_position(p,a,bp)pending+=position_is_todo(p,bp);printf("ENHANCE pending_after_finished=%d\n",pending);book_free(&b);search_free(&s);}
  else if(!strcmp(t,"core")){core(argc>2?atoi(argv[2]):1);}
  else if(!strcmp(t,"nboard")){Result result={0};result.n_nodes=1234;result.time=12345;nboard_observer(&result);}
  else if(!strcmp(t,"gtp")||!strcmp(t,"gtptime")||!strcmp(t,"gtpreg")||!strcmp(t,"xboard")){
- options.n_task=1;options.hash_table_size=10;options.verbosity=0;options.cpu_affinity=false;options.book_file="tests/merge-complete-fixture.dat";
- eval_open(eval_path());search_global_init();UI *ui=mm_malloc(sizeof *ui);memset(ui,0,sizeof *ui);event_init(&ui->event);
+ options.n_task=1;options.hash_table_size=10;options.verbosity=0;options.cpu_affinity=false;options.book_file=(char*)"tests/merge-complete-fixture.dat";
+ eval_open(eval_path());search_global_init();UI *ui=(UI*)mm_malloc(sizeof *ui);memset(ui,0,sizeof *ui);event_init(&ui->event);
  if(!strcmp(t,"xboard")){ui->type=UI_XBOARD;ui_init_xboard(ui);event_add_message(&ui->event,string_duplicate("level 0 5 1"));event_add_message(&ui->event,string_duplicate("quit"));ui_loop_xboard(ui);ui_free_xboard(ui);}
  else {ui->type=UI_GTP;ui_init_gtp(ui);if(!strcmp(t,"gtp")){event_add_message(&ui->event,string_duplicate("42 play white d3"));event_add_message(&ui->event,string_duplicate("7 name"));event_add_message(&ui->event,string_duplicate("name"));}
  else if(!strcmp(t,"gtpreg")){options.level=0;event_add_message(&ui->event,string_duplicate("reg_genmove black"));} else{ui->play->force.real[0].opponent=0x12345678;printf("GTP before forced_board=%llx\n",ui->play->force.real[0].opponent);event_add_message(&ui->event,string_duplicate("time_left banana 99 0"));}
@@ -127,12 +127,12 @@ int main(int argc,char **argv){if(argc<2)return 1;setbuf(stdout,NULL);bit_init()
  }
  else if(!strcmp(t,"pgnlong")){Game g;FILE *f=tmpfile();fputs("[Event \"audit\"]\n",f);for(int i=0;i<300;++i)fprintf(f,"%d. d3 c3 ",i+1);rewind(f);game_import_pgn(&g,f);fclose(f);}
  else if(!strcmp(t,"pgnfen")){Game g;Board want=late_board(12);char fen[128];FILE *f=tmpfile();fprintf(f,"[FEN \"%s\"]\n*\n",board_to_FEN(&want,BLACK,fen));rewind(f);game_import_pgn(&g,f);printf("PGN FEN expected_empty=%d actual_empty=%d\n",board_count_empties(&want),board_count_empties(&g.initial_board));fclose(f);}
- else if(!strcmp(t,"unsupported")){FILE *f=fopen("audit-sentinel.xyz","wb");fputs("KEEP THIS FILE",f);fclose(f);Play *p=mm_malloc(sizeof *p);memset(p,0,sizeof *p);board_init(&p->initial_board);p->initial_player=BLACK;play_save(p,"audit-sentinel.xyz");f=fopen("audit-sentinel.xyz","rb");fseek(f,0,SEEK_END);printf("UNSUPPORTED SAVE bytes_before=14 bytes_after=%ld\n",ftell(f));fclose(f);mm_free(p);}
+ else if(!strcmp(t,"unsupported")){FILE *f=fopen("audit-sentinel.xyz","wb");fputs("KEEP THIS FILE",f);fclose(f);Play *p=(Play*)mm_malloc(sizeof *p);memset(p,0,sizeof *p);board_init(&p->initial_board);p->initial_player=BLACK;play_save(p,"audit-sentinel.xyz");f=fopen("audit-sentinel.xyz","rb");fseek(f,0,SEEK_END);printf("UNSUPPORTED SAVE bytes_before=14 bytes_after=%ld\n",ftell(f));fclose(f);mm_free(p);}
  else if(!strcmp(t,"bookio")){Book b={0},c={0};FILE *f=fopen("audit-book-saved.dat","wb");fputs("KEEP",f);fclose(f);if(!book_load(&b,"tests/merge-complete-fixture.dat")||b.n_nodes!=2)return 2;if(!book_save(&b,"audit-book-saved.dat"))return 2;if(!book_load(&c,"audit-book-saved.dat")||c.n_nodes!=2)return 2;printf("BOOK save and reload nodes=%d\n",c.n_nodes);book_free(&b);book_free(&c);}
  else if(!strcmp(t,"truncated")){FILE *in=fopen("tests/merge-complete-fixture.dat","rb"),*out=fopen("audit-truncated.dat","wb");fseek(in,0,SEEK_END);long n=ftell(in);rewind(in);for(long i=0;i<n-1;++i)fputc(fgetc(in),out);fclose(in);fclose(out);Book b={0};int ok=book_load(&b,"audit-truncated.dat");printf("TRUNCATED accepted=%d nodes=%d original_expected=2\n",ok,b.n_nodes);book_free(&b);if(ok)return 2;}
- else if(!strcmp(t,"corruptstartup")){FILE *in=fopen("tests/merge-complete-fixture.dat","rb"),*out=fopen("audit-truncated.dat","wb");fseek(in,0,SEEK_END);long n=ftell(in);rewind(in);for(long i=0;i<n-1;++i)fputc(fgetc(in),out);fclose(in);fclose(out);options.n_task=1;options.hash_table_size=10;options.verbosity=0;options.cpu_affinity=false;options.book_file="audit-truncated.dat";eval_open(eval_path());search_global_init();UI *ui=mm_malloc(sizeof *ui);memset(ui,0,sizeof *ui);event_init(&ui->event);ui->type=UI_GTP;ui_init_gtp(ui);int safe=!ui->book.need_saving;ui_free_gtp(ui);event_free(&ui->event);mm_free(ui);in=fopen("audit-truncated.dat","rb");fseek(in,0,SEEK_END);long after=ftell(in);fclose(in);printf("CORRUPT STARTUP autosave_disabled=%d original_bytes=%ld after_bytes=%ld\n",safe,n-1,after);if(!safe||after!=n-1)return 2;}
+ else if(!strcmp(t,"corruptstartup")){FILE *in=fopen("tests/merge-complete-fixture.dat","rb"),*out=fopen("audit-truncated.dat","wb");fseek(in,0,SEEK_END);long n=ftell(in);rewind(in);for(long i=0;i<n-1;++i)fputc(fgetc(in),out);fclose(in);fclose(out);options.n_task=1;options.hash_table_size=10;options.verbosity=0;options.cpu_affinity=false;options.book_file=(char*)"audit-truncated.dat";eval_open(eval_path());search_global_init();UI *ui=(UI*)mm_malloc(sizeof *ui);memset(ui,0,sizeof *ui);event_init(&ui->event);ui->type=UI_GTP;ui_init_gtp(ui);int safe=!ui->book.need_saving;ui_free_gtp(ui);event_free(&ui->event);mm_free(ui);in=fopen("audit-truncated.dat","rb");fseek(in,0,SEEK_END);long after=ftell(in);fclose(in);printf("CORRUPT STARTUP autosave_disabled=%d original_bytes=%ld after_bytes=%ld\n",safe,n-1,after);if(!safe||after!=n-1)return 2;}
  else if(!strcmp(t,"ggsclock")){GGSClock c;char input[WORD_SIZE+1];memset(input,'1',WORD_SIZE);input[WORD_SIZE]=0;ggs_parse_clock(&c,input);}
- else if(!strcmp(t,"cassio")){options.n_task=1;options.hash_table_size=10;options.verbosity=0;options.cpu_affinity=false;eval_open(eval_path());search_global_init();Engine *e=calloc(1,sizeof *e);e->search=engine_create_search();for(int i=0;i<24;++i){Board b=late_board(3+i%7);char text[80];int want=ref_solve(b,-65,65);for(int repeat=0;repeat<2;++repeat){int got=engine_endgame_search(e,board_to_string(&b,BLACK,text),-64,64,100);if(got!=want){printf("FAIL Cassio expected=%d actual=%d\n",want,got);return 2;}}}engine_free(e->search);free(e);puts("PASS Cassio endgame API 24 positions x 2 repeated searches");}
+ else if(!strcmp(t,"cassio")){options.n_task=1;options.hash_table_size=10;options.verbosity=0;options.cpu_affinity=false;eval_open(eval_path());search_global_init();Engine *e=(Engine*)calloc(1,sizeof *e);e->search=engine_create_search();for(int i=0;i<24;++i){Board b=late_board(3+i%7);char text[80];int want=ref_solve(b,-65,65);for(int repeat=0;repeat<2;++repeat){int got=engine_endgame_search(e,board_to_string(&b,BLACK,text),-64,64,100);if(got!=want){printf("FAIL Cassio expected=%d actual=%d\n",want,got);return 2;}}}engine_free(e->search);free(e);puts("PASS Cassio endgame API 24 positions x 2 repeated searches");}
  else if(!strcmp(t,"events")){Event ev;event_init(&ev);int expected=0;for(int i=0;i<10000;++i){char b[32];sprintf(b,"%d",i);event_add_message(&ev,string_duplicate(b));if(i%3==0){char *s=event_peek_message(&ev);if(!s||atoi(s)!=expected++)return 2;free(s);}}char *s;while((s=event_peek_message(&ev))){if(atoi(s)!=expected++)return 2;free(s);}printf("PASS event FIFO %d messages with wrap and growth\n",expected);event_free(&ev);}
  else if(!strcmp(t,"missinglink")){Search s;init_search(&s,1);Book b={0};if(!book_load(&b,"tests/merge-complete-fixture.dat")||b.n_nodes!=2)return 2;b.search=&s;Position *root=book_root(&b),*child=NULL,*p;PositionArray *a;Book *bp=&b;foreach_position(p,a,bp)if(p!=root)child=p;if(!root||!child||root->n_link==0)return 2;{PositionArray *ca=b.array+(board_get_hash_code(&child->board)&(b.n-1));book_remove_at(&b,ca,(int)(child-ca->positions));}book_clean(&b);position_negamax(book_root(&b),&b);book_fix(&b);root=book_root(&b);printf("MISSING LINK nodes=%d root_links_after_fix=%d\n",b.n_nodes,root->n_link);if(b.n_nodes!=1||root->n_link!=0)return 2;book_free(&b);search_free(&s);}
  else if(!strcmp(t,"mergefile")){FILE *in=fopen("tests/merge-complete-fixture.dat","rb"),*out=fopen("audit-merge-truncated.dat","wb");fseek(in,0,SEEK_END);long n=ftell(in);rewind(in);for(long i=0;i<n-1;++i)fputc(fgetc(in),out);fclose(in);fclose(out);Book d={0};book_init(&d);int ok=book_merge_file(&d,"audit-merge-truncated.dat");printf("MERGE truncated_source accepted=%d destination_nodes=%d\n",ok,d.n_nodes);if(ok||d.n_nodes!=0)return 2;ok=book_merge_file(&d,"tests/merge-complete-fixture.dat");printf("MERGE complete_source accepted=%d destination_nodes=%d\n",ok,d.n_nodes);if(!ok||d.n_nodes!=2)return 2;book_free(&d);}
@@ -143,7 +143,7 @@ int main(int argc,char **argv){if(argc<2)return 1;setbuf(stdout,NULL);bit_init()
   b=late_board(40);position_init(&p);board_unique(&b,&p.board);p.level=1;if(book_add(&s,&p)<=0)return 2; /* a position out of reach from the root */
   if(!book_save(&s,"audit-merge-a.dat"))return 2;book_free(&s);
   book_init(&s);b=late_board(38);position_init(&p);board_unique(&b,&p.board);p.level=1;if(book_add(&s,&p)<=0)return 2;if(!book_save(&s,"audit-merge-one.dat"))return 2;book_free(&s);
-  f=fopen("audit-merge-one.dat","rb");if(f==NULL)return 2;fseek(f,0,SEEK_END);n=ftell(f);rewind(f);data=malloc(n);if(fread(data,1,n,f)!=(size_t)n)return 2;fclose(f);
+  f=fopen("audit-merge-one.dat","rb");if(f==NULL)return 2;fseek(f,0,SEEK_END);n=ftell(f);rewind(f);data=(unsigned char*)malloc(n);if(fread(data,1,n,f)!=(size_t)n)return 2;fclose(f);
   memcpy(data+38,&count,4);f=fopen("audit-merge-dup.dat","wb");fwrite(data,1,n,f);fwrite(data+42,1,n-42,f);fclose(f);free(data); /* the same position twice */
   book_init(&d);
   ok=book_merge_file(&d,"audit-merge-a.dat");printf("MERGE first accepted=%d nodes=%u\n",ok,d.n_nodes);if(!ok||d.n_nodes!=2)return 2;
@@ -166,7 +166,7 @@ int main(int argc,char **argv){if(argc<2)return 1;setbuf(stdout,NULL);bit_init()
   const char *ext[]={".txt",".pgn",".ggf",".sgf",".edx"};const char *line[]={"f5d6c3d3c4f4f6f3e6e7d7g6g5f7e8","f5f6e6f4e3c5c4","f5d6c5f4e3"};int ok=1;
   for(int e=0;e<5;++e){char name[32];Base b;Game g;FILE *f;long n;char *buf;sprintf(name,"audit-lastgame%s",ext[e]);remove(name);base_init(&b);
    for(int i=0;i<3;++i){game_init(&g);text_to_game(line[i],&g);base_append(&b,&g);}base_save(&b,name);base_free(&b);
-   f=fopen(name,"rb");fseek(f,0,SEEK_END);n=ftell(f);rewind(f);buf=malloc(n);if(fread(buf,1,n,f)!=(size_t)n)n=0;fclose(f);if(e<4)while(n>0&&(buf[n-1]=='\n'||buf[n-1]=='\r'))--n;
+   f=fopen(name,"rb");fseek(f,0,SEEK_END);n=ftell(f);rewind(f);buf=(char*)malloc(n);if(fread(buf,1,n,f)!=(size_t)n)n=0;fclose(f);if(e<4)while(n>0&&(buf[n-1]=='\n'||buf[n-1]=='\r'))--n;
    f=fopen(name,"wb");fwrite(buf,1,n,f);fclose(f);free(buf);base_init(&b);int loaded=base_load(&b,name);printf("BASE %s without the final end of line: loaded=%d games=%d (expected 3)\n",ext[e],loaded,b.n_games);
    if(!loaded||b.n_games!=3||b.game[2].move[4]!=g.move[4]){ok=0;}base_free(&b);remove(name);}
   if(!ok)return 2;}
@@ -209,13 +209,13 @@ int main(int argc,char **argv){if(argc<2)return 1;setbuf(stdout,NULL);bit_init()
   printf("WTHOR truncated file kept ok=%d\n",ok);remove("audit-trunc.wtb");remove("WTHOR.JOU");if(!ok)return 2;}
  else if(!strcmp(t,"cassiolist")){ /* v4.5.5-nikque.16: the list of the positions of Cassio keeps every position */
   options.n_task=1;options.hash_table_size=10;options.verbosity=0;options.cpu_affinity=false;eval_open(eval_path());search_global_init();
-  Engine *e=calloc(1,sizeof *e);Board b[3];int ok;e->search=engine_create_search();e->last_position.n=0;
+  Engine *e=(Engine*)calloc(1,sizeof *e);Board b[3];int ok;e->search=engine_create_search();e->last_position.n=0;
   for(int i=0;i<3;++i){b[i]=late_board(20+i);is_position_new(e,b+i);}
   ok=e->last_position.n==3&&board_equal(e->last_position.board,b+2)&&board_equal(e->last_position.board+1,b+1)&&board_equal(e->last_position.board+2,b);
   ok=ok&&!is_position_new(e,b);printf("CASSIO position list of 3 ok=%d\n",ok);engine_free(e->search);free(e);if(!ok)return 2;}
  else if(!strcmp(t,"parsers")){ /* v4.5.5-nikque.16: D:HH:MM:SS times, "P@" alone, option files that read themselves, mode */
   int ok=string_to_time("0:1:0:0")==3600000&&string_to_time("1:0:0:0")==86400000&&string_to_time("1:00:00")==3600000&&string_to_time("1:30")==90000&&string_to_time("2:03.5")==123500;
-  char *p=malloc(3);strcpy(p,"P@");ok=ok&&string_to_coordinate(p)==NOMOVE;free(p);p=malloc(2);strcpy(p,"@");ok=ok&&string_to_coordinate(p)==NOMOVE;free(p);
+  char *p=(char*)malloc(3);strcpy(p,"P@");ok=ok&&string_to_coordinate(p)==NOMOVE;free(p);p=(char*)malloc(2);strcpy(p,"@");ok=ok&&string_to_coordinate(p)==NOMOVE;free(p);
   ok=ok&&string_to_coordinate("P@d3")==D3&&string_to_coordinate("@@@@")==PASS;
   FILE *f=fopen("audit-loop.ini","w");fputs("option-file audit-loop.ini\nmode 9\n",f);fclose(f);options_parse("audit-loop.ini");options_bound();ok=ok&&options.mode==3;remove("audit-loop.ini");
   printf("PARSERS times, coordinates, option-file loop, mode ok=%d\n",ok);if(!ok)return 2;}
