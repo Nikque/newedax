@@ -13,6 +13,20 @@
 
 #include "core/bit.h"
 
+/**
+ * Feature slots: 48 (the 47 features of Edax 4.5, the default) or 64 (EVAL_SLOTS=64: 16 more features,
+ * slots 48 to 63, see eval_feature64.h). The features fill whole vectors: 3 or 4 of 256 bits.
+ */
+#ifndef EVAL_SLOTS
+	#define EVAL_SLOTS 48
+#endif
+#if EVAL_SLOTS != 48 && EVAL_SLOTS != 64
+	#error "EVAL_SLOTS is 48 or 64"
+#endif
+#if EVAL_SLOTS > 48 && !defined(hasSSE2) && !defined(__ARM_NEON) && !defined(VECTOR_EVAL_UPDATE)
+	#define VECTOR_EVAL_UPDATE	// (the update square by square of eval.cpp knows the 47 features of Edax 4.5 only)
+#endif
+
 /** number of features */
 enum { EVAL_N_FEATURE = 47 };
 
@@ -21,15 +35,15 @@ enum { EVAL_N_FEATURE = 47 };
  * @brief evaluation function
  */
 typedef union {
-	unsigned short us[48];
-	unsigned long long ull[12];	// SWAR
+	unsigned short us[EVAL_SLOTS];
+	unsigned long long ull[EVAL_SLOTS / 4];	// SWAR
 #ifdef __ARM_NEON
-	int16x8_t v8[6];
+	int16x8_t v8[EVAL_SLOTS / 8];
 #elif defined(hasSSE2) || defined(USE_MSVC_X86)
-	__m128i	v8[6];
+	__m128i	v8[EVAL_SLOTS / 8];
 #endif
 #ifdef __AVX2__
-	__m256i	v16[3];
+	__m256i	v16[EVAL_SLOTS / 16];
 #endif
 } EVAL_FEATURE_V;
 
@@ -38,7 +52,7 @@ extern const EVAL_FEATURE_V EVAL_FEATURE[65];
 extern const EVAL_FEATURE_V EVAL_FEATURE_all_opponent;
 
 typedef struct Eval {
-	EVAL_FEATURE_V feature;                       /**!< discs' features (96) */
+	EVAL_FEATURE_V feature;                       /**!< discs' features (96, or 128 with 64 slots) */
 	int n_empties;                                /**< number of empty squares (4) */
 	unsigned int parity;                          /**< parity (4) */
 } Eval;
@@ -57,6 +71,9 @@ typedef struct Eval_weight {
 	short	S101[59049][2];
 	short	S8x4[6561*4][2];
 	short	S7654[2187+729+243+81][2];
+#if EVAL_SLOTS > 48
+	short	X[4][59049][2];	// extra groups of 10 squares (slots 48-63, 4 places each)
+#endif
 } Eval_weight;
 
 /** number of plies */

@@ -37,33 +37,51 @@ static EDAX_FORCE_INLINE void eval_update_sse_parity(int x, unsigned long long f
 	__m256i	f0 = eval_in->feature.v16[0];
 	__m256i	f1 = eval_in->feature.v16[1];
 	__m256i	f2 = eval_in->feature.v16[2];
+  #if EVAL_SLOTS > 48
+	__m256i	f3 = eval_in->feature.v16[3];
+  #endif
 
 	if (parity) {
 		f0 = _mm256_sub_epi16(f0, EVAL_FEATURE[x].v16[0]);
 		f1 = _mm256_sub_epi16(f1, EVAL_FEATURE[x].v16[1]);
 		f2 = _mm256_sub_epi16(f2, EVAL_FEATURE[x].v16[2]);
+  #if EVAL_SLOTS > 48
+		f3 = _mm256_sub_epi16(f3, EVAL_FEATURE[x].v16[3]);
+  #endif
 
 		foreach_bit (x, f) {
 			f0 = _mm256_add_epi16(f0, EVAL_FEATURE[x].v16[0]);
 			f1 = _mm256_add_epi16(f1, EVAL_FEATURE[x].v16[1]);
 			f2 = _mm256_add_epi16(f2, EVAL_FEATURE[x].v16[2]);
+  #if EVAL_SLOTS > 48
+			f3 = _mm256_add_epi16(f3, EVAL_FEATURE[x].v16[3]);
+  #endif
 		}
 
 	} else {
 		f0 = _mm256_sub_epi16(f0, _mm256_slli_epi16(EVAL_FEATURE[x].v16[0], 1));
 		f1 = _mm256_sub_epi16(f1, _mm256_slli_epi16(EVAL_FEATURE[x].v16[1], 1));
 		f2 = _mm256_sub_epi16(f2, _mm256_slli_epi16(EVAL_FEATURE[x].v16[2], 1));
+  #if EVAL_SLOTS > 48
+		f3 = _mm256_sub_epi16(f3, _mm256_slli_epi16(EVAL_FEATURE[x].v16[3], 1));
+  #endif
 
 		foreach_bit (x, f) {
 			f0 = _mm256_sub_epi16(f0, EVAL_FEATURE[x].v16[0]);
 			f1 = _mm256_sub_epi16(f1, EVAL_FEATURE[x].v16[1]);
 			f2 = _mm256_sub_epi16(f2, EVAL_FEATURE[x].v16[2]);
+  #if EVAL_SLOTS > 48
+			f3 = _mm256_sub_epi16(f3, EVAL_FEATURE[x].v16[3]);
+  #endif
 		}
 	}
 
 	eval_out->feature.v16[0] = f0;
 	eval_out->feature.v16[1] = f1;
 	eval_out->feature.v16[2] = f2;
+  #if EVAL_SLOTS > 48
+	eval_out->feature.v16[3] = f3;
+  #endif
 
   #else
 	__m128i	f0 = eval_in->feature.v8[0];
@@ -72,6 +90,10 @@ static EDAX_FORCE_INLINE void eval_update_sse_parity(int x, unsigned long long f
 	__m128i	f3 = eval_in->feature.v8[3];
 	__m128i	f4 = eval_in->feature.v8[4];
 	__m128i	f5 = eval_in->feature.v8[5];
+  #if EVAL_SLOTS > 48
+	__m128i	f6 = eval_in->feature.v8[6];
+	__m128i	f7 = eval_in->feature.v8[7];
+  #endif
 
 	if (parity) {
 		f0 = _mm_sub_epi16(f0, EVAL_FEATURE[x].v8[0]);
@@ -80,6 +102,10 @@ static EDAX_FORCE_INLINE void eval_update_sse_parity(int x, unsigned long long f
 		f3 = _mm_sub_epi16(f3, EVAL_FEATURE[x].v8[3]);
 		f4 = _mm_sub_epi16(f4, EVAL_FEATURE[x].v8[4]);
 		f5 = _mm_sub_epi16(f5, EVAL_FEATURE[x].v8[5]);
+  #if EVAL_SLOTS > 48
+		f6 = _mm_sub_epi16(f6, EVAL_FEATURE[x].v8[6]);
+		f7 = _mm_sub_epi16(f7, EVAL_FEATURE[x].v8[7]);
+  #endif
 
 		foreach_bit (x, f) {
 			f0 = _mm_add_epi16(f0, EVAL_FEATURE[x].v8[0]);
@@ -88,6 +114,10 @@ static EDAX_FORCE_INLINE void eval_update_sse_parity(int x, unsigned long long f
 			f3 = _mm_add_epi16(f3, EVAL_FEATURE[x].v8[3]);
 			f4 = _mm_add_epi16(f4, EVAL_FEATURE[x].v8[4]);
 			f5 = _mm_add_epi16(f5, EVAL_FEATURE[x].v8[5]);
+  #if EVAL_SLOTS > 48
+			f6 = _mm_add_epi16(f6, EVAL_FEATURE[x].v8[6]);
+			f7 = _mm_add_epi16(f7, EVAL_FEATURE[x].v8[7]);
+  #endif
 		}
 
 	} else {
@@ -97,6 +127,10 @@ static EDAX_FORCE_INLINE void eval_update_sse_parity(int x, unsigned long long f
 		f3 = _mm_sub_epi16(f3, _mm_slli_epi16(EVAL_FEATURE[x].v8[3], 1));
 		f4 = _mm_sub_epi16(f4, _mm_slli_epi16(EVAL_FEATURE[x].v8[4], 1));
 		f5 = _mm_sub_epi16(f5, _mm_slli_epi16(EVAL_FEATURE[x].v8[5], 1));
+  #if EVAL_SLOTS > 48
+		f6 = _mm_sub_epi16(f6, _mm_slli_epi16(EVAL_FEATURE[x].v8[6], 1));
+		f7 = _mm_sub_epi16(f7, _mm_slli_epi16(EVAL_FEATURE[x].v8[7], 1));
+  #endif
 
 		foreach_bit (x, f) {
 			f0 = _mm_sub_epi16(f0, EVAL_FEATURE[x].v8[0]);
@@ -105,6 +139,10 @@ static EDAX_FORCE_INLINE void eval_update_sse_parity(int x, unsigned long long f
 			f3 = _mm_sub_epi16(f3, EVAL_FEATURE[x].v8[3]);
 			f4 = _mm_sub_epi16(f4, EVAL_FEATURE[x].v8[4]);
 			f5 = _mm_sub_epi16(f5, EVAL_FEATURE[x].v8[5]);
+  #if EVAL_SLOTS > 48
+			f6 = _mm_sub_epi16(f6, EVAL_FEATURE[x].v8[6]);
+			f7 = _mm_sub_epi16(f7, EVAL_FEATURE[x].v8[7]);
+  #endif
 		}
 	}
 
@@ -114,6 +152,10 @@ static EDAX_FORCE_INLINE void eval_update_sse_parity(int x, unsigned long long f
 	eval_out->feature.v8[3] = f3;
 	eval_out->feature.v8[4] = f4;
 	eval_out->feature.v8[5] = f5;
+  #if EVAL_SLOTS > 48
+	eval_out->feature.v8[6] = f6;
+	eval_out->feature.v8[7] = f7;
+  #endif
   #endif
 }
 
@@ -141,6 +183,10 @@ void eval_update_sse(int x, unsigned long long f, Eval *eval_out, const Eval *ev
 	__m128i	f3 = _mm_loadu_si128((const __m128i *) &eval_in->feature.us[24]);
 	__m128i	f4 = _mm_loadu_si128((const __m128i *) &eval_in->feature.us[32]);
 	__m128i	f5 = _mm_loadu_si128((const __m128i *) &eval_in->feature.us[40]);
+  #if EVAL_SLOTS > 48
+	__m128i	f6 = _mm_loadu_si128((const __m128i *) &eval_in->feature.us[48]);
+	__m128i	f7 = _mm_loadu_si128((const __m128i *) &eval_in->feature.us[56]);
+  #endif
 	#define	EVAL_FEATURE_SSE(x, i)	_mm_loadu_si128((const __m128i *) &EVAL_FEATURE[x].us[(i) * 8])
 
 	if (eval_in->n_empties & 1) {
@@ -150,6 +196,10 @@ void eval_update_sse(int x, unsigned long long f, Eval *eval_out, const Eval *ev
 		f3 = _mm_sub_epi16(f3, EVAL_FEATURE_SSE(x, 3));
 		f4 = _mm_sub_epi16(f4, EVAL_FEATURE_SSE(x, 4));
 		f5 = _mm_sub_epi16(f5, EVAL_FEATURE_SSE(x, 5));
+  #if EVAL_SLOTS > 48
+		f6 = _mm_sub_epi16(f6, EVAL_FEATURE_SSE(x, 6));
+		f7 = _mm_sub_epi16(f7, EVAL_FEATURE_SSE(x, 7));
+  #endif
 
 		foreach_bit (x, f) {
 			f0 = _mm_add_epi16(f0, EVAL_FEATURE_SSE(x, 0));
@@ -158,6 +208,10 @@ void eval_update_sse(int x, unsigned long long f, Eval *eval_out, const Eval *ev
 			f3 = _mm_add_epi16(f3, EVAL_FEATURE_SSE(x, 3));
 			f4 = _mm_add_epi16(f4, EVAL_FEATURE_SSE(x, 4));
 			f5 = _mm_add_epi16(f5, EVAL_FEATURE_SSE(x, 5));
+  #if EVAL_SLOTS > 48
+			f6 = _mm_add_epi16(f6, EVAL_FEATURE_SSE(x, 6));
+			f7 = _mm_add_epi16(f7, EVAL_FEATURE_SSE(x, 7));
+  #endif
 		}
 
 	} else {
@@ -167,6 +221,10 @@ void eval_update_sse(int x, unsigned long long f, Eval *eval_out, const Eval *ev
 		f3 = _mm_sub_epi16(f3, _mm_slli_epi16(EVAL_FEATURE_SSE(x, 3), 1));
 		f4 = _mm_sub_epi16(f4, _mm_slli_epi16(EVAL_FEATURE_SSE(x, 4), 1));
 		f5 = _mm_sub_epi16(f5, _mm_slli_epi16(EVAL_FEATURE_SSE(x, 5), 1));
+  #if EVAL_SLOTS > 48
+		f6 = _mm_sub_epi16(f6, _mm_slli_epi16(EVAL_FEATURE_SSE(x, 6), 1));
+		f7 = _mm_sub_epi16(f7, _mm_slli_epi16(EVAL_FEATURE_SSE(x, 7), 1));
+  #endif
 
 		foreach_bit (x, f) {
 			f0 = _mm_sub_epi16(f0, EVAL_FEATURE_SSE(x, 0));
@@ -175,6 +233,10 @@ void eval_update_sse(int x, unsigned long long f, Eval *eval_out, const Eval *ev
 			f3 = _mm_sub_epi16(f3, EVAL_FEATURE_SSE(x, 3));
 			f4 = _mm_sub_epi16(f4, EVAL_FEATURE_SSE(x, 4));
 			f5 = _mm_sub_epi16(f5, EVAL_FEATURE_SSE(x, 5));
+  #if EVAL_SLOTS > 48
+			f6 = _mm_sub_epi16(f6, EVAL_FEATURE_SSE(x, 6));
+			f7 = _mm_sub_epi16(f7, EVAL_FEATURE_SSE(x, 7));
+  #endif
 		}
 	}
 	#undef	EVAL_FEATURE_SSE
@@ -185,6 +247,10 @@ void eval_update_sse(int x, unsigned long long f, Eval *eval_out, const Eval *ev
 	_mm_storeu_si128((__m128i *) &eval_out->feature.us[24], f3);
 	_mm_storeu_si128((__m128i *) &eval_out->feature.us[32], f4);
 	_mm_storeu_si128((__m128i *) &eval_out->feature.us[40], f5);
+  #if EVAL_SLOTS > 48
+	_mm_storeu_si128((__m128i *) &eval_out->feature.us[48], f6);
+	_mm_storeu_si128((__m128i *) &eval_out->feature.us[56], f7);
+  #endif
 }
 
 #endif // hasSSE2
@@ -205,11 +271,17 @@ void eval_set(Eval *eval, const Board *board)
 	__m256i	f0 = EVAL_FEATURE_all_opponent.v16[0];
 	__m256i	f1 = EVAL_FEATURE_all_opponent.v16[1];
 	__m256i	f2 = EVAL_FEATURE_all_opponent.v16[2];
+  #if EVAL_SLOTS > 48
+	__m256i	f3 = EVAL_FEATURE_all_opponent.v16[3];
+  #endif
 
 	foreach_bit (x, b) {
 		f0 = _mm256_sub_epi16(f0, EVAL_FEATURE[x].v16[0]);
 		f1 = _mm256_sub_epi16(f1, EVAL_FEATURE[x].v16[1]);
 		f2 = _mm256_sub_epi16(f2, EVAL_FEATURE[x].v16[2]);
+  #if EVAL_SLOTS > 48
+		f3 = _mm256_sub_epi16(f3, EVAL_FEATURE[x].v16[3]);
+  #endif
 	}
 
 	b = ~(board->opponent | board->player);
@@ -217,10 +289,16 @@ void eval_set(Eval *eval, const Board *board)
 		f0 = _mm256_add_epi16(f0, EVAL_FEATURE[x].v16[0]);
 		f1 = _mm256_add_epi16(f1, EVAL_FEATURE[x].v16[1]);
 		f2 = _mm256_add_epi16(f2, EVAL_FEATURE[x].v16[2]);
+  #if EVAL_SLOTS > 48
+		f3 = _mm256_add_epi16(f3, EVAL_FEATURE[x].v16[3]);
+  #endif
 	}
 	eval->feature.v16[0] = f0;
 	eval->feature.v16[1] = f1;
 	eval->feature.v16[2] = f2;
+  #if EVAL_SLOTS > 48
+	eval->feature.v16[3] = f3;
+  #endif
 
   #else
 	__m128i	f0 = EVAL_FEATURE_all_opponent.v8[0];
@@ -229,6 +307,10 @@ void eval_set(Eval *eval, const Board *board)
 	__m128i	f3 = EVAL_FEATURE_all_opponent.v8[3];
 	__m128i	f4 = EVAL_FEATURE_all_opponent.v8[4];
 	__m128i	f5 = EVAL_FEATURE_all_opponent.v8[5];
+  #if EVAL_SLOTS > 48
+	__m128i	f6 = EVAL_FEATURE_all_opponent.v8[6];
+	__m128i	f7 = EVAL_FEATURE_all_opponent.v8[7];
+  #endif
 
 	foreach_bit (x, b) {
 		f0 = _mm_sub_epi16(f0, EVAL_FEATURE[x].v8[0]);
@@ -237,6 +319,10 @@ void eval_set(Eval *eval, const Board *board)
 		f3 = _mm_sub_epi16(f3, EVAL_FEATURE[x].v8[3]);
 		f4 = _mm_sub_epi16(f4, EVAL_FEATURE[x].v8[4]);
 		f5 = _mm_sub_epi16(f5, EVAL_FEATURE[x].v8[5]);
+  #if EVAL_SLOTS > 48
+		f6 = _mm_sub_epi16(f6, EVAL_FEATURE[x].v8[6]);
+		f7 = _mm_sub_epi16(f7, EVAL_FEATURE[x].v8[7]);
+  #endif
 	}
 
 	b = ~(board->opponent | board->player);
@@ -247,6 +333,10 @@ void eval_set(Eval *eval, const Board *board)
 		f3 = _mm_add_epi16(f3, EVAL_FEATURE[x].v8[3]);
 		f4 = _mm_add_epi16(f4, EVAL_FEATURE[x].v8[4]);
 		f5 = _mm_add_epi16(f5, EVAL_FEATURE[x].v8[5]);
+  #if EVAL_SLOTS > 48
+		f6 = _mm_add_epi16(f6, EVAL_FEATURE[x].v8[6]);
+		f7 = _mm_add_epi16(f7, EVAL_FEATURE[x].v8[7]);
+  #endif
 	}
 
 	eval->feature.v8[0] = f0;
@@ -255,6 +345,10 @@ void eval_set(Eval *eval, const Board *board)
 	eval->feature.v8[3] = f3;
 	eval->feature.v8[4] = f4;
 	eval->feature.v8[5] = f5;
+  #if EVAL_SLOTS > 48
+	eval->feature.v8[6] = f6;
+	eval->feature.v8[7] = f7;
+  #endif
   #endif
 }
 

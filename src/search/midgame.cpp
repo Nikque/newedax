@@ -90,6 +90,14 @@ static int accumlate_eval(int ply, Eval *eval)
 	FF = _mm512_add_epi32(_mm512_cvtepu16_epi32(eval->feature.v16[2]), _mm512_set1_epi32(W_S7));
 	DD = _mm512_mask_i32gather_epi32(_mm512_setzero_si512(), 0x3fff, FF, (const int *) w, 4);
 	SS = _mm512_add_epi32(SS, _mm512_srai_epi32(_mm512_sll_epi32(DD, SW), 16));
+  #if EVAL_SLOTS > 48
+	enum { W_X = offsetof(Eval_weight, X) / 4, W_N = 59049 };
+	FF = _mm512_add_epi32(_mm512_cvtepu16_epi32(eval->feature.v16[3]), _mm512_set_epi32(
+		W_X + 3 * W_N, W_X + 3 * W_N, W_X + 3 * W_N, W_X + 3 * W_N, W_X + 2 * W_N, W_X + 2 * W_N, W_X + 2 * W_N, W_X + 2 * W_N,
+		W_X + W_N, W_X + W_N, W_X + W_N, W_X + W_N, W_X, W_X, W_X, W_X));
+	DD = _mm512_i32gather_epi32(FF, (const int *) w, 4);
+	SS = _mm512_add_epi32(SS, _mm512_srai_epi32(_mm512_sll_epi32(DD, SW), 16));
+  #endif
 	sum = _mm512_reduce_add_epi32(SS);
 	w = (Eval_weight *)(w->S0 + b0);
 	return sum + *(w->S0);
@@ -121,6 +129,17 @@ static int accumlate_eval(int ply, Eval *eval)
 
 	DD = _mm256_i32gather_epi32((int *) w->S7654, _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i *) &eval->feature.us[38])), 4);
 	SS = _mm256_add_epi32(SS, _mm256_srai_epi32(_mm256_sll_epi32(DD, SW), 16));
+  #if EVAL_SLOTS > 48
+	enum { W_X = offsetof(Eval_weight, X) / 4, W_N = 59049 };
+	FF = _mm256_add_epi32(_mm256_cvtepu16_epi32(eval->feature.v8[6]),
+		_mm256_set_epi32(W_X + W_N, W_X + W_N, W_X + W_N, W_X + W_N, W_X, W_X, W_X, W_X));
+	DD = _mm256_i32gather_epi32((int *) w, FF, 4);
+	SS = _mm256_add_epi32(SS, _mm256_srai_epi32(_mm256_sll_epi32(DD, SW), 16));
+	FF = _mm256_add_epi32(_mm256_cvtepu16_epi32(eval->feature.v8[7]),
+		_mm256_set_epi32(W_X + 3 * W_N, W_X + 3 * W_N, W_X + 3 * W_N, W_X + 3 * W_N, W_X + 2 * W_N, W_X + 2 * W_N, W_X + 2 * W_N, W_X + 2 * W_N));
+	DD = _mm256_i32gather_epi32((int *) w, FF, 4);
+	SS = _mm256_add_epi32(SS, _mm256_srai_epi32(_mm256_sll_epi32(DD, SW), 16));
+  #endif
 	__m128i S = _mm_add_epi32(_mm256_castsi256_si128(SS), _mm256_extracti128_si256(SS, 1));
 
 	__m128i D = _mm_i32gather_epi32((int *) w->S8x4, _mm_cvtepu16_epi32(eval->feature.v8[3]), 4);
@@ -143,6 +162,12 @@ static int accumlate_eval(int ply, Eval *eval)
 	  + *(w->S7654[f[34]]) + *(w->S7654[f[35]]) + *(w->S7654[f[36]]) + *(w->S7654[f[37]])
 	  + *(w->S7654[f[38]]) + *(w->S7654[f[39]]) + *(w->S7654[f[40]]) + *(w->S7654[f[41]])
 	  + *(w->S7654[f[42]]) + *(w->S7654[f[43]]) + *(w->S7654[f[44]]) + *(w->S7654[f[45]]);
+  #if EVAL_SLOTS > 48
+	sum += *(w->X[0][f[48]]) + *(w->X[0][f[49]]) + *(w->X[0][f[50]]) + *(w->X[0][f[51]])
+	  + *(w->X[1][f[52]]) + *(w->X[1][f[53]]) + *(w->X[1][f[54]]) + *(w->X[1][f[55]])
+	  + *(w->X[2][f[56]]) + *(w->X[2][f[57]]) + *(w->X[2][f[58]]) + *(w->X[2][f[59]])
+	  + *(w->X[3][f[60]]) + *(w->X[3][f[61]]) + *(w->X[3][f[62]]) + *(w->X[3][f[63]]);
+  #endif
 #endif
 	return sum + *(w->S8x4[f[28]]) + *(w->S8x4[f[29]]) + *(w->S0);
 }
