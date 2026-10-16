@@ -418,16 +418,21 @@ static void apply_base(int pi, int ply)
 	free(bn); free(bo); free(bs); free(w);
 }
 
+// the teacher's evaluation of a position: the 46 features, and the mobility weights of eval2 (outside the loops that call it)
+static EVTOOL_NOINLINE double teacher_value(uint64_t P, uint64_t O)
+{
+	int idx[ET_NF];
+	et_features(P, O, idx);
+	return (et_sum(teacher->w[et_ply(64 - popc(P | O))], idx) + (teacher->has_mob ? et_mob(teacher, P, O) : 0)) / 128.0;
+}
+
 static void apply_teacher(Data *d)
 {
 	int k;
 	if (!teacher || alpha >= 1.0) return;
 	#pragma omp parallel for schedule(static)
 	for (k = 0; k < d->n; ++k) {
-		int idx[ET_NF];
-		const uint64_t P = d->r[k].P, O = d->r[k].O;
-		et_features(P, O, idx);
-		const double te = (et_sum(teacher->w[et_ply(64 - popc(P | O))], idx) + (teacher->has_mob ? et_mob(teacher, P, O) : 0)) / 128.0;
+		const double te = teacher_value(d->r[k].P, d->r[k].O);
 		d->t[k] = (float) (alpha * d->r[k].v + (1.0 - alpha) * te);
 	}
 }
@@ -575,9 +580,7 @@ static void run_config(const Config *c, int pi, double *mse)
 			for (int j = 0; j < nf; ++j) pr += w[f[j]];
 			se += (pr - T->r[k].v) * (pr - T->r[k].v);
 			if (teacher) {	// distance to the teacher's evaluation
-				int idx2[ET_NF];
-				et_features(T->r[k].P, T->r[k].O, idx2);
-				const double te = (et_sum(teacher->w[et_ply(64 - popc(T->r[k].P | T->r[k].O))], idx2) + (teacher->has_mob ? et_mob(teacher, T->r[k].P, T->r[k].O) : 0)) / 128.0;
+				const double te = teacher_value(T->r[k].P, T->r[k].O);
 				st += (pr - te) * (pr - te);
 			}
 		}
