@@ -37,3 +37,11 @@ From a native Visual Studio 2022 x86 Developer Command Prompt, run
 MSVC's x86 optimization of the inlined CRC hash could corrupt a later AVX2
 legal-move calculation, causing wrong scores or repeated passes until stack
 overflow. The `core` case compares 96 exact searches with an independent solver.
+
+`tests/boost_check.cpp` checks that the Boost headers used by new edax build with
+the options of Edax (C++23, no exceptions, no RTTI). It is not part of Edax. The
+build files look for Boost in `third_party/boost_1_92_0` next to the repository
+(`BOOST_DIR` changes it). With MSVC:
+`cl /std:c++23preview /EHs-c- /D _HAS_EXCEPTIONS=0 /GR- /O2 /I <boost> tests\boost_check.cpp`,
+then run `boost_check.exe` (exit code 0). With gcc or clang:
+`g++ -std=c++23 -fno-exceptions -fno-rtti -O2 -I <boost> tests/boost_check.cpp`.

@@ -44,9 +44,12 @@ ifeq ($(CC),clang)
 endif
 
 
+# Boost (headers only): third_party/boost_1_92_0 next to the repository, or BOOST_DIR=<directory>
+BOOST_DIR ?= ../../third_party/boost_1_92_0
+
 # gcc 4.x (x >= 7)
 ifeq ($(COMP),gcc)
-	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -pedantic -W -Wall -Wextra -pipe -D_GNU_SOURCE=1 -DUNICODE
+	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -isystem $(BOOST_DIR) -pedantic -W -Wall -Wextra -pipe -D_GNU_SOURCE=1 -DUNICODE
 	PGO_GEN = -fprofile-generate
 	PGO_USE = -fprofile-correction -fprofile-use
 
@@ -139,7 +142,7 @@ endif
 
 #icc
 ifeq ($(COMP),icc)
-	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -Wall -Wcheck -wd2259 -D_GNU_SOURCE=1 -DUNICODE -Qoption,cpp,--unicode_source_kind,"UTF-8"
+	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -isystem $(BOOST_DIR) -Wall -Wcheck -wd2259 -D_GNU_SOURCE=1 -DUNICODE -Qoption,cpp,--unicode_source_kind,"UTF-8"
 	PGO_GEN = -prof_gen
 	PGO_USE = -prof_use -wd11505
 
@@ -171,7 +174,7 @@ endif
 
 #clang
 ifeq ($(COMP),clang)
-	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -pedantic -W -Wall -D_GNU_SOURCE=1 -DUNICODE
+	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -isystem $(BOOST_DIR) -pedantic -W -Wall -D_GNU_SOURCE=1 -DUNICODE
 	PGO_GEN = -fprofile-instr-generate
 	PGO_USE = -fprofile-instr-use=edax.profdata
 	PGO = llvm-profdata merge -output=edax.profdata $(BIN)/*.profraw
