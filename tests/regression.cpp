@@ -22,6 +22,9 @@ static void core(int tasks){Search s;init_search(&s,tasks);unsigned long long ch
  for(int i=0;i<96;++i){Board b=late_board(1+i%12);int want=ref_solve(b,-65,65);search_cleanup(&s);search_set_board(&s,&b,BLACK);search_set_level(&s,60,board_count_empties(&b));search_run(&s);if(s.result->score!=want){printf("FAIL exact tasks=%d empty=%d expected=%d actual=%d\n",tasks,board_count_empties(&b),want,s.result->score);exit(2);}++exact;}
  printf("PASS core tasks=%d games=300 flip_checks=%llu symmetries=all8 exact_positions=%d empties=1..12 pass_events=%d\n",tasks,checks,exact,passes);search_free(&s);}
 int main(int argc,char **argv){if(argc<2)return 1;setbuf(stdout,NULL);bit_init();edge_stability_init();const char *t=argv[1];
+#if !defined(hasSSE2) && (defined(USE_GAS_X86) || defined(USE_MSVC_X86))
+ if(getenv("EDAX_NO_SSE2")){hasSSE2=false;puts("(EDAX_NO_SSE2: the code for processors without SSE2)");} /* x86 builds that choose SSE2 at run time */
+#endif
  if(!strcmp(t,"bool")){bool b=false;options_read("book-usage","abcdef");printf("value=%d\n",b);}
  else if(!strcmp(t,"short")){Base b;base_init(&b);char *p=(char*)malloc(2);p[0]='x';p[1]=0;base_load(&b,p);free(p);base_free(&b);}
  else if(!strcmp(t,"ggf")){Game g;FILE *f=tmpfile();fputs("(;GM[Othello]PB[",f);for(int i=0;i<1000;++i)fputc('a',f);fputs("];)",f);rewind(f);game_import_ggf(&g,f);fclose(f);}
@@ -253,6 +256,37 @@ Board pb=b;if(e.n_empties&1){pb.player=b.opponent;pb.opponent=b.player;}for(int 
   unsigned char buffer[300];int bad=0;unsigned int check=crc32c_bytes(0,"123456789",9);if(check!=0xE3069283u)++bad;
   for(int i=0;i<2000;++i){size_t n=rr()%257,o=rr()%8,m=n?rr()%(n+1):0;for(size_t k=0;k<n;++k)buffer[o+k]=(unsigned char)rr();unsigned int want=reference(buffer+o,n);if(crc32c_bytes(0,buffer+o,n)!=want||crc32c_bytes(crc32c_bytes(0,buffer+o,m),buffer+o+m,n-m)!=want)++bad;}
   printf("CRC32C check value %08x (e3069283 expected), 2000 buffers against the bit by bit reference, differences=%d\n",check,bad);if(bad)return 2;}
+ else if(!strcmp(t,"bookread")){ /* a book of 80,068 positions with random values (counts of 1 to 5 bytes in form 2, some in the table), saved in form 1 and in form 2, is read back the same (the records read in the buffer, and the last ones across its end) */
+  Book b={0},*bp=&b;Position *p;PositionArray *a;book_init(&b);options.verbosity=0;
+  {Position q;Board ib;position_init(&q);board_init(&ib);board_unique(&ib,&q.board);if(book_add(&b,&q)<=0)return 2;}
+  int n_cur=1,n_next;Board *cur=(Board*)malloc(sizeof(Board)),*next;board_init(cur);
+  for(int ply=1;ply<=8;++ply){next=(Board*)malloc((size_t)n_cur*MAX_MOVE*sizeof(Board));n_next=0;
+   for(int i=0;i<n_cur;++i){unsigned long long m=board_get_moves(cur+i);int x;foreach_bit(x,m){Board nb,u;board_next(cur+i,x,&nb);board_unique(&nb,&u);if(book_probe(&b,&u))continue;Position q;position_init(&q);q.board=u;if(book_add(&b,&q)<=0)return 2;next[n_next++]=u;}}
+   free(cur);cur=next;n_cur=n_next;}
+  free(cur);
+  auto rnd_count=[](){unsigned r=rr()%100;return r<70?rr()%128:r<85?rr()%16384:r<95?rr()%65534:r<98?65534+rr()%100000:rr();};
+  foreach_position(p,a,bp){p->level=(unsigned char)(rr()%61);p->score.value=(signed char)(rr()%129-64);p->score.lower=(signed char)(p->score.value-rr()%3);p->score.upper=(signed char)(p->score.value+rr()%3);
+   unsigned long long m=board_get_moves(&p->board);if(m&&rr()%2){p->leaf.move=(unsigned char)first_bit(m);p->leaf.score=(signed char)(rr()%129-64);}unsigned int c[4]={rnd_count(),rnd_count(),rnd_count(),rnd_count()};position_set_counts_n(p,&b,c);}
+  foreach_position(p,a,bp)position_link(p,&b);
+  int bad=0;unsigned int table=b.counts?(unsigned int)b.counts->map.size():0;
+  for(int form=1;form<=4;++form){Book c={0};options.book_format=form>2?form-2:form;const char *f=form==1?"audit-read-1.dat":form==2?"audit-read-2.dat":form==3?"audit-read-3.dat":"audit-read-4.dat";
+   if(form==3){int n0=b.n;book_grow_buckets(&b,(long long)b.n*64);if(b.n<=n0)return 2;} /* 3, 4: saved in the order of more buckets than a load makes */
+   if(!book_save(&b,f)||!book_load(&c,f)||c.n_nodes!=b.n_nodes||c.file_format!=options.book_format||(form>2&&c.n>=b.n))return 2;
+   foreach_position(p,a,bp){Position *q=book_probe(&c,&p->board);unsigned int n1[4],n2[4];if(!q){++bad;continue;}position_get_counts_n(p,&b,n1);position_get_counts_n(q,&c,n2);
+    if(memcmp(n1,n2,16)||q->n_link!=p->n_link||memcmp(position_links(q),position_links(p),2*p->n_link)||q->leaf.move!=p->leaf.move||q->leaf.score!=p->leaf.score||q->level!=p->level||q->score.value!=p->score.value||q->score.lower!=p->score.lower||q->score.upper!=p->score.upper)++bad;}
+   if(form>2){ /* the positions of a bucket keep the order of the file */
+    boost::unordered_flat_map<BookCountsKey,unsigned int,BookCountsHash> order;unsigned int k=0;foreach_position(p,a,bp)order[BookCountsKey{p->board.player,p->board.opponent}]=k++;
+    Book *cp=&c;for(a=cp->array;a<cp->array+cp->n;++a)for(int i=1;i<a->n;++i)if(order[BookCountsKey{a->positions[i-1].board.player,a->positions[i-1].board.opponent}]>order[BookCountsKey{a->positions[i].board.player,a->positions[i].board.opponent}])++bad;}
+   book_free(&c);}
+  options.book_format=0;
+  for(int k=0;k<3;++k){ /* in another bucket order too, a damaged file is not loaded: one byte less (form 1), one bit changed (form 2), the first position twice (form 1) */
+   FILE *f=fopen(k==1?"audit-read-4.dat":"audit-read-3.dat","rb");fseek(f,0,SEEK_END);long n=ftell(f);rewind(f);unsigned char *d=(unsigned char*)malloc(n);if(fread(d,1,n,f)!=(size_t)n)return 2;fclose(f);
+   if(k==1)d[n/2]^=4;f=fopen("audit-read-bad.dat","wb");
+   if(k==2){unsigned int count;memcpy(&count,d+38,4);++count;memcpy(d+38,&count,4);fwrite(d,1,n,f);fwrite(d+42,1,40+2*(d[42+38]+1),f);}else fwrite(d,1,k?n:n-1,f);
+   fclose(f);free(d);Book c={0};if(book_load(&c,"audit-read-bad.dat"))++bad;book_free(&c);}
+  {FILE *f=fopen("audit-read-1.dat","rb");fseek(f,0,SEEK_END);long size=ftell(f);fclose(f);
+   printf("BOOKREAD positions=%u counts_in_table=%u form1_bytes=%ld differences=%d (forms 1 and 2, saved in the bucket order of the load and of 4 times more buckets)\n",b.n_nodes,table,size,bad);}
+  book_free(&b);if(bad||table==0)return 2;}
  else if(!strcmp(t,"bigcounts")){ /* game counts above 65534 (kept in the table of the book): the negamax with threads gives the counts of one thread, positions going in and out of the table; the table keeps an entry for each position whose counts are in it, and for no other board (book fix, book subtree) */
   Search s;init_search(&s,1);Book b={0},*bp=&b;Position *p,*root;PositionArray *a;book_init(&b);b.search=&s;b.options.level=1;b.options.n_empties=40;
   {Position q;Board ib;position_init(&q);board_init(&ib);board_unique(&ib,&q.board);q.level=1;if(book_add(&b,&q)<=0)return 2;} /* every position up to ply 8 (unique boards) */

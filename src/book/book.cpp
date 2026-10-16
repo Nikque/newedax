@@ -713,14 +713,21 @@ static void book_stream_reset(BookStream *s)
 	s->crc_on = false;
 }
 
-/** @return true if the moves and the level read from a book file can be those of a position. */
-static bool position_read_is_sound(const int n_link, const Link *links, const Link *leaf, const int level)
+/**
+ * @brief Tell if the moves and the level read from a book file can be those of a position.
+ * @param n_link Number of links.
+ * @param links Links as they are in the file (score and move bytes).
+ * @param leaf_move Move of the leaf.
+ * @param level Level.
+ * @return true if they can.
+ */
+static bool position_read_is_sound(const int n_link, const unsigned char *links, const int leaf_move, const int level)
 {
 	int i;
 
-	if (level > 60 || n_link + (leaf->move != NOMOVE) > MAX_MOVE) return false;
-	for (i = 0; i < n_link; ++i) if (links[i].move > PASS) return false;
-	return leaf->move <= NOMOVE;
+	if (level > 60 || n_link + (leaf_move != NOMOVE) > MAX_MOVE) return false;
+	for (i = 0; i < n_link; ++i) if (links[2 * i + 1] > PASS) return false;
+	return leaf_move <= NOMOVE;
 }
 
 /**
@@ -733,10 +740,20 @@ static bool position_read_is_sound(const int n_link, const Link *links, const Li
  */
 static bool position_read(Position *position, BookStream *s, Book *book)
 {
-	unsigned char h[POSITION_FIXED_SIZE];
-	Link links[256];
+	unsigned char record[POSITION_FIXED_SIZE + sizeof (Link) * 256]; // the largest record: 255 links and the leaf
+	const unsigned char *h;
+	int n_link;
 
-	if (!book_stream_read(s, h, sizeof h)) return false;
+	if (s->n - s->pos >= sizeof record) { // the whole record is in the buffer: it is read there
+		h = s->buffer + s->pos;
+		n_link = h[38];
+		s->pos += POSITION_FIXED_SIZE + sizeof (Link) * (n_link + 1);
+	} else {
+		if (!book_stream_read(s, record, POSITION_FIXED_SIZE)) return false;
+		n_link = record[38];
+		if (!book_stream_read(s, record + POSITION_FIXED_SIZE, sizeof (Link) * (n_link + 1))) return false;
+		h = record;
+	}
 	memcpy(&position->board.player, h, 8);
 	memcpy(&position->board.opponent, h + 8, 8);
 	position->count[0] = position->count[1] = position->count[2] = position->count[3] = 0;
@@ -758,15 +775,14 @@ static bool position_read(Position *position, BookStream *s, Book *book)
 
 	position->state = 0;
 
-	if (!book_stream_read(s, links, sizeof (Link) * h[38])) return false;
-	if (!book_stream_read(s, &position->leaf, sizeof (Link))) return false;
+	memcpy(&position->leaf, h + POSITION_FIXED_SIZE + sizeof (Link) * n_link, sizeof (Link));
 	// a damaged file (or one of another tool): more moves than a position has, a level above 60 (an index of
 	// LEVEL[][]), a move that is no square: the book is not loaded (the lists of moves and the tables would be
 	// read or written out of bounds)
-	if (!position_read_is_sound(h[38], links, &position->leaf, position->level)) return false;
+	if (!position_read_is_sound(n_link, h + POSITION_FIXED_SIZE, position->leaf.move, position->level)) return false;
 
 	position->n_link = 0;
-	if (!position_set_links(position, links, h[38])) {
+	if (!position_set_links(position, (const Link*) (h + POSITION_FIXED_SIZE), n_link)) {
 		error("cannot allocate opening book position's moves\n");
 		return false;
 	}
@@ -900,6 +916,35 @@ static EDAX_FORCE_INLINE bool book_stream_count(BookStream *s, unsigned int *n)
 }
 
 /**
+ * @brief Read a count (LEB128, as book_stream_count) from bytes that hold it whole.
+ * @param p Bytes (moved after the count).
+ * @param n Count.
+ * @return false if it holds more than 32 bits.
+ */
+static EDAX_FORCE_INLINE bool count_decode(const unsigned char **p, unsigned int *n)
+{
+	const unsigned char *q = *p;
+	unsigned int v = q[0], shift;
+
+	if (v < 0x80) { // (most counts)
+		*n = v;
+		*p = q + 1;
+		return true;
+	}
+	v &= 0x7f;
+	for (shift = 7; *q++ & 0x80; shift += 7) {
+		if (shift == 28 && *q > 0x0f) return false; // more than 32 bits
+		v |= (unsigned int) (*q & 0x7f) << shift;
+	}
+	*n = v;
+	*p = q;
+	return true;
+}
+
+/** Bytes of the largest position record of form 2: 255 links, counts of 5 bytes. */
+#define POSITION2_MAX_SIZE (POSITION2_FIXED_SIZE + 4 * 5 + 2 * 255)
+
+/**
  * @brief Read a position of a book file of form 2.
  *
  * @param position Position to read in.
@@ -912,6 +957,31 @@ static bool position_read_2(Position *position, BookStream *s, Book *book)
 	unsigned int n[4];
 	Link links[256];
 	int i;
+
+	if (s->n - s->pos >= POSITION2_MAX_SIZE) { // the whole record is in the buffer: it is read there
+		const unsigned char *b = s->buffer + s->pos, *c = b + POSITION2_FIXED_SIZE;
+		const int n_link = b[16];
+		memcpy(&position->board.player, b, 8);
+		memcpy(&position->board.opponent, b + 8, 8);
+		position->level = b[17];
+		position->score.value = (signed char) b[18];
+		position->score.lower = (signed char) b[19];
+		position->score.upper = (signed char) b[20];
+		position->leaf.score = (signed char) b[21];
+		position->leaf.move = b[22];
+		position->state = 0;
+		for (i = 0; i < 4; ++i) if (!count_decode(&c, n + i)) return false;
+		s->pos = (size_t) (c - s->buffer) + sizeof (Link) * n_link;
+		position->count[0] = position->count[1] = position->count[2] = position->count[3] = 0;
+		if (book) position_set_counts_n(position, book, n);
+		if (!position_read_is_sound(n_link, c, position->leaf.move, position->level)) return false;
+		position->n_link = 0;
+		if (!position_set_links(position, (const Link*) c, n_link)) {
+			error("cannot allocate opening book position's moves\n");
+			return false;
+		}
+		return true;
+	}
 
 	if (!book_stream_read(s, h, sizeof h)) return false;
 	memcpy(&position->board.player, h, 8);
@@ -928,7 +998,7 @@ static bool position_read_2(Position *position, BookStream *s, Book *book)
 	if (book) position_set_counts_n(position, book, n);
 
 	if (!book_stream_read(s, links, sizeof (Link) * h[16])) return false;
-	if (!position_read_is_sound(h[16], links, &position->leaf, position->level)) return false;
+	if (!position_read_is_sound(h[16], (const unsigned char*) links, position->leaf.move, position->level)) return false;
 
 	position->n_link = 0;
 	if (!position_set_links(position, links, h[16])) {
@@ -3435,6 +3505,106 @@ static void book_pool_shrink(Book *book, const long long n)
 	}
 }
 
+/** @brief Go back to a place of a book file, to read it again from there. @return false on failure. */
+static bool book_stream_seek(BookStream *s, const long long place)
+{
+	book_stream_reset(s);
+#ifdef _WIN32
+	return _fseeki64(s->f, place, SEEK_SET) == 0;
+#else
+	return fseeko(s->f, (off_t) place, SEEK_SET) == 0;
+#endif
+}
+
+/**
+ * @brief Load the positions of a book file saved in another bucket order (book_load): a book whose buckets
+ * were more (after book subtree or book prune) or fewer (a book that grew) when it was saved.
+ *
+ * What was read is released, the positions of each bucket are counted, then the positions are read again
+ * into the places of their buckets in the pool, in the order of the file: the book is the same as with
+ * the positions added one after the other, in one block (the memory of a book saved in this bucket order).
+ *
+ * @param loaded Book being loaded (its buckets and its pool of n positions).
+ * @param s Input stream.
+ * @param header Header of the file.
+ * @param file File name (for the messages).
+ * @param n Number of positions of the file.
+ * @return false if the file cannot be read (a message was printed).
+ */
+static bool book_load_by_bucket(Book *loaded, BookStream *s, const BookFileHeader *header, const char *file, const unsigned int n)
+{
+	Position *pool = (Position*) loaded->pool, p;
+	PositionArray *a;
+	unsigned int i, used = 0;
+
+	for (a = loaded->array; a < loaded->array + loaded->n; ++a) {
+		position_array_free(a);
+		position_array_init(a);
+	}
+	if (loaded->counts) {
+		loaded->counts->~BookCounts();
+		aligned_free(loaded->counts);
+		loaded->counts = NULL;
+	}
+	loaded->n_nodes = 0;
+	loaded->stats.n_nodes = 0;
+
+	// the number of positions of each bucket (in size)
+	if (!book_stream_seek(s, header->start)) { error("Cannot read %s again\n", file); return false; }
+	for (i = 0; i < n; ++i) {
+		if (!position_read_form(header->format, &p, s, NULL)) {
+			error("Truncated or damaged opening book %s at position %u/%u\n", file, i, n);
+			return false;
+		}
+		++book_array(loaded, &p.board)->size;
+		position_free(&p);
+	}
+	for (a = loaded->array; a < loaded->array + loaded->n; ++a) {
+		if (a->size > 0) {
+			a->positions = pool + used;
+			used += (unsigned int) a->size;
+			a->size = -a->size; // (in the pool: -1 once the positions are read; until then, minus the places of the bucket)
+		}
+	}
+
+	// the positions, in their places
+	if (!book_stream_seek(s, header->start)) { error("Cannot read %s again\n", file); return false; }
+	if (header->format == 2) book_stream_crc_start(s, false);
+	for (i = 0; i < n; ++i) {
+		if (!position_read_form(header->format, &p, s, loaded)) {
+			error("Truncated or damaged opening book %s at position %u/%u\n", file, i, n);
+			return false;
+		}
+		a = book_array(loaded, &p.board);
+		if (a->n == -a->size) { // not what was counted: the file changed
+			position_free(&p);
+			error("%s changed while it was read\n", file);
+			return false;
+		}
+		a->positions[a->n] = p;
+		a->positions[a->n].state = loaded->epoch | POSITION_DONE;
+		++a->n;
+	}
+
+	// duplicated positions (looked for once all are in place, bucket after bucket): the later ones are left
+	// out, and the count check of book_load fails
+	for (a = loaded->array; a < loaded->array + loaded->n; ++a) {
+		if (a->size < 0) a->size = -1;
+		for (int k = 1; k < a->n; ++k) {
+			int j;
+			for (j = 0; j < k && !board_equal(&a->positions[j].board, &a->positions[k].board); ++j) ;
+			if (j < k) {
+				position_free(a->positions + k);
+				memmove(a->positions + k, a->positions + k + 1, (size_t) (a->n - k - 1) * sizeof (Position));
+				--a->n; --k;
+			}
+		}
+		loaded->n_nodes += (unsigned int) a->n;
+	}
+	loaded->stats.n_nodes = loaded->n_nodes;
+	return true;
+}
+
 /**
  * @brief Load the opening book.
  *
@@ -3516,7 +3686,8 @@ bool book_load(Book *book, const char *file)
 		if (header.format == 2) book_stream_crc_start(&stream, false);
 		// A saved book lists its positions bucket by bucket: store them contiguously
 		// in one pool, exactly sized (no per-bucket block, no spare capacity).
-		// Positions out of bucket order fall back to the usual growing arrays.
+		// Positions out of bucket order (a book saved with other buckets) are read again: see book_load_by_bucket.
+		// Without a pool, the positions go to the usual growing arrays.
 		// (32-bit builds: the size of the pool must fit a size_t, or a smaller block would be allocated)
 		pool = (expected > 0 && (unsigned long long) expected * sizeof (Position) <= SIZE_MAX) ? (Position*) malloc((size_t) expected * sizeof (Position)) : NULL;
 		loaded.pool = pool;
@@ -3530,25 +3701,13 @@ bool book_load(Book *book, const char *file)
 			if (pooling) {
 				const int b = (int) (board_get_hash_code(&p.board) & (loaded.n - 1));
 				PositionArray *a = loaded.array + b;
-				if (b < last_bucket) { // not saved in this bucket order: stop using the pool
-					pooling = false;
-					if (used < expected / 2) { // mostly unused: move what it holds and release it now
-						PositionArray *c;
-						for (c = loaded.array; c < loaded.array + loaded.n; ++c) {
-							if (c->size < 0) {
-								Position *q = (Position*) malloc(c->n * sizeof (Position));
-								if (q == NULL) { error("cannot allocate space to store the positions\n"); goto book_load_failed; }
-								memcpy(q, c->positions, c->n * sizeof (Position));
-								c->positions = q; c->size = c->n;
-							}
-						}
-						free(pool);
-						loaded.pool = pool = NULL;
-						loaded.pool_size = 0;
-						used = 0;
-					}
+				if (b < last_bucket) { // not saved in this bucket order: read again, bucket by bucket
+					position_free(&p);
+					if (!book_load_by_bucket(&loaded, &stream, &header, file, expected)) goto book_load_failed;
+					used = expected;
+					break;
 				}
-				if (pooling && (a->n == 0 || (a->size < 0 && a->positions + a->n == pool + used))) {
+				if (a->n == 0 || (a->size < 0 && a->positions + a->n == pool + used)) {
 					int k;
 					for (k = 0; k < a->n; ++k) if (board_equal(&a->positions[k].board, &p.board)) break;
 					if (k == a->n) {
