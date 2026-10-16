@@ -40,8 +40,8 @@ def prepare(a):
     """Inputs made once in the work directory (from the data of ev, which is only read)."""
     w = a.work
     os.makedirs(w, exist_ok=True)
-    # books of form 1: the first 20000 and 300000 positions of A_cut40.dat
-    for name, n in (('A_head.dat', 20000), ('A_big.dat', 300000)):
+    # books of form 1: the first 20000 and 800000 positions (more than the 16 MB buffer of BookReader) of A_cut40.dat
+    for name, n in (('A_head.dat', 20000), ('A_big.dat', 800000)):
         book = os.path.join(w, name)
         if not os.path.exists(book):
             src = r'D:\edaxwork\data\A_cut40.dat'

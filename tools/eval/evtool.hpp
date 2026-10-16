@@ -184,6 +184,8 @@ struct BookRecord {
 struct BookReader {
 	FILE *f;
 	const char *file;
+	unsigned char *buf;             // the file is read in this buffer, 16 MB at a time
+	size_t pos, n;                  // next byte, bytes in the buffer
 	int form;                       // 1 or 2
 	uint64_t n_positions, read;
 	int level, n_empties;           // settings of the book (header)
@@ -191,11 +193,32 @@ struct BookReader {
 	uint64_t bytes;                 // form 2: bytes of the positions read so far
 };
 
-/** read n bytes of the positions (form 2: counted in the CRC); exits if the file ends */
-inline void book_reader_bytes(BookReader *r, unsigned char *p, size_t n)
+enum { BOOK_READER_BUFFER = 1 << 24 };
+
+/** the next k bytes of the file (k at most 4096) in the buffer, or fewer at the end of the file */
+inline const unsigned char *book_reader_fill(BookReader *r, size_t k)
 {
-	if (fread(p, 1, n, r->f) != n) die("%s is truncated", r->file);
-	if (r->form == 2) { r->crc = crc32c_update(r->crc, p, n); r->bytes += n; }
+	if (r->n - r->pos < k) {	// (the rare case: the buffer is filled again)
+		memmove(r->buf, r->buf + r->pos, r->n - r->pos);
+		r->n -= r->pos; r->pos = 0;
+		r->n += fread(r->buf + r->n, 1, BOOK_READER_BUFFER - r->n, r->f);
+	}
+	return r->buf + r->pos;
+}
+
+/** the next k bytes of the file (k at most 4096) in the buffer, or exit if the file ends before them */
+inline const unsigned char *book_reader_need(BookReader *r, size_t k)
+{
+	const unsigned char *p = book_reader_fill(r, k);
+	if (r->n - r->pos < k) die("%s is truncated", r->file);
+	return p;
+}
+
+/** k bytes of the positions read (form 2: counted in the CRC) */
+inline void book_reader_take(BookReader *r, size_t k)
+{
+	if (r->form == 2) { r->crc = crc32c_update(r->crc, r->buf + r->pos, k); r->bytes += k; }
+	r->pos += k;
 }
 
 inline void book_reader_open(BookReader *r, const char *file)
@@ -203,74 +226,78 @@ inline void book_reader_open(BookReader *r, const char *file)
 	memset(r, 0, sizeof *r);
 	r->file = file;
 	r->f = xfopen(file, "rb");
-	setvbuf(r->f, nullptr, _IOFBF, 1 << 24);
-	unsigned char h[64];
-	if (fread(h, 1, 8, r->f) != 8) die("%s is not a book", file);
+	setvbuf(r->f, nullptr, _IONBF, 0);	// (read in BookReader::buf)
+	r->buf = (unsigned char *) xmalloc(BOOK_READER_BUFFER);
+	const unsigned char *h = book_reader_need(r, 8);
 	if (!memcmp(h, "XADEKOOB", 8)) {	// form 1: version, release, date (8), options (20), number of positions (4)
-		if (fread(h + 8, 1, 34, r->f) != 34) die("%s is truncated", file);
+		h = book_reader_need(r, 42);
 		uint32_t n;
 		memcpy(&n, h + 38, 4);
 		r->form = 1; r->n_positions = n;
 		r->level = h[18]; r->n_empties = h[22];
+		r->pos += 42;
 	} else if (!memcmp(h, "NEDXBOOK", 8)) {	// form 2: header of header_size bytes (64 known)
-		if (fread(h + 8, 1, 4, r->f) != 4) die("%s is truncated", file);
+		h = book_reader_need(r, 12);
 		uint16_t form, size;
 		memcpy(&form, h + 8, 2); memcpy(&size, h + 10, 2);
-		if (form != 2 || size < 64) die("%s is a book of another form", file);
-		unsigned char *x = (unsigned char *) xmalloc(size);
-		memcpy(x, h, 12);
-		if (fread(x + 12, 1, size - 12, r->f) != (size_t) (size - 12)) die("%s is truncated", file);
+		if (form != 2 || size < 64 || size > 4096) die("%s is a book of another form", file);
+		h = book_reader_need(r, size);
 		uint32_t crc, flags;
-		memcpy(&crc, x + size - 4, 4); memcpy(&flags, x + 12, 4);
-		if (crc32c_update(0, x, size - 4) != crc) die("%s has a damaged header", file);
-		if (flags != 0 || x[18] != 1) die("%s is a book of a later form", file);
+		memcpy(&crc, h + size - 4, 4); memcpy(&flags, h + 12, 4);
+		if (crc32c_update(0, h, size - 4) != crc) die("%s has a damaged header", file);
+		if (flags != 0 || h[18] != 1) die("%s is a book of a later form", file);
 		int32_t level, n_empties;
-		memcpy(&level, x + 28, 4); memcpy(&n_empties, x + 32, 4);
-		memcpy(&r->n_positions, x + 48, 8);
+		memcpy(&level, h + 28, 4); memcpy(&n_empties, h + 32, 4);
+		memcpy(&r->n_positions, h + 48, 8);
 		r->form = 2; r->level = level; r->n_empties = n_empties;
-		free(x);
+		r->pos += size;
 	} else die("%s is not a book", file);
 }
 
 /** the next position, or false after the last one (then a file of form 2 has been checked to its end) */
 inline bool book_reader_next(BookReader *r, BookRecord *p)
 {
-	unsigned char h[40], links[2 * 256];
 	if (r->read == r->n_positions) {
 		if (r->form == 2) {
-			unsigned char t[16];
+			const unsigned char *t = book_reader_need(r, 16);
 			uint64_t bytes;
 			uint32_t crc;
-			if (fread(t, 1, 16, r->f) != 16) die("%s is truncated", r->file);
 			memcpy(&bytes, t, 8); memcpy(&crc, t + 8, 4);
-			if (bytes != r->bytes || crc != r->crc || memcmp(t + 12, "BEND", 4) || fgetc(r->f) != EOF) die("%s is damaged (the check of the positions fails)", r->file);
+			r->pos += 16;
+			if (bytes != r->bytes || crc != r->crc || memcmp(t + 12, "BEND", 4) || r->pos != r->n || fgetc(r->f) != EOF)
+				die("%s is damaged (the check of the positions fails)", r->file);
 		}
 		return false;
 	}
 	++r->read;
 	if (r->form == 1) {	// board (16), 4 counts (16), value, lower, upper (2 each), n_link, level; links; leaf
-		book_reader_bytes(r, h, 40);
+		const unsigned char *h = book_reader_fill(r, 40 + 2 * 256);	// (at most: the file may end before)
+		if (r->n - r->pos < 40 || r->n - r->pos < (size_t) 40 + 2 * (h[38] + 1)) die("%s is truncated", r->file);
 		int16_t v[3];
 		memcpy(&p->P, h, 8); memcpy(&p->O, h + 8, 8); memcpy(v, h + 32, 6);
 		p->value = v[0]; p->lower = v[1]; p->upper = v[2];
 		p->n_link = h[38]; p->level = h[39];
-		book_reader_bytes(r, links, 2 * (p->n_link + 1));
-		p->leaf_score = (signed char) links[2 * p->n_link]; p->leaf_move = links[2 * p->n_link + 1];
+		p->leaf_score = (signed char) h[40 + 2 * p->n_link]; p->leaf_move = h[40 + 2 * p->n_link + 1];
+		book_reader_take(r, 40 + 2 * (p->n_link + 1));
 	} else {	// board (16), n_link, level, value, lower, upper, leaf score, leaf move; 4 counts (LEB128); links
-		book_reader_bytes(r, h, 23);
+		const unsigned char *h = book_reader_fill(r, 23 + 4 * 5 + 2 * 255);	// (at most: the file may end before)
+		const size_t left = r->n - r->pos;
+		if (left < 23 + 4) die("%s is truncated", r->file);
 		memcpy(&p->P, h, 8); memcpy(&p->O, h + 8, 8);
 		p->n_link = h[16]; p->level = h[17];
 		p->value = (signed char) h[18]; p->lower = (signed char) h[19]; p->upper = (signed char) h[20];
 		p->leaf_score = (signed char) h[21]; p->leaf_move = h[22];
+		size_t k = 23;
 		for (int i = 0; i < 4; ++i) {
-			unsigned char c;
-			int k = 0;
+			int b = 0;
 			do {
-				book_reader_bytes(r, &c, 1);
-				if (++k > 5) die("%s is damaged (a count of more than 32 bits)", r->file);
-			} while (c & 0x80);
+				if (k >= left) die("%s is truncated", r->file);
+				if (++b > 5) die("%s is damaged (a count of more than 32 bits)", r->file);
+			} while (h[k++] & 0x80);
 		}
-		book_reader_bytes(r, links, 2 * p->n_link);
+		k += 2 * p->n_link;
+		if (k > left) die("%s is truncated", r->file);
+		book_reader_take(r, k);
 	}
 	return true;
 }
