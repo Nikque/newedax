@@ -102,12 +102,21 @@ Windows（MSVC）では、C 版の `bool` が 4 バイト、C++ 版が 1 バイ�
 - NDK r27d clang 18 の arm64-v8a・armeabi-v7a（`-std=c++23 -fno-exceptions -fno-rtti`、libc++ を静的にリンク）：コンパイルとリンクが通った（実行はしていない）。大きさは 462,136・310,852 バイト。**本体で標準ライブラリを使い始めると、Android の実行ファイルが大きくなる**（報告の対象）。
 - 手順書の `nmake /n`・`make -n` で、Boost の場所が命令に入ることを確かめた。
 
+### 3.12 試験 A：14 suite の book（2026-10-16 16:26〜17:09、1論理CPU、優先度「通常」）
+
+- 実行ファイル：C++ 版（`eaeee50` のソース。`tools/port/build-msvc.cmd x64`、基準と同じ `/O2 /GL /arch:AVX512 /vlen=256`、PGO なし。SHA-256 `91a2b4a9…`）。
+- 道具：記録の `run.py` の写し（入力は `inputs`、出力は `runs\suiteA\runs`）。比べ方：`tools/port/compare_suites_port.py`（記録の `compare.py` を使う。book は保存日時以外のバイト・保存順・生の記録・論理データ、ほかはバイト）。
+- 比べた相手：記録の `S-<suite>-R1`（`-n 32 -book-seed 1 -book-reproducible on`）と `S-<suite>-Dn1`（`-n 1`、既定の設定）。どちらも C 版 `edax-repro.exe`（`b2d85931…`）の出力。
+- 結果：**28 回すべて終了コード 0。264 ファイルのうち 261 が保存日時以外のバイトまで一致**（book 236、テキスト 20、そのほか 8）。`R1` は 14 suite すべて一致。
+- 一致しなかった3つ：S3 の `Dn1` の学習の後の book（`book.dat.store`・`u01_learn.dat`・`u02_fix.dat`、各 147 局面、局面数 32,312 と 32,293）。既定の設定では book の乱数の種が時計なので、記録でも C 版どうしで一致しない（nikque.17 の検証報告 5b、`Dn1/Bn1` が 2/5）。確かめ（17:10〜17:12、許可の範囲の時間内）：同じ条件に `-book-seed 1` だけを足して、C 版と C++ 版を1回ずつ流すと、**5ファイルすべて保存日時以外のバイトまで一致**（32,313 局面。記録にある種1の book と同じ局面数）。
+- 時間（混んだ PC の1論理CPU。速さの比較には使えない）：`R1` 合計 1,494 秒（記録 1,647 秒）、`Dn1` 1,062 秒（記録 1,074 秒）。最大メモリ：`R1` 685〜2,044 MiB、`Dn1` 99〜120 MiB（記録の側には値がない）。
+
 ## 4. まだのこと
 
 - Linux（WSL に gcc 13 が入ってから）、32ビット Linux。macOS は最後。
 - Android の実行（端末がない）。
 - PGO のビルド（PGO の学習の実行は申請が要る）と、配布物と同じ作り方での機械語・大きさの比較。
-- 14 suite の book のバイト比較（申請が要る。1論理CPUで約2時間の記録）。
+- 14 suite の book のバイト比較：済み（3.12）。
 - 速さとメモリの実測（申請が要る）。`search_eval_2`（3.6）を含む。
 - `tests/regression.cpp` の `reproducible`（長い）。
 - README・RELEASE-NOTES の `.c` の記述（段階1では変えていない）。
@@ -116,7 +125,7 @@ Windows（MSVC）では、C 版の `bool` が 4 バイト、C++ 版が 1 バイ�
 
 | # | 試験 | CPU | 時間の見込み |
 |---|---|---|---|
-| A | 14 suite の book（C++ 版を基準と同じ `/O2 /GL /arch:AVX512` でビルド。`R1`＝`-n 32 -book-seed 1 -book-reproducible on` と `Dn1`＝`-n 1` 既定の 28 回）を記録（`repro-runs\S-*-R1`・`S-*-Dn1`）と `compare_suites.py` で比べる | 1論理CPU | 約 45 分（記録：同じ条件の 70 回が約 1 時間 50 分） |
+| A（済み、3.12） | 14 suite の book（C++ 版を基準と同じ `/O2 /GL /arch:AVX512` でビルド。`R1`＝`-n 32 -book-seed 1 -book-reproducible on` と `Dn1`＝`-n 1` 既定の 28 回）を記録（`repro-runs\S-*-R1`・`S-*-Dn1`）と `compare_suites.py` で比べる | 1論理CPU | 約 45 分（記録：同じ条件の 70 回が約 1 時間 50 分） |
 | B | `tests/regression.cpp` の `reproducible` | 1論理CPU | 約 2 分（記録 97 秒） |
 | C | Windows の PGO のビルド 5 種（学習の実行：fforum-20-39 を level 60 で1スレッド、level 18 の自己対局 4 局） | 1論理CPU | 約 15〜30 分 |
 | D | 速さとメモリ（C 版と交互に、静かな時間に）：fforum-20-39 1スレッド・32スレッド、fforum-40-59 32スレッド、中盤 30 局面 level 18・21、suite F（deviate 系）、最大メモリ | 全CPU（静かなとき） | 約 1 時間 |
