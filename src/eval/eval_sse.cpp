@@ -10,6 +10,7 @@
 
 #include <assert.h>
 
+#include "util/cpp_headers.h"
 #include "core/bit.h"
 #include "core/board.h"
 #include "core/move.h"
@@ -30,7 +31,7 @@
  * eval_update_sse() with parity = eval_in->n_empties & 1. A loop over the moves of a position computes the
  * parity once (search_eval_2): the compiler then keeps fewer values across the calls of the loop.
  */
-static inline void eval_update_sse_parity(int x, unsigned long long f, Eval *eval_out, const Eval *eval_in, const int parity)
+static EDAX_FORCE_INLINE void eval_update_sse_parity(int x, unsigned long long f, Eval *eval_out, const Eval *eval_in, const int parity)
 {
   #ifdef __AVX2__
 	__m256i	f0 = eval_in->feature.v16[0];
