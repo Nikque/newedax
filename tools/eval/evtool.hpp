@@ -152,12 +152,127 @@ inline bool dir_name_parse(const char *s, char *dir, size_t dir_size, char *name
 	return true;
 }
 
-/** exit with a message if the header of a book file (its first 8 bytes) is not the one of form 1 ("EDAX" "BOOK") */
-inline void book_form1_check(const unsigned char *header, const char *file)
+/** CRC-32C (Castagnoli, reflected, as crc32c_bytes of src/util): crc of the bytes so far (0 at the start) */
+inline uint32_t crc32c_update(uint32_t crc, const unsigned char *p, size_t n)
 {
-	if (!memcmp(header, "XADEKOOB", 8)) return;
-	if (!memcmp(header, "NEDXBOOK", 8)) die("%s is a book of form 2: convert it to form 1 (edax -book-convert with -book-format 1)", file);
-	die("%s is not a book of form 1", file);
+	static uint32_t table[256];
+	if (table[1] == 0) {
+		for (uint32_t i = 0; i < 256; ++i) {
+			uint32_t c = i;
+			for (int k = 0; k < 8; ++k) c = c & 1 ? (c >> 1) ^ 0x82F63B78U : c >> 1;
+			table[i] = c;
+		}
+	}
+	crc = ~crc;
+	for (size_t i = 0; i < n; ++i) crc = table[(crc ^ p[i]) & 0xff] ^ (crc >> 8);
+	return ~crc;
+}
+
+/** a position of a book file (the fields the tools read) */
+struct BookRecord {
+	uint64_t P, O;                  // player, opponent
+	int value, lower, upper;        // score of the position and its bounds
+	int n_link, level;              // number of moves, level of the search
+	int leaf_score, leaf_move;      // best move not in the links
+};
+
+/**
+ * Reading the positions of a book file of form 1 (Edax 4, nikque) or form 2 ("NEDXBOOK", docs/port/DESIGN-format.md)
+ * one after the other. A file of form 2 is checked: its header CRC, the number of positions, the trailer (size and
+ * CRC of the positions, "BEND") and nothing after it.
+ */
+struct BookReader {
+	FILE *f;
+	const char *file;
+	int form;                       // 1 or 2
+	uint64_t n_positions, read;
+	int level, n_empties;           // settings of the book (header)
+	uint32_t crc;                   // form 2: CRC of the positions read so far
+	uint64_t bytes;                 // form 2: bytes of the positions read so far
+};
+
+/** read n bytes of the positions (form 2: counted in the CRC); exits if the file ends */
+inline void book_reader_bytes(BookReader *r, unsigned char *p, size_t n)
+{
+	if (fread(p, 1, n, r->f) != n) die("%s is truncated", r->file);
+	if (r->form == 2) { r->crc = crc32c_update(r->crc, p, n); r->bytes += n; }
+}
+
+inline void book_reader_open(BookReader *r, const char *file)
+{
+	memset(r, 0, sizeof *r);
+	r->file = file;
+	r->f = xfopen(file, "rb");
+	setvbuf(r->f, nullptr, _IOFBF, 1 << 24);
+	unsigned char h[64];
+	if (fread(h, 1, 8, r->f) != 8) die("%s is not a book", file);
+	if (!memcmp(h, "XADEKOOB", 8)) {	// form 1: version, release, date (8), options (20), number of positions (4)
+		if (fread(h + 8, 1, 34, r->f) != 34) die("%s is truncated", file);
+		uint32_t n;
+		memcpy(&n, h + 38, 4);
+		r->form = 1; r->n_positions = n;
+		r->level = h[18]; r->n_empties = h[22];
+	} else if (!memcmp(h, "NEDXBOOK", 8)) {	// form 2: header of header_size bytes (64 known)
+		if (fread(h + 8, 1, 4, r->f) != 4) die("%s is truncated", file);
+		uint16_t form, size;
+		memcpy(&form, h + 8, 2); memcpy(&size, h + 10, 2);
+		if (form != 2 || size < 64) die("%s is a book of another form", file);
+		unsigned char *x = (unsigned char *) xmalloc(size);
+		memcpy(x, h, 12);
+		if (fread(x + 12, 1, size - 12, r->f) != (size_t) (size - 12)) die("%s is truncated", file);
+		uint32_t crc, flags;
+		memcpy(&crc, x + size - 4, 4); memcpy(&flags, x + 12, 4);
+		if (crc32c_update(0, x, size - 4) != crc) die("%s has a damaged header", file);
+		if (flags != 0 || x[18] != 1) die("%s is a book of a later form", file);
+		int32_t level, n_empties;
+		memcpy(&level, x + 28, 4); memcpy(&n_empties, x + 32, 4);
+		memcpy(&r->n_positions, x + 48, 8);
+		r->form = 2; r->level = level; r->n_empties = n_empties;
+		free(x);
+	} else die("%s is not a book", file);
+}
+
+/** the next position, or false after the last one (then a file of form 2 has been checked to its end) */
+inline bool book_reader_next(BookReader *r, BookRecord *p)
+{
+	unsigned char h[40], links[2 * 256];
+	if (r->read == r->n_positions) {
+		if (r->form == 2) {
+			unsigned char t[16];
+			uint64_t bytes;
+			uint32_t crc;
+			if (fread(t, 1, 16, r->f) != 16) die("%s is truncated", r->file);
+			memcpy(&bytes, t, 8); memcpy(&crc, t + 8, 4);
+			if (bytes != r->bytes || crc != r->crc || memcmp(t + 12, "BEND", 4) || fgetc(r->f) != EOF) die("%s is damaged (the check of the positions fails)", r->file);
+		}
+		return false;
+	}
+	++r->read;
+	if (r->form == 1) {	// board (16), 4 counts (16), value, lower, upper (2 each), n_link, level; links; leaf
+		book_reader_bytes(r, h, 40);
+		int16_t v[3];
+		memcpy(&p->P, h, 8); memcpy(&p->O, h + 8, 8); memcpy(v, h + 32, 6);
+		p->value = v[0]; p->lower = v[1]; p->upper = v[2];
+		p->n_link = h[38]; p->level = h[39];
+		book_reader_bytes(r, links, 2 * (p->n_link + 1));
+		p->leaf_score = (signed char) links[2 * p->n_link]; p->leaf_move = links[2 * p->n_link + 1];
+	} else {	// board (16), n_link, level, value, lower, upper, leaf score, leaf move; 4 counts (LEB128); links
+		book_reader_bytes(r, h, 23);
+		memcpy(&p->P, h, 8); memcpy(&p->O, h + 8, 8);
+		p->n_link = h[16]; p->level = h[17];
+		p->value = (signed char) h[18]; p->lower = (signed char) h[19]; p->upper = (signed char) h[20];
+		p->leaf_score = (signed char) h[21]; p->leaf_move = h[22];
+		for (int i = 0; i < 4; ++i) {
+			unsigned char c;
+			int k = 0;
+			do {
+				book_reader_bytes(r, &c, 1);
+				if (++k > 5) die("%s is damaged (a count of more than 32 bits)", r->file);
+			} while (c & 0x80);
+		}
+		book_reader_bytes(r, links, 2 * p->n_link);
+	}
+	return true;
 }
 
 enum { ET_NW = 114364, ET_NF = 46, ET_NPLY = 61 };

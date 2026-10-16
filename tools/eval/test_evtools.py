@@ -197,16 +197,34 @@ def t_short_weights(a, d):
 
 
 def t_book_form2(a, d):
-    """bookdump and bookscan refuse a book that is not of form 1 (C: read as form 1)"""
+    """bookdump and bookscan read a book of form 2 as the same book of form 1 (C: read the form 2 file as form 1);
+    a damaged or truncated book of form 2 is refused"""
     if not a.edax:
         return None, 'no --edax'
-    b2 = os.path.join(d, 'b2.dat')
+    b2, b1 = os.path.join(d, 'b2.dat'), os.path.join(d, 'b1.dat')	# the form 1 book written back from b2 (same order)
     run([a.edax, '-book-format', '2', '-book-convert', os.path.join(a.work, 'A_head.dat'), b2], d)
-    if not os.path.exists(b2):
-        return False, 'no book of form 2 written'
-    rc, out = run([a.tool('bookdump'), b2, d], d)
+    run([a.edax, '-book-format', '1', '-book-convert', b2, b1], d)
+    if not (os.path.exists(b2) and os.path.exists(b1)):
+        return False, 'no book of form 2 or 1 written'
+    res = []
+    d1, d2 = os.path.join(d, 'f1'), os.path.join(d, 'f2')
+    os.makedirs(d1); os.makedirs(d2)
+    rc1, out1 = run([a.tool('bookdump'), b1, d1], d)
+    rc2, out2 = run([a.tool('bookdump'), b2, d2], d)
+    same_files = sorted(os.listdir(d1)) == sorted(os.listdir(d2)) and len(os.listdir(d1)) > 0 and all(
+        open(os.path.join(d1, f), 'rb').read() == open(os.path.join(d2, f), 'rb').read() for f in os.listdir(d1))
+    res.append(('bookdump', rc1, rc2, out1 == out2, same_files))
+    rc1, out1 = run([a.tool('bookscan'), b1], d)
     rc2, out2 = run([a.tool('bookscan'), b2], d)
-    return rc == 1 and 'form' in out and rc2 == 1 and 'form' in out2, f'bookdump exit {rc} {out.strip()[-80:]!r}; bookscan exit {rc2} {out2.strip()[-80:]!r}'
+    res.append(('bookscan', rc1, rc2, out1 == out2))
+    data = bytearray(open(b2, 'rb').read())
+    bad = bytearray(data); bad[64 + 100] ^= 0x01	# a byte of the positions
+    open(os.path.join(d, 'bad.dat'), 'wb').write(bad)
+    open(os.path.join(d, 'cut.dat'), 'wb').write(data[:-20])
+    rc3, out3 = run([a.tool('bookscan'), os.path.join(d, 'bad.dat')], d)
+    rc4, out4 = run([a.tool('bookscan'), os.path.join(d, 'cut.dat')], d)
+    ok = res[0][1:] == (0, 0, True, True) and res[1][1:] == (0, 0, True) and rc3 == 1 and rc4 == 1
+    return ok, f'{res}; damaged: exit {rc3} {out3.strip()[-60:]!r}; truncated: exit {rc4} {out4.strip()[-60:]!r}'
 
 
 def t_selfplay_random_range(a, d):
@@ -263,9 +281,128 @@ def mix64(x):
     return x
 
 
+# ---- a reference board (squares 0 = a1 ... 63 = h8; P: side to move) ----
+
+def ref_flips(P, O, x):
+    if (P | O) >> x & 1:
+        return 0
+    f = 0
+    r0, c0 = divmod(x, 8)
+    for dr in (-1, 0, 1):
+        for dc in (-1, 0, 1):
+            if dr == 0 and dc == 0:
+                continue
+            r, c, run = r0 + dr, c0 + dc, 0
+            while 0 <= r < 8 and 0 <= c < 8:
+                q = 1 << (r * 8 + c)
+                if O & q:
+                    run |= q
+                elif P & q:
+                    f |= run
+                    break
+                else:
+                    break
+                r += dr; c += dc
+    return f
+
+
+def ref_moves(P, O):
+    return [x for x in range(64) if ref_flips(P, O, x)]
+
+
+def ref_next(P, O, x):
+    f = ref_flips(P, O, x)
+    return O ^ f, P | f | (1 << x)
+
+
+def read_records(path):
+    data = open(path, 'rb').read() if os.path.exists(path) else b''
+    return [struct.unpack('<QQb', data[i:i + 17]) for i in range(0, len(data), 17)]
+
+
+def t_trans2rec(a, d):
+    """trans2rec: the records of random legal games (with passes) as computed here; an illegal move is refused"""
+    import random
+    rnd = random.Random(5)
+    lines, expected = [], {}
+    frm = 6
+    for g in range(300):
+        P, O, colour, moves, recs = 0x0000000810000000, 0x0000001008000000, 1, '', []
+        while True:
+            ms = ref_moves(P, O)
+            if not ms:
+                P, O, colour = O, P, -colour
+                ms = ref_moves(P, O)
+                if not ms:
+                    break
+            if g % 50 == 7 and len(moves) >= 40:	# a few games stop before their end
+                break
+            x = rnd.choice(ms)
+            if 64 - bin(P | O).count('1') <= 60 - frm:
+                recs.append((P, O, colour))
+            moves += 'abcdefgh'[x % 8] + str(x // 8 + 1)
+            P, O = ref_next(P, O, x)
+            colour = -colour
+        diff = bin(P).count('1') - bin(O).count('1')
+        e = 64 - bin(P | O).count('1')
+        diff = diff + e if diff > 0 else diff - e if diff < 0 else 0
+        for p, o, s in recs:
+            ply = bin(p | o).count('1') - 4
+            expected.setdefault(ply, []).append(struct.pack('<QQb', p, o, diff if s == colour else -diff))
+        lines.append(moves.upper() if g % 3 == 0 else moves + (' 12 extra\r' if g % 5 == 0 else ''))
+    tr = os.path.join(d, 'games.txt')
+    open(tr, 'w', newline='\n').write('# comment\n\n' + '\n'.join(lines) + '\n')
+    out = os.path.join(d, 'out'); os.makedirs(out)
+    rc, text = run([a.tool('trans2rec'), out, 'tr', '-from', str(frm), tr], d)
+    got = {int(f[2:4]): open(os.path.join(out, f), 'rb').read() for f in os.listdir(out)}
+    same = got == {k: b''.join(v) for k, v in expected.items()}
+    bad = os.path.join(d, 'bad.txt'); open(bad, 'w').write('f5d6c3a1\n')
+    rc2, text2 = run([a.tool('trans2rec'), out, 'bad', bad], d)
+    return rc == 0 and same and rc2 == 1 and 'illegal' in text2, f'exit {rc} same {same} ({len(got)} plies): {text.strip()[-80:]!r}; illegal: exit {rc2} {text2.strip()[-60:]!r}'
+
+
+def t_selfplay_alt(a, d):
+    """selfplay3 -alt: the files sp, ss are the same as without it; each position of sa follows a position of ss by
+    one legal move, and its value is a score"""
+    e = rel_ev(a, d)
+    base, alt = os.path.join(d, 'base'), os.path.join(d, 'alt')
+    os.makedirs(base); os.makedirs(alt)
+    common = ['30', '3', '1', '-level', '2', '-exact', '8', '-eval', f'{e}/eval_orig.dat']
+    rc1, _ = run([a.tool('selfplay3'), base] + common, d)
+    rc2, text = run([a.tool('selfplay3'), alt] + common + ['-alt', '0.5'], d)
+    same = all(open(os.path.join(base, f), 'rb').read() == open(os.path.join(alt, f), 'rb').read() for f in os.listdir(base))
+    n_alt, reachable = 0, True
+    for q in range(61):
+        sa = read_records(os.path.join(alt, f'sa{q:02d}.bin'))
+        if not sa:
+            continue
+        parents = read_records(os.path.join(alt, f'ss{q - 1:02d}.bin'))
+        children = {ref_next(p, o, x) for p, o, _ in parents for x in ref_moves(p, o)}
+        for p, o, v in sa:
+            n_alt += 1
+            reachable &= (p, o) in children and -64 <= v <= 64
+    return rc1 == 0 and rc2 == 0 and same and n_alt > 0 and reachable, f'exit {rc1}/{rc2}, sp ss same {same}, sa positions {n_alt}, reachable {reachable}; {text.strip()[-60:]!r}'
+
+
+def t_evsearch_window(a, d):
+    """evsearch -window 0 gives the same outputs as without it; -window 1 trains on more samples; bad values refused"""
+    e = rel_ev(a, d)
+    cfg = os.path.join(d, 'cfg.txt'); open(cfg, 'w').write('Rt l2 d8\n')
+    common = [a.tool('evsearch'), '-lib', f'{e}/patterns.txt', '-configs', cfg, '-plies', '30', '-threads', '1', '-src', f'ss:{e}/sp8:1:20000', '-iter', '3']
+    outs = {}
+    for name, extra in (('none', []), ('w0', ['-window', '0']), ('w1', ['-window', '1', '-decay', '0.5'])):
+        o = os.path.join(d, name); os.makedirs(o)
+        rc, text = run(common + extra + ['-dump', o], d)
+        outs[name] = (rc, text, open(os.path.join(o, 'Rt_30.w'), 'rb').read() if rc == 0 else b'')
+    rc, text = run(common + ['-window', '1', '-decay', '0'], d)
+    ok = (outs['none'][0] == 0 and outs['none'][1] == outs['w0'][1] and outs['none'][2] == outs['w0'][2]
+          and outs['w1'][0] == 0 and outs['w1'][2] != outs['none'][2] and ' 30:ss ' in outs['w1'][1] and rc == 1)
+    return ok, f"none/w0 same {outs['none'][2] == outs['w0'][2]}, w1 differs {outs['w1'][2] != outs['none'][2]}; bad decay exit {rc}"
+
+
 TESTS = [t_src_drive, t_base_drive, t_src_bad, t_many_instances, t_many_sources, t_many_plies, t_bad_ply_range, t_pattern_bad,
          t_missing_files, t_out_of_memory, t_short_weights, t_book_form2, t_selfplay_random_range, t_gen_low_ply,
-         t_gen_no_training, t_leafgen_keep_all]
+         t_gen_no_training, t_leafgen_keep_all, t_trans2rec, t_selfplay_alt, t_evsearch_window]
 
 
 def main():

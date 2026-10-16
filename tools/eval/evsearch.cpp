@@ -13,7 +13,8 @@
  *                  stab (stable discs of both sides, edges + full lines), front (frontier discs), disc,
  *                  estab (edge-stable discs), mobhv, mobd (mobility along some directions), mob2d (joint table of both mobilities)
  *   output       : "config_name lanes table_entries | ply source mse ..." one line per configuration
- *   other options: -lambda-prior l, -prior eval.dat, -teacher eval.dat -alpha a, -base dir:cfg, -dump dir, -notie
+ *   other options: -lambda-prior l, -prior eval.dat, -teacher eval.dat -alpha a, -base dir:cfg, -dump dir, -notie,
+ *                  -window k -decay d (training samples also from the plies p +- 2, ..., p +- 2k, weighted by d^j)
  */
 #include <cmath>
 #include <omp.h>
@@ -426,27 +427,38 @@ static void apply_teacher(Data *d)
 	}
 }
 
+// -window k -decay d: the training samples of a ply p also come from the plies p - 2k .. p + 2k of the same parity,
+// with their weights multiplied by d^j at a distance of 2j plies; the test samples come from p only.
+static int window = 0;
+static double decay = 0.5;
+
 static void load(int pi, int ply)
 {
-	for (int d = 0; d < n_src; ++d) {
-		char name[1024];
-		sprintf(name, "%s/%s%02d.bin", src[d].dir, src[d].prefix, ply);
-		FILE *f = fopen(name, "rb");
-		if (!f) continue;
-		const long long n = file_size(f) / (long long) sizeof (Rec);
-		const double keep = n > src[d].max ? (double) src[d].max / n : 1.0;
-		const uint64_t thr = keep >= 1.0 ? ~0ULL : (uint64_t) (keep * 18446744073709551615.0);	// (2^64 as a double does not fit)
-		Rec *buf = (Rec *) xmalloc(sizeof (Rec) << 20);
-		size_t m;
-		while ((m = fread(buf, sizeof (Rec), 1 << 20, f)) > 0) {
-			for (size_t i = 0; i < m; ++i) {
-				const uint64_t h = mix64(buf[i].P * 0x9E3779B97F4A7C15ULL ^ buf[i].O);
-				if (h % 32 == 0) { if ((mix64(h) >> 40) % 4 == 0 || n < 4000000) push(&test[pi][d], buf + i, 1.0f); }
-				else if (mix64(h ^ 0x1234567ULL) <= thr) push(&train[pi], buf + i, (float) src[d].weight);
+	for (int j = -window; j <= window; ++j) {
+		const int q = ply + 2 * j;
+		if (q < 0 || q > 60) continue;
+		const double factor = pow(decay, abs(j));
+		for (int d = 0; d < n_src; ++d) {
+			char name[1024];
+			sprintf(name, "%s/%s%02d.bin", src[d].dir, src[d].prefix, q);
+			FILE *f = fopen(name, "rb");
+			if (!f) continue;
+			const long long n = file_size(f) / (long long) sizeof (Rec);
+			const double keep = n > src[d].max ? (double) src[d].max / n : 1.0;
+			const uint64_t thr = keep >= 1.0 ? ~0ULL : (uint64_t) (keep * 18446744073709551615.0);	// (2^64 as a double does not fit)
+			const float weight = (float) (src[d].weight * factor);
+			Rec *buf = (Rec *) xmalloc(sizeof (Rec) << 20);
+			size_t m;
+			while ((m = fread(buf, sizeof (Rec), 1 << 20, f)) > 0) {
+				for (size_t i = 0; i < m; ++i) {
+					const uint64_t h = mix64(buf[i].P * 0x9E3779B97F4A7C15ULL ^ buf[i].O);
+					if (h % 32 == 0) { if (j == 0 && ((mix64(h) >> 40) % 4 == 0 || n < 4000000)) push(&test[pi][d], buf + i, 1.0f); }
+					else if (mix64(h ^ 0x1234567ULL) <= thr) push(&train[pi], buf + i, weight);
+				}
 			}
+			free(buf);
+			fclose(f);
 		}
-		free(buf);
-		fclose(f);
 	}
 }
 
@@ -600,6 +612,8 @@ int main(int argc, char **argv)
 		else if (!strcmp(argv[i], "-threads")) nt = atoi(value(i));
 		else if (!strcmp(argv[i], "-dump")) dumpdir = value(i);
 		else if (!strcmp(argv[i], "-notie")) tie = 0;
+		else if (!strcmp(argv[i], "-window")) { window = atoi(value(i)); if (window < 0 || window > 30) die("bad -window (0 to 30)"); }
+		else if (!strcmp(argv[i], "-decay")) { decay = atof(value(i)); if (!(decay > 0 && decay <= 1)) die("bad -decay (0 < d <= 1)"); }
 		else if (!strcmp(argv[i], "-base")) { if (!dir_name_parse(value(i), base_dir, sizeof base_dir, base_cfg, sizeof base_cfg)) die("bad -base %s (dir:cfg)", argv[i]); }
 		else if (!strcmp(argv[i], "-teacher")) { et_init(); teacher = et_read(value(i)); }
 		else if (!strcmp(argv[i], "-alpha")) alpha = atof(value(i));

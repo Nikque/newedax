@@ -9,10 +9,11 @@ $here = $PSScriptRoot
 $root = Split-Path -Parent (Split-Path -Parent $here)
 if (-not $Tree) { $Tree = $root }
 $boost = Join-Path (Split-Path -Parent $root) 'third_party\boost_1_92_0'
-$all = @('evsearch', 'evtrain', 'w2dat2', 'sprepair', 'sample', 'bookdump', 'bookscan', 'selfplay3', 'label', 'playout', 'gen', 'leafgen', 'evcheck')
+if (-not (Test-Path "$boost\boost\version.hpp")) { $boost = 'D:\newedax\third_party\boost_1_92_0' }	# (a work tree under runs)
+$all = @('evsearch', 'evtrain', 'w2dat2', 'sprepair', 'sample', 'bookdump', 'bookscan', 'selfplay3', 'label', 'playout', 'gen', 'leafgen', 'evcheck', 'trans2rec')
 $list = if ($Tools) { $Tools -split ',' } else { $all }
 $omp = @('evsearch', 'evtrain', 'selfplay3', 'label', 'playout', 'gen', 'leafgen')
-$engine = @('selfplay3', 'label', 'playout', 'gen', 'leafgen', 'evcheck')
+$engine = @('selfplay3', 'label', 'playout', 'gen', 'leafgen', 'evcheck', 'trans2rec')
 $vsdev = 'C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat'
 $env:PATH = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer;$env:PATH"
 New-Item -ItemType Directory -Force $Out | Out-Null
