@@ -489,7 +489,8 @@ static unsigned short *OPPONENT_FEATURE;
 
 #if EVAL_MOBILITY
 /** weights of the mobility (number of legal moves, 0..31) of the side to move [0..31] and of the opponent [32..63],
-    for each ply 0..60; optional part of an evaluation file of form 1 (all zero when absent) */
+    for each ply 0..60; optional part of an evaluation file (form 1: after the plies; form 2: the mobility group), all zero
+    when absent */
 short EVAL_MOBILITY_WEIGHT[61][64];
 bool EVAL_HAS_MOBILITY;
 #endif
@@ -587,6 +588,15 @@ constexpr int EVAL_N_PACKED = 114364;
 constexpr int EVAL_N_X = 59049;
 static const char EVAL2_MAGIC[8] = {'N', 'E', 'D', 'X', 'E', 'V', 'A', 'L'};
 static const char EVAL2_END[4] = {'E', 'E', 'N', 'D'};
+/** weights of the mobility group: the numbers of legal moves (0..31) of the side to move, then of the opponent */
+constexpr int EVAL_N_MOBILITY = 64;
+/** plies of the mobility weights (0..60, not folded as the pattern weights) */
+constexpr int EVAL_N_MOBILITY_PLY = 61;
+/**
+ * The mobility group of a file of form 2, after the pattern groups: no square, 2 places, kind 1 (the third byte of a
+ * group: 0 for a pattern group), 64 weights.
+ */
+static const unsigned char EVAL2_MOBILITY_GROUP[EVAL2_GROUP_SIZE] = { 0, 2, 1, 0, EVAL_N_MOBILITY, 0, 0, 0 };
 
 /** pattern groups of the weights, in the order of the packed weights: squares, places on the board, packed weights, squares of the first place */
 static const struct EvalGroup {
@@ -626,6 +636,7 @@ typedef struct EvalFileHeader {
 	double date;
 	int n_plies;                 /**< form 2: plies in the file */
 	int n_group;                 /**< pattern groups of the weights: EVAL2_N_GROUP, or EVAL2_N_GROUP_ALL (extra groups) */
+	bool mobility;               /**< form 2: the weights of a ply end with the mobility group */
 	unsigned int n_weights;      /**< weights of a ply */
 	double coefficient[6];       /**< error coefficients A, B, C, a, b, c */
 } EvalFileHeader;
@@ -657,16 +668,19 @@ static void eval_file_header_read(FILE *f, const char *file, EvalFileHeader *h)
 
 	if (fread(magic, 1, 8, f) != 8) fatal_error("%s is not an Edax evaluation file\n", file);
 	if (memcmp(magic, EVAL2_MAGIC, 8) == 0) {
-		unsigned char x[EVAL2_HEADER_SIZE(EVAL2_N_GROUP_ALL)], groups[EVAL2_N_GROUP_ALL * EVAL2_GROUP_SIZE];
+		unsigned char x[EVAL2_HEADER_SIZE(EVAL2_N_GROUP_ALL + 1)], groups[EVAL2_N_GROUP_ALL * EVAL2_GROUP_SIZE];
 		unsigned short format, size, n_plies, first_ply, n_group;
 		unsigned int flags, n_weights, crc, n_expected = 0;
+		bool mobility;
+		int n_pattern;
 
 		memcpy(x, magic, 8);
 		if (fread(x + 8, 1, 4, f) != 4) fatal_error("Cannot read version info from %s\n", file);
 		memcpy(&format, x + 8, 2);
 		memcpy(&size, x + 10, 2);
 		if (format != 2) fatal_error("%s is an evaluation file of another form (%u)\n", file, format);
-		if (size != EVAL2_HEADER_SIZE(EVAL2_N_GROUP) && size != EVAL2_HEADER_SIZE(EVAL2_N_GROUP_ALL))
+		if (size != EVAL2_HEADER_SIZE(EVAL2_N_GROUP) && size != EVAL2_HEADER_SIZE(EVAL2_N_GROUP_ALL)
+		 && size != EVAL2_HEADER_SIZE(EVAL2_N_GROUP + 1) && size != EVAL2_HEADER_SIZE(EVAL2_N_GROUP_ALL + 1))
 			fatal_error("%s holds weights of patterns this Edax does not use\n", file);
 		if (fread(x + 12, 1, size - 12, f) != (size_t) (size - 12)) fatal_error("Cannot read version info from %s\n", file);
 		memcpy(&crc, x + size - 4, 4);
@@ -681,16 +695,22 @@ static void eval_file_header_read(FILE *f, const char *file, EvalFileHeader *h)
 		memcpy(&n_weights, x + 40, 4);
 		memcpy(&n_group, x + 44, 2);
 		memcpy(h->coefficient, x + 48, sizeof h->coefficient);
+		// the pattern groups, then the mobility group or not
+		mobility = size == EVAL2_HEADER_SIZE(n_group) && n_group > 1
+			&& memcmp(x + EVAL2_GROUPS_AT + (n_group - 1) * EVAL2_GROUP_SIZE, EVAL2_MOBILITY_GROUP, EVAL2_GROUP_SIZE) == 0;
+		n_pattern = n_group - (mobility ? 1 : 0);
 		eval_groups_write(groups, EVAL2_N_GROUP_ALL);
-		for (int i = 0; i < n_group && i < EVAL2_N_GROUP_ALL; ++i) n_expected += EVAL_GROUP[i].n_packed;
-		if (flags != 0 || (n_group != EVAL2_N_GROUP && n_group != EVAL2_N_GROUP_ALL) || size != EVAL2_HEADER_SIZE(n_group)
-		 || n_weights != n_expected || memcmp(x + EVAL2_GROUPS_AT, groups, n_group * EVAL2_GROUP_SIZE) != 0)
+		for (int i = 0; i < n_pattern && i < EVAL2_N_GROUP_ALL; ++i) n_expected += EVAL_GROUP[i].n_packed;
+		if (mobility) n_expected += EVAL_N_MOBILITY;
+		if (flags != 0 || (n_pattern != EVAL2_N_GROUP && n_pattern != EVAL2_N_GROUP_ALL) || size != EVAL2_HEADER_SIZE(n_group)
+		 || n_weights != n_expected || memcmp(x + EVAL2_GROUPS_AT, groups, n_pattern * EVAL2_GROUP_SIZE) != 0)
 			fatal_error("%s holds weights of patterns this Edax does not use\n", file);
 		if (first_ply != 0 || n_plies < EVAL_N_2PLY * 2) fatal_error("%s does not hold the weights of plies 0 to %d\n", file, EVAL_N_2PLY * 2 - 1);
 		h->format = 2;
 		h->swap = false;
 		h->n_plies = n_plies;
-		h->n_group = n_group;
+		h->n_group = n_pattern;
+		h->mobility = mobility;
 		h->n_weights = n_weights;
 		return;
 	}
@@ -712,6 +732,7 @@ static void eval_file_header_read(FILE *f, const char *file, EvalFileHeader *h)
 	}
 	h->n_plies = 0; // (not told by the file)
 	h->n_group = EVAL2_N_GROUP;
+	h->mobility = false; // (form 1: the mobility weights are after the plies, see eval_open and eval_convert)
 	h->n_weights = EVAL_N_PACKED;
 	memcpy(h->coefficient, EVAL_ERROR_COEFFICIENT, sizeof h->coefficient);
 }
@@ -724,8 +745,10 @@ static void eval_file_header_read(FILE *f, const char *file, EvalFileHeader *h)
  * @param h Header.
  * @param crc CRC of the weights read.
  * @param w Room for the weights of a ply.
+ * @param mobility Where the mobility weights of the plies read here go (the plies below EVAL_N_MOBILITY_PLY), or NULL.
  */
-static void eval_file_check_2(FILE *f, const char *file, const EvalFileHeader *h, unsigned int crc, const int read_plies, short *w)
+static void eval_file_check_2(FILE *f, const char *file, const EvalFileHeader *h, unsigned int crc, const int read_plies, short *w,
+	short (*mobility)[EVAL_N_MOBILITY])
 {
 	unsigned char t[8];
 	unsigned int c;
@@ -733,6 +756,7 @@ static void eval_file_check_2(FILE *f, const char *file, const EvalFileHeader *h
 	for (int ply = read_plies; ply < h->n_plies; ++ply) {
 		if (fread(w, sizeof (short), h->n_weights, f) != h->n_weights) fatal_error("Cannot read evaluation weight from %s\n", file);
 		crc = crc32c_bytes(crc, w, h->n_weights * sizeof (short));
+		if (mobility && ply < EVAL_N_MOBILITY_PLY) memcpy(mobility[ply], w + h->n_weights - EVAL_N_MOBILITY, sizeof mobility[ply]);
 	}
 	if (fread(t, 1, 8, f) != 8) fatal_error("Cannot read evaluation weight from %s\n", file);
 	memcpy(&c, t, 4);
@@ -743,6 +767,8 @@ static void eval_file_check_2(FILE *f, const char *file, const EvalFileHeader *h
  * @brief Convert an evaluation file of form 1 into form 2, or form 2 into form 1.
  *
  * The weights are copied as they are (the weights of every ply of the file, even the ones Edax does not use).
+ * The mobility weights go with them: a file of form 1 of 61 plies followed by "MOBW" (or "WBOM": bytes swapped) and
+ * 61 x 64 weights becomes a file of form 2 with the mobility group, and back (form 2 of 61 plies).
  *
  * @param in File to convert.
  * @param out File to write.
@@ -752,56 +778,85 @@ bool eval_convert(const char *in, const char *out)
 {
 	EvalFileHeader h;
 	FILE *f, *g;
-	short *w = NULL;
+	short *w = NULL, *mob = NULL; // weights: n_plies x n_w; the mobility weights of form 1: 61 x 64
 	long long n_plies = 0, i;
-	unsigned int crc = 0;
-	bool ok = false;
+	size_t n_w = EVAL_N_PACKED;
+	unsigned int crc = 0, tag = 0;
+	bool ok = false, mobility = false;
 
 	f = file_open(in, "rb");
 	if (f == NULL) { error("Cannot open %s\n", in); return false; }
 	eval_file_header_read(f, in, &h);
 	if (h.format == 2) {
 		n_plies = h.n_plies;
+		n_w = h.n_weights;
+		mobility = h.mobility;
 		if (h.n_group != EVAL2_N_GROUP) { error("%s holds weights that form 1 cannot hold\n", in); fclose(f); return false; }
-	} else { // the plies that are left in the file
+		if (mobility && n_plies != EVAL_N_MOBILITY_PLY) { error("%s: form 1 holds the mobility weights of %d plies only\n", in, EVAL_N_MOBILITY_PLY); fclose(f); return false; }
+	} else { // the plies that are left in the file, and the mobility weights or not
+		const long long ply_bytes = EVAL_N_PACKED * sizeof (short);
+		const long long mobility_bytes = sizeof tag + EVAL_N_MOBILITY_PLY * EVAL_N_MOBILITY * sizeof (short);
 		long long here, end;
 #ifdef _WIN32
 		here = _ftelli64(f); _fseeki64(f, 0, SEEK_END); end = _ftelli64(f); _fseeki64(f, here, SEEK_SET);
 #else
 		here = ftello(f); fseeko(f, 0, SEEK_END); end = ftello(f); fseeko(f, here, SEEK_SET);
 #endif
-		if (here < 0 || end < here || (end - here) % (EVAL_N_PACKED * sizeof (short)) != 0 || end == here) {
-			error("%s does not hold whole plies of weights\n", in);
-			fclose(f);
-			return false;
+		if (here >= 0 && end - here == EVAL_N_MOBILITY_PLY * ply_bytes + mobility_bytes) {
+#ifdef _WIN32
+			_fseeki64(f, here + EVAL_N_MOBILITY_PLY * ply_bytes, SEEK_SET);
+			mobility = fread(&tag, sizeof tag, 1, f) == 1 && (tag == (unsigned int) MOBW || tag == (unsigned int) WBOM);
+			_fseeki64(f, here, SEEK_SET);
+#else
+			fseeko(f, here + EVAL_N_MOBILITY_PLY * ply_bytes, SEEK_SET);
+			mobility = fread(&tag, sizeof tag, 1, f) == 1 && (tag == (unsigned int) MOBW || tag == (unsigned int) WBOM);
+			fseeko(f, here, SEEK_SET);
+#endif
 		}
-		n_plies = (end - here) / (EVAL_N_PACKED * sizeof (short));
-		if (n_plies > 65535) { error("%s holds too many plies\n", in); fclose(f); return false; }
+		if (mobility) n_plies = EVAL_N_MOBILITY_PLY;
+		else {
+			if (here < 0 || end < here || (end - here) % ply_bytes != 0 || end == here) {
+				error("%s does not hold whole plies of weights\n", in);
+				fclose(f);
+				return false;
+			}
+			n_plies = (end - here) / ply_bytes;
+			if (n_plies > 65535) { error("%s holds too many plies\n", in); fclose(f); return false; }
+		}
 	}
-	w = (short*) malloc((size_t) n_plies * EVAL_N_PACKED * sizeof (short));
-	if (w == NULL) { error("Cannot allocate the weights of %s\n", in); fclose(f); return false; }
-	if (fread(w, sizeof (short) * EVAL_N_PACKED, (size_t) n_plies, f) != (size_t) n_plies) {
+	w = (short*) malloc((size_t) n_plies * n_w * sizeof (short));
+	if (mobility && h.format == 1) mob = (short*) malloc(EVAL_N_MOBILITY_PLY * EVAL_N_MOBILITY * sizeof (short));
+	if (w == NULL || (mobility && h.format == 1 && mob == NULL)) { error("Cannot allocate the weights of %s\n", in); free(w); free(mob); fclose(f); return false; }
+	if (fread(w, sizeof (short) * n_w, (size_t) n_plies, f) != (size_t) n_plies) {
 		error("Cannot read evaluation weight from %s\n", in);
 		goto convert_end;
 	}
 	if (h.format == 2) {
 		unsigned char t[8];
 		unsigned int c;
-		crc = crc32c_bytes(0, w, (size_t) n_plies * EVAL_N_PACKED * sizeof (short));
+		crc = crc32c_bytes(0, w, (size_t) n_plies * n_w * sizeof (short));
 		if (fread(t, 1, 8, f) != 8 || (memcpy(&c, t, 4), c != crc) || memcmp(t + 4, EVAL2_END, 4) != 0 || fgetc(f) != EOF) {
 			error("Damaged evaluation file %s (the check of the weights fails)\n", in);
 			goto convert_end;
 		}
-	} else if (h.swap) {
-		for (i = 0; i < n_plies * EVAL_N_PACKED; ++i) w[i] = bswap_short(w[i]);
+	} else {
+		if (h.swap) for (i = 0; i < n_plies * EVAL_N_PACKED; ++i) w[i] = bswap_short(w[i]);
+		if (mobility) {
+			if (fread(&tag, sizeof tag, 1, f) != 1 || fread(mob, sizeof (short), EVAL_N_MOBILITY_PLY * EVAL_N_MOBILITY, f) != EVAL_N_MOBILITY_PLY * EVAL_N_MOBILITY) {
+				error("Cannot read the mobility weights from %s\n", in);
+				goto convert_end;
+			}
+			if (tag == (unsigned int) WBOM) for (i = 0; i < EVAL_N_MOBILITY_PLY * EVAL_N_MOBILITY; ++i) mob[i] = bswap_short(mob[i]);
+		}
 	}
 
 	g = file_open(out, "wb");
 	if (g == NULL) { error("Cannot open %s\n", out); goto convert_end; }
 	if (h.format == 1) { // into form 2
-		unsigned char x[EVAL2_HEADER_SIZE(EVAL2_N_GROUP)] = {};
-		const unsigned short format = 2, size = EVAL2_HEADER_SIZE(EVAL2_N_GROUP), plies = (unsigned short) n_plies, first_ply = 0, n_group = EVAL2_N_GROUP;
-		const unsigned int n_weights = EVAL_N_PACKED;
+		unsigned char x[EVAL2_HEADER_SIZE(EVAL2_N_GROUP + 1)] = {};
+		const int groups = EVAL2_N_GROUP + (mobility ? 1 : 0);
+		const unsigned short format = 2, size = (unsigned short) EVAL2_HEADER_SIZE(groups), plies = (unsigned short) n_plies, first_ply = 0, n_group = (unsigned short) groups;
+		const unsigned int n_weights = EVAL_N_PACKED + (mobility ? EVAL_N_MOBILITY : 0);
 		unsigned char t[8];
 		memcpy(x, EVAL2_MAGIC, 8);
 		memcpy(x + 8, &format, 2);
@@ -816,19 +871,38 @@ bool eval_convert(const char *in, const char *out)
 		memcpy(x + 44, &n_group, 2);
 		memcpy(x + 48, h.coefficient, sizeof h.coefficient);
 		eval_groups_write(x + EVAL2_GROUPS_AT, EVAL2_N_GROUP);
+		if (mobility) memcpy(x + EVAL2_GROUPS_AT + EVAL2_N_GROUP * EVAL2_GROUP_SIZE, EVAL2_MOBILITY_GROUP, EVAL2_GROUP_SIZE);
 		crc = crc32c_bytes(0, x, size - 4);
 		memcpy(x + size - 4, &crc, 4);
-		crc = crc32c_bytes(0, w, (size_t) n_plies * EVAL_N_PACKED * sizeof (short));
+		ok = fwrite(x, 1, size, g) == size;
+		if (!mobility) {
+			crc = crc32c_bytes(0, w, (size_t) n_plies * EVAL_N_PACKED * sizeof (short));
+			ok = ok && fwrite(w, sizeof (short) * EVAL_N_PACKED, (size_t) n_plies, g) == (size_t) n_plies;
+		} else { // each ply: the pattern weights, then the mobility weights
+			crc = 0;
+			for (i = 0; i < n_plies && ok; ++i) {
+				const short *wp = w + i * EVAL_N_PACKED, *mp = mob + i * EVAL_N_MOBILITY;
+				crc = crc32c_bytes(crc, wp, EVAL_N_PACKED * sizeof (short));
+				crc = crc32c_bytes(crc, mp, EVAL_N_MOBILITY * sizeof (short));
+				ok = fwrite(wp, sizeof (short), EVAL_N_PACKED, g) == (size_t) EVAL_N_PACKED
+				  && fwrite(mp, sizeof (short), EVAL_N_MOBILITY, g) == (size_t) EVAL_N_MOBILITY;
+			}
+		}
 		memcpy(t, &crc, 4);
 		memcpy(t + 4, EVAL2_END, 4);
-		ok = fwrite(x, 1, size, g) == size
-		  && fwrite(w, sizeof (short) * EVAL_N_PACKED, (size_t) n_plies, g) == (size_t) n_plies
-		  && fwrite(t, 1, 8, g) == 8;
+		ok = ok && fwrite(t, 1, 8, g) == 8;
 	} else { // into form 1
 		const unsigned int header[5] = { (unsigned int) EDAX, (unsigned int) EVAL, h.version, h.release, h.build };
 		ok = fwrite(header, sizeof header, 1, g) == 1
-		  && fwrite(&h.date, sizeof h.date, 1, g) == 1
-		  && fwrite(w, sizeof (short) * EVAL_N_PACKED, (size_t) n_plies, g) == (size_t) n_plies;
+		  && fwrite(&h.date, sizeof h.date, 1, g) == 1;
+		if (!mobility) {
+			ok = ok && fwrite(w, sizeof (short) * EVAL_N_PACKED, (size_t) n_plies, g) == (size_t) n_plies;
+		} else { // the pattern weights of each ply, then "MOBW" and the mobility weights of each ply
+			const unsigned int mobw = (unsigned int) MOBW;
+			for (i = 0; i < n_plies && ok; ++i) ok = fwrite(w + i * n_w, sizeof (short), EVAL_N_PACKED, g) == (size_t) EVAL_N_PACKED;
+			ok = ok && fwrite(&mobw, sizeof mobw, 1, g) == 1;
+			for (i = 0; i < n_plies && ok; ++i) ok = fwrite(w + i * n_w + EVAL_N_PACKED, sizeof (short), EVAL_N_MOBILITY, g) == (size_t) EVAL_N_MOBILITY;
+		}
 		if (memcmp(h.coefficient, EVAL_ERROR_COEFFICIENT, sizeof h.coefficient) != 0)
 			warn("%s: the error coefficients of %s are not kept (form 1 does not hold them)\n", out, in);
 	}
@@ -837,6 +911,7 @@ bool eval_convert(const char *in, const char *out)
 
 convert_end:
 	free(w);
+	free(mob);
 	fclose(f);
 	return ok;
 }
@@ -936,6 +1011,12 @@ void eval_open(const char* file)
 
 	// File header
 	eval_file_header_read(f, file, &header);
+#if EVAL_MOBILITY
+	memset(EVAL_MOBILITY_WEIGHT, 0, sizeof EVAL_MOBILITY_WEIGHT);
+	EVAL_HAS_MOBILITY = header.mobility;
+#else
+	if (header.mobility) fatal_error("%s holds mobility weights: they need a build with EVAL_MOBILITY\n", file);
+#endif
 	n_w = (int) header.n_weights;
 	w = (short*) malloc(n_w * sizeof (*w)); // a temporary to read packed weights
 	if (w == NULL) fatal_error("Cannot allocate temporary table variable.\n");
@@ -944,6 +1025,9 @@ void eval_open(const char* file)
 		r = fread(w, sizeof (short), n_w, f);
 		if (r != n_w) fatal_error("Cannot read evaluation weight from %s\n", file);
 		if (header.format == 2) crc = crc32c_bytes(crc, w, n_w * sizeof (short));
+#if EVAL_MOBILITY
+		if (header.mobility) memcpy(EVAL_MOBILITY_WEIGHT[ply], w + n_w - EVAL_N_MOBILITY, sizeof EVAL_MOBILITY_WEIGHT[ply]); // (form 2, ply 0 to 53)
+#endif
 		if (ply < 2) continue;	// skip ply 1 & 2
 
 		if (header.swap) for (i = 0; i < n_w; ++i) w[i] = bswap_short(w[i]);
@@ -983,18 +1067,18 @@ void eval_open(const char* file)
 		// extra groups: the file weights (from the side to move at an even ply), or 0 if the file has none
 		for (i = 0; i < 4; ++i) {
 			const short *wx = w + EVAL_N_PACKED + i * EVAL_N_X;
-			if (n_w == EVAL_N_PACKED) for (k = 0; k < EVAL_N_X; k++) *(pe->X[i][k]) = 0;
+			if (header.n_group == EVAL2_N_GROUP) for (k = 0; k < EVAL_N_X; k++) *(pe->X[i][k]) = 0;
 			else if (ply & 1) for (k = 0; k < EVAL_N_X; k++) *(pe->X[i][k]) = wx[OPPONENT_FEATURE[k]];
 			else for (k = 0; k < EVAL_N_X; k++) *(pe->X[i][k]) = wx[k];
 		}
 #endif
 	}
 
-	if (header.format == 2) eval_file_check_2(f, file, &header, crc, EVAL_N_2PLY * 2, w);
 #if EVAL_MOBILITY
+	if (header.format == 2) eval_file_check_2(f, file, &header, crc, EVAL_N_2PLY * 2, w, header.mobility ? EVAL_MOBILITY_WEIGHT : nullptr);
+	// form 2 of fewer plies than the mobility weights: the missing plies as the ply 2 before (same parity)
+	if (header.mobility) for (ply = header.n_plies; ply < EVAL_N_MOBILITY_PLY; ++ply) memcpy(EVAL_MOBILITY_WEIGHT[ply], EVAL_MOBILITY_WEIGHT[ply - 2], sizeof EVAL_MOBILITY_WEIGHT[ply]);
 	// optional mobility weights of a file of form 1, after its 61 plies of pattern weights: "MOBW" then 61 x 64 shorts
-	memset(EVAL_MOBILITY_WEIGHT, 0, sizeof EVAL_MOBILITY_WEIGHT);
-	EVAL_HAS_MOBILITY = false;
 	if (header.format == 1 && fseek(f, 5 * sizeof (int) + sizeof (double) + 61L * n_w * sizeof (short), SEEK_SET) == 0) {
 		unsigned int tag;
 		if (fread(&tag, sizeof tag, 1, f) == 1 && (tag == (unsigned int) MOBW || tag == (unsigned int) WBOM)) {
@@ -1003,6 +1087,8 @@ void eval_open(const char* file)
 			EVAL_HAS_MOBILITY = true;
 		}
 	}
+#else
+	if (header.format == 2) eval_file_check_2(f, file, &header, crc, EVAL_N_2PLY * 2, w, nullptr);
 #endif
 	fclose(f);
 	free(w);

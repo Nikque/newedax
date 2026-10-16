@@ -2,7 +2,9 @@
 # run on one logical CPU. Each test runs a tool of --exe and checks its exit code, messages or outputs.
 # usage: py -3 test_evtools.py --exe <dir of the tools> --work <work dir> [--ev D:\edaxwork\ev] [--edax <new edax exe>]
 #                              [--exe-avx2 <dir of the tools built with /arch:AVX2>] [--tests a,b,...] [--cpu n]
-#   --edax: an edax.exe of this repository (to write a book of form 2 with -book-convert).
+#                              [--edax-mob <new edax exe built with EVAL_MOBILITY=1>] [--eval2 <eval.dat of eval2>]
+#   --edax: an edax.exe of this repository (to write a book of form 2 with -book-convert, an eval.dat of form 2 with
+#   -eval-convert; a build without EVAL_MOBILITY).
 import argparse, ctypes, os, shutil, struct, subprocess, sys, time
 from ctypes import wintypes
 
@@ -400,9 +402,86 @@ def t_evsearch_window(a, d):
     return ok, f"none/w0 same {outs['none'][2] == outs['w0'][2]}, w1 differs {outs['w1'][2] != outs['none'][2]}; bad decay exit {rc}"
 
 
+START_OBF = '-' * 27 + 'OX' + '-' * 6 + 'XO' + '-' * 27 + ' X;\n'
+
+
+def eval2_form2(a, d):
+    """the eval.dat of eval2 (form 1 + MOBW) converted into form 2 by --edax; the name of the file"""
+    f2 = os.path.join(d, 'eval2-f2.dat')
+    run([a.edax, '-eval-convert', a.eval2, f2], d)
+    return f2
+
+
+def mobility_table(path, ply):
+    """the mobility weights of a ply of an eval.dat of form 1 + MOBW"""
+    data = open(path, 'rb').read()
+    at = 28 + 61 * 114364 * 2 + 4 + ply * 128
+    return list(struct.unpack('<64h', data[at:at + 128]))
+
+
+def t_eval_form2_mob(a, d):
+    """eval.dat of form 2 with the mobility group (DESIGN-format.md 3.4): eval2 into form 2 and back gives the same
+    bytes; a build without EVAL_MOBILITY refuses the file, a build with it reads it"""
+    if not (a.edax and a.edax_mob and a.eval2):
+        return None, 'no --edax, --edax-mob or --eval2'
+    f2, f1 = eval2_form2(a, d), os.path.join(d, 'eval2-f1.dat')
+    rc0, out0 = run([a.edax, '-eval-convert', f2, f1], d)
+    same = os.path.exists(f1) and open(f1, 'rb').read() == open(a.eval2, 'rb').read()
+    obf = os.path.join(d, 'start.obf'); open(obf, 'w').write(START_OBF)
+    common = ['-eval-file', f2, '-book-usage', 'off', '-n', '1', '-l', '2', '-solve', obf]
+    rc1, out1 = run([a.edax] + common, d, timeout=60)
+    rc2, out2 = run([a.edax_mob] + common, d, timeout=60)
+    ok = rc0 == 0 and same and rc1 != 0 and 'EVAL_MOBILITY' in out1 and rc2 == 0
+    return ok, f'convert back exit {rc0} same {same}; default build exit {rc1} {out1.strip()[-80:]!r}; EVAL_MOBILITY build exit {rc2}'
+
+
+def t_evcheck_mob(a, d):
+    """evcheck (built with EVAL_MOBILITY): the evaluation of evtool, mobility included, as Edax's on the eval.dat of eval2
+    in form 1 and in form 2"""
+    if not (a.edax and a.eval2):
+        return None, 'no --edax or --eval2'
+    f2 = eval2_form2(a, d)
+    res = []
+    for f in (a.eval2, f2):
+        rc, out = run([a.tool('evcheck'), f, '300'], d)
+        res.append((rc, 'mobility weights compared too' in out, out.strip()[-60:]))
+    return all(rc == 0 and mob for rc, mob, _ in res), repr(res)
+
+
+def t_teacher_prior_mob(a, d):
+    """evsearch with the eval.dat of eval2: -teacher gives the same outputs from form 1 and form 2; -prior frozen
+    (-lambda-prior 1e30) keeps the mobility weights of eval2; evtrain refuses a file with mobility weights"""
+    if not (a.edax and a.eval2):
+        return None, 'no --edax or --eval2'
+    f2 = eval2_form2(a, d)
+    e = rel_ev(a, d)
+    cfg = os.path.join(d, 'cfg.txt'); open(cfg, 'w').write('Rt l2 d8 mob\n')
+    common = [a.tool('evsearch'), '-lib', f'{e}/patterns.txt', '-configs', cfg, '-plies', '30', '-threads', '1', '-src', f'ss:{e}/sp8:1:20000', '-iter', '3']
+    outs = []
+    for name, f in (('t1', a.eval2), ('t2', f2)):
+        o = os.path.join(d, name); os.makedirs(o)
+        rc, text = run(common + ['-teacher', f, '-alpha', '0.5', '-dump', o], d)
+        outs.append((rc, text, open(os.path.join(o, 'Rt_30.w'), 'rb').read() if rc == 0 else b''))
+    teacher_same = outs[0][0] == 0 and outs[0][1:] == outs[1][1:]
+    cfgp = os.path.join(d, 'cfgp.txt'); open(cfgp, 'w').write('Rm l2 d8 mob\n')
+    o = os.path.join(d, 'prior'); os.makedirs(o)
+    rc, text = run([a.tool('evsearch'), '-lib', f'{e}/patterns.txt', '-configs', cfgp, '-plies', '30', '-threads', '1', '-src', f'ss:{e}/sp8:1:2000',
+                    '-iter', '1', '-prior', a.eval2, '-lambda-prior', '1e30', '-dump', o], d)
+    prior_kept = False
+    if rc == 0:
+        scl = struct.unpack('<22i', open(os.path.join(o, 'Rm.scl'), 'rb').read())
+        w = open(os.path.join(o, 'Rm_30.w'), 'rb').read()
+        mob = [round(x * 128) for x in struct.unpack('<64d', w[8 * scl[1]:8 * scl[1] + 512])]
+        prior_kept = scl[0] == 1 and mob == mobility_table(a.eval2, 30)
+    rc3, text3 = run([a.tool('evtrain'), '-init', a.eval2, '-out', os.path.join(d, 'x.dat'), '-src', f'ss:{e}/sp8:1:100', '-plies', '30-30', '-threads', '1'], d)
+    ok = teacher_same and prior_kept and rc3 == 1 and 'mobility' in text3
+    return ok, f'teacher form 1 / form 2 same {teacher_same}; frozen prior keeps the mobility weights {prior_kept} (exit {rc}); evtrain exit {rc3} {text3.strip()[-60:]!r}'
+
+
 TESTS = [t_src_drive, t_base_drive, t_src_bad, t_many_instances, t_many_sources, t_many_plies, t_bad_ply_range, t_pattern_bad,
          t_missing_files, t_out_of_memory, t_short_weights, t_book_form2, t_selfplay_random_range, t_gen_low_ply,
-         t_gen_no_training, t_leafgen_keep_all, t_trans2rec, t_selfplay_alt, t_evsearch_window]
+         t_gen_no_training, t_leafgen_keep_all, t_trans2rec, t_selfplay_alt, t_evsearch_window,
+         t_eval_form2_mob, t_evcheck_mob, t_teacher_prior_mob]
 
 
 def main():
@@ -410,6 +489,7 @@ def main():
     ap.add_argument('--exe', required=True); ap.add_argument('--work', required=True); ap.add_argument('--ev', default=r'D:\edaxwork\ev')
     ap.add_argument('--edax', default=''); ap.add_argument('--exe-avx2', default=''); ap.add_argument('--tests', default='')
     ap.add_argument('--cpu', type=int, default=0)
+    ap.add_argument('--edax-mob', default=''); ap.add_argument('--eval2', default='')
     a = ap.parse_args()
     global CPU
     CPU = a.cpu

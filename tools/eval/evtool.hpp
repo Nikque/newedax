@@ -450,32 +450,145 @@ inline void et_features(uint64_t P, uint64_t O, int *idx)
 	}
 }
 
-/** eval.dat of form 1: header (5 ints, a double), then the packed weights of 61 plies */
+enum { ET_NMOB = 64 };	// mobility weights of a ply: the numbers of legal moves (0..31) of the side to move, then of the opponent
+
+/**
+ * eval.dat: header of form 1 (5 ints, a double), the packed weights of 61 plies, and the mobility weights of eval2
+ * (has_mob; 61 plies, indexed by the ply itself, not folded as the pattern weights)
+ */
 struct ET_Eval {
 	unsigned int edax, eval, version, release, build;
 	double date;
 	short w[ET_NPLY][ET_NW];
+	short mob[ET_NPLY][ET_NMOB];
+	bool has_mob;
 };
 
-/** read an eval.dat of form 1 (at least 54 plies; the missing plies are copies of the last one) */
+/** the group table of a file of form 2 with the 46 features of Edax 4.5 (13 groups), as eval_groups_write of src/eval */
+inline void et_groups(unsigned char *x)
+{
+	static const int first[12] = { 0, 4, 8, 12, 16, 20, 24, 28, 30, 34, 38, 42 };	// a feature of each group
+	memset(x, 0, 13 * 20);
+	for (int g = 0; g < 12; ++g, x += 20) {
+		const ET_F2X *f = ET_FEAT + first[g];
+		x[0] = (unsigned char) f->n; x[1] = g == 7 ? 2 : 4;	// (the main diagonals: 2 places)
+		memcpy(x + 4, &ET_PSIZE[g], 4);
+		memcpy(x + 8, f->x, f->n);
+	}
+	x[1] = 1; x[4] = 1;	// S0: no square, 1 place, 1 weight
+}
+
+/** the mobility group of a file of form 2 (src/eval: EVAL2_MOBILITY_GROUP) */
+inline constexpr unsigned char ET_MOBILITY_GROUP[20] = { 0, 2, 1, 0, ET_NMOB, 0, 0, 0 };
+
+/** read an eval.dat of form 2 ("NEDXEVAL") with the 46 features and the mobility group or not */
+inline void et_read_2(FILE *f, const char *file, ET_Eval *e)
+{
+	unsigned char x[96 + 14 * 20 + 4], groups[13 * 20];
+	uint16_t form, size, n_plies, first_ply, n_group;
+	uint32_t flags, n_weights, crc;
+	if (fread(x, 1, 12, f) != 12) die("%s is truncated", file);
+	memcpy(&form, x + 8, 2); memcpy(&size, x + 10, 2);
+	if (form != 2 || (size != 96 + 13 * 20 + 4 && size != 96 + 14 * 20 + 4)) die("%s holds weights of other patterns than the 46 features of Edax 4.5", file);
+	if (fread(x + 12, 1, size - 12, f) != (size_t) (size - 12)) die("%s is truncated", file);
+	memcpy(&crc, x + size - 4, 4);
+	if (crc32c_update(0, x, size - 4) != crc) die("%s has a damaged header", file);
+	memcpy(&flags, x + 12, 4);
+	memcpy(&e->version, x + 16, 4); memcpy(&e->release, x + 20, 4); memcpy(&e->build, x + 24, 4);
+	memcpy(&e->date, x + 28, 8);
+	memcpy(&n_plies, x + 36, 2); memcpy(&first_ply, x + 38, 2); memcpy(&n_weights, x + 40, 4); memcpy(&n_group, x + 44, 2);
+	et_groups(groups);
+	e->has_mob = n_group == 14;
+	if (flags != 0 || size != 96 + n_group * 20 + 4 || memcmp(x + 96, groups, sizeof groups)
+	 || (e->has_mob && memcmp(x + 96 + 13 * 20, ET_MOBILITY_GROUP, 20)) || n_weights != (uint32_t) ET_NW + (e->has_mob ? ET_NMOB : 0))
+		die("%s holds weights of other patterns than the 46 features of Edax 4.5", file);
+	if (first_ply != 0 || n_plies < 54) die("%s does not hold the weights of plies 0 to 53", file);
+	short *w = (short *) xmalloc(n_weights * sizeof *w);
+	crc = 0;
+	for (int ply = 0; ply < n_plies; ++ply) {
+		xfread(w, sizeof *w, n_weights, f, file);
+		crc = crc32c_update(crc, (const unsigned char *) w, n_weights * sizeof *w);
+		if (ply < ET_NPLY) {
+			memcpy(e->w[ply], w, sizeof e->w[ply]);
+			if (e->has_mob) memcpy(e->mob[ply], w + ET_NW, sizeof e->mob[ply]);
+		}
+	}
+	free(w);
+	unsigned char t[8];
+	uint32_t c;
+	if (fread(t, 1, 8, f) != 8) die("%s is truncated", file);
+	memcpy(&c, t, 4);
+	if (c != crc || memcmp(t + 4, "EEND", 4) || fgetc(f) != EOF) die("%s is damaged (the check of the weights fails)", file);
+	for (int ply = n_plies; ply < ET_NPLY; ++ply) {	// missing plies: as the last one (patterns), as the ply 2 before (mobility)
+		memcpy(e->w[ply], e->w[ply - 1], sizeof e->w[0]);
+		memcpy(e->mob[ply], e->mob[ply - 2], sizeof e->mob[0]);
+	}
+	e->edax = 0x45444158; e->eval = 0x4556414c;	// (written as form 1 by et_write)
+}
+
+/**
+ * read an eval.dat of form 1 (at least 54 plies; the missing plies are copies of the last one; the mobility weights
+ * of eval2 after 61 plies: "MOBW" or "WBOM" (bytes swapped) and 61 x 64 shorts), or of form 2
+ */
 inline ET_Eval *et_read(const char *file)
 {
 	FILE *f = fopen(file, "rb");
 	if (!f) { fprintf(stderr, "cannot open %s\n", file); exit(1); }
 	ET_Eval *e = (ET_Eval *) calloc(1, sizeof *e);
 	if (e == nullptr) { fprintf(stderr, "out of memory\n"); exit(1); }
-	size_t r = fread(&e->edax, 4, 5, f);
-	if (r >= 2 && !(e->edax == 0x45444158 && e->eval == 0x4556414c)) {	// "EDAX" "EVAL"
-		if (!memcmp(&e->edax, "NEDXEVAL", 8)) die("%s is an evaluation file of form 2: convert it to form 1 (edax -eval-convert)", file);
-		die("%s is not an evaluation file of form 1", file);
+	unsigned char magic[8];
+	if (fread(magic, 1, 8, f) == 8 && !memcmp(magic, "NEDXEVAL", 8)) {
+		rewind(f);
+		et_read_2(f, file, e);
+		fclose(f);
+		return e;
 	}
+	rewind(f);
+	size_t r = fread(&e->edax, 4, 5, f);
+	if (r >= 2 && !(e->edax == 0x45444158 && e->eval == 0x4556414c)) die("%s is not an evaluation file", file);	// "EDAX" "EVAL"
 	r += fread(&e->date, 8, 1, f);
 	int np = 0;
 	while (np < ET_NPLY && fread(e->w[np], 2, ET_NW, f) == ET_NW) ++np;
+	if (np == ET_NPLY) {	// mobility weights of eval2, or not
+		uint32_t tag;
+		if (fread(&tag, 4, 1, f) == 1 && (tag == 0x4d4f4257 || tag == 0x57424f4d)) {
+			xfread(e->mob, sizeof (short), (size_t) ET_NPLY * ET_NMOB, f, file);
+			if (tag == 0x57424f4d) for (int p = 0; p < ET_NPLY; ++p) for (int i = 0; i < ET_NMOB; ++i) e->mob[p][i] = (short) ((uint16_t) e->mob[p][i] << 8 | (uint16_t) e->mob[p][i] >> 8);
+			e->has_mob = true;
+		}
+	}
 	fclose(f);
 	if (r != 6 || np < 54) { fprintf(stderr, "bad eval file %s (%d plies)\n", file, np); exit(1); }
 	for (; np < ET_NPLY; ++np) memcpy(e->w[np], e->w[np - 1], sizeof e->w[0]);
 	return e;
+}
+
+/** legal moves of P against O */
+inline uint64_t et_get_moves(uint64_t P, uint64_t O)
+{
+	uint64_t moves = 0, mO = O & 0x7e7e7e7e7e7e7e7eULL, flip, pre;
+	const int dir[4] = { 1, 7, 8, 9 };
+	const uint64_t mask[4] = { mO, mO, O, mO };
+	for (int d = 0; d < 4; ++d) {
+		const int s = dir[d]; const uint64_t m = mask[d];
+		flip = m & (P << s); flip |= m & (flip << s); pre = m & (m << s);
+		flip |= pre & (flip << 2 * s); flip |= pre & (flip << 2 * s);
+		moves |= flip << s;
+		flip = m & (P >> s); flip |= m & (flip >> s); pre = m & (m >> s);
+		flip |= pre & (flip >> 2 * s); flip |= pre & (flip >> 2 * s);
+		moves |= flip >> s;
+	}
+	return moves & ~(P | O);
+}
+
+/** the mobility part of the evaluation of eval2 (x 128): the weights of the numbers of legal moves of both sides */
+inline int et_mob(const ET_Eval *e, uint64_t P, uint64_t O)
+{
+	const int ply = popc(P | O) - 4;
+	int a = popc(et_get_moves(P, O)), b = popc(et_get_moves(O, P));
+	if (a > 31) a = 31;
+	if (b > 31) b = 31;
+	return e->mob[ply][a] + e->mob[ply][32 + b];
 }
 
 inline void et_write(const ET_Eval *e, const char *file)

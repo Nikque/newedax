@@ -348,6 +348,11 @@ static void prior_weights(const Config *c, int ply, double *w0, char *cov)
 			break;
 		}
 	}
+	if (prior->has_mob) {	// the mobility weights of eval2 (of the ply itself) for mob and mobp
+		const short *m = prior->mob[ply];
+		if (c->scalar[S_MOB]) for (int a = 0; a < 64; ++a) { w0[c->scalar_ofs[S_MOB] + a] = m[a] / 128.0; cov[c->scalar_ofs[S_MOB] + a] = 1; }
+		if (c->scalar[S_MOBP]) for (int a = 0; a < 32; ++a) { w0[c->scalar_ofs[S_MOBP] + a] = m[a] / 128.0; cov[c->scalar_ofs[S_MOBP] + a] = 1; }
+	}
 }
 
 // more room for the records of a data set (outside push, which is called for each record)
@@ -422,7 +427,7 @@ static void apply_teacher(Data *d)
 		int idx[ET_NF];
 		const uint64_t P = d->r[k].P, O = d->r[k].O;
 		et_features(P, O, idx);
-		const double te = et_sum(teacher->w[et_ply(64 - popc(P | O))], idx) / 128.0;
+		const double te = (et_sum(teacher->w[et_ply(64 - popc(P | O))], idx) + (teacher->has_mob ? et_mob(teacher, P, O) : 0)) / 128.0;
 		d->t[k] = (float) (alpha * d->r[k].v + (1.0 - alpha) * te);
 	}
 }
@@ -572,7 +577,7 @@ static void run_config(const Config *c, int pi, double *mse)
 			if (teacher) {	// distance to the teacher's evaluation
 				int idx2[ET_NF];
 				et_features(T->r[k].P, T->r[k].O, idx2);
-				const double te = et_sum(teacher->w[et_ply(64 - popc(T->r[k].P | T->r[k].O))], idx2) / 128.0;
+				const double te = (et_sum(teacher->w[et_ply(64 - popc(T->r[k].P | T->r[k].O))], idx2) + (teacher->has_mob ? et_mob(teacher, T->r[k].P, T->r[k].O) : 0)) / 128.0;
 				st += (pr - te) * (pr - te);
 			}
 		}

@@ -188,6 +188,7 @@ int main(int argc, char **argv)
 	omp_set_num_threads(nt);
 	et_init();
 	ET_Eval *e = et_read(init);
+	if (e->has_mob) die("%s holds mobility weights: evtrain trains the 46 features only (evsearch trains them with mob)", init);
 
 	double *w0 = (double *) xmalloc(ET_NW * sizeof *w0), *w = (double *) xmalloc(ET_NW * sizeof *w);
 	double *r = (double *) xmalloc(ET_NW * sizeof *r), *z = (double *) xmalloc(ET_NW * sizeof *z);

@@ -43,6 +43,29 @@ static int eval_mobility_case(void){
    if(!wipeout){got=search_eval_1(&srch,SCORE_MIN,SCORE_MAX,m);if(got!=eval_round(best)){printf("FAIL evalmobility eval_1 file=%d empties=%d expected=%d actual=%d\n",s,e,eval_round(best),got);return 2;}++checks1;}
    int k=rr()%bit_count(m);while(k--)m&=m-1;b=ref_next(b,first_bit(m));}}}
  search_free(&srch);printf("PASS evalmobility EVAL_MOBILITY=%d eval_0_checks=%ld eval_1_checks=%ld\n",EVAL_MOBILITY,checks0,checks1);return 0;}
+/* evalform2mob: files of form 1 with random mobility weights ("MOBW", and "WBOM" byte-swapped) into form 2 with the
+   mobility group (docs/port/DESIGN-format.md 3.4) and back: the same bytes as the "MOBW" file, the same form 2 from both;
+   with EVAL_MOBILITY=1, the file of form 2 gives the same pattern and mobility weights as the file of form 1. */
+static bool same_files(const char *a,const char *b){FILE *f=fopen(a,"rb"),*g=fopen(b,"rb");if(!f||!g){if(f)fclose(f);if(g)fclose(g);return false;}int same=1;for(int x,y;;){x=fgetc(f);y=fgetc(g);if(x!=y){same=0;break;}if(x==EOF)break;}fclose(f);fclose(g);return same;}
+static int eval_form2_mobility_case(void){
+ static short mob[61][64];for(int p=0;p<61;++p)for(int i=0;i<64;++i)mob[p][i]=(short)((int)(rr()%2001)-1000);
+ const long size=5*4+8+61L*114364*2;FILE *f=fopen(eval_path(),"rb");if(!f)return 2;unsigned char *d=(unsigned char*)malloc(size);if(fread(d,1,size,f)!=(size_t)size){fclose(f);return 2;}fclose(f);
+ const char *name[2]={"audit-f2m-mobw.dat","audit-f2m-wbom.dat"};
+ for(int s=0;s<2;++s){FILE *g=fopen(name[s],"wb");fwrite(d,1,size,g);unsigned tag=s?0x57424f4dU:0x4d4f4257U;fwrite(&tag,4,1,g);for(int p=0;p<61;++p)for(int i=0;i<64;++i){unsigned short v=(unsigned short)mob[p][i];if(s)v=(unsigned short)(v<<8|v>>8);fwrite(&v,2,1,g);}fclose(g);}
+ free(d);
+ if(!eval_convert(name[0],"audit-f2m-2.dat")||!eval_convert("audit-f2m-2.dat","audit-f2m-1.dat")||!eval_convert(name[1],"audit-f2m-2w.dat")){puts("FAIL evalform2mob convert");return 2;}
+ const bool round_trip=same_files(name[0],"audit-f2m-1.dat"),wbom=same_files("audit-f2m-2.dat","audit-f2m-2w.dat");
+ /* the header of form 2: 14 groups, the last one the mobility group; the size of the file */
+ unsigned char x[96+14*20+4]={};unsigned short hs=0,ng=0;unsigned int nw=0;long fsize=0;bool header=false;
+ if((f=fopen("audit-f2m-2.dat","rb"))!=NULL){if(fread(x,1,sizeof x,f)==sizeof x){memcpy(&hs,x+10,2);memcpy(&ng,x+44,2);memcpy(&nw,x+40,4);static const unsigned char mg[20]={0,2,1,0,64};header=hs==96+14*20+4&&ng==14&&nw==114364+64&&memcmp(x+96+13*20,mg,20)==0;}fseek(f,0,SEEK_END);fsize=ftell(f);fclose(f);}
+ const bool length=fsize==96+14*20+4+61L*(114364+64)*2+8;
+ bool weights=true,mobility=true;
+#if EVAL_MOBILITY
+ options.verbosity=0;eval_open(name[0]);size_t z=sizeof *EVAL_WEIGHT;void *w=malloc(z);memcpy(w,EVAL_WEIGHT,z);eval_close();
+ eval_open("audit-f2m-2.dat");weights=memcmp(w,EVAL_WEIGHT,z)==0;mobility=EVAL_HAS_MOBILITY&&memcmp(mob,EVAL_MOBILITY_WEIGHT,sizeof mob)==0;eval_close();free(w);
+#endif
+ printf("EVAL form2 with mobility: form1 round trip=%d WBOM same=%d header=%d length=%d weights=%d mobility=%d (EVAL_MOBILITY=%d)\n",round_trip,wbom,header,length,weights,mobility,EVAL_MOBILITY);
+ return round_trip&&wbom&&header&&length&&weights&&mobility?0:2;}
 int main(int argc,char **argv){if(argc<2)return 1;setbuf(stdout,NULL);bit_init();edge_stability_init();const char *t=argv[1];
 #if !defined(hasSSE2) && (defined(USE_GAS_X86) || defined(USE_MSVC_X86))
  if(getenv("EDAX_NO_SSE2")){hasSSE2=false;puts("(EDAX_NO_SSE2: the code for processors without SSE2)");} /* x86 builds that choose SSE2 at run time */
@@ -169,6 +192,7 @@ Board pb=b;if(e.n_empties&1){pb.player=b.opponent;pb.opponent=b.player;}for(int 
 }
  else if(!strcmp(t,"bookform2")){Book b={0},c={0},d={0};if(!book_load(&b,"tests/merge-complete-fixture.dat")||b.n_nodes!=2||b.file_format!=1)return 2;options.book_format=2;if(!book_save(&b,"audit-form2.dat"))return 2;if(!book_load(&c,"audit-form2.dat")||c.n_nodes!=2||c.file_format!=2)return 2;options.book_format=0;if(!book_save(&c,"audit-form2b.dat"))return 2;options.book_format=1;if(!book_save(&c,"audit-form1.dat"))return 2;options.book_format=0;if(!book_load(&d,"audit-form2b.dat")||d.file_format!=2)return 2;book_free(&d);FILE *f=fopen("tests/merge-complete-fixture.dat","rb"),*g=fopen("audit-form1.dat","rb");int same=1;long i=0;for(int x,y;;++i){x=fgetc(f);y=fgetc(g);if(x!=y&&(i<10||i>17))same=0;if(x==EOF||y==EOF){if(x!=y)same=0;break;}}fclose(f);fclose(g);printf("FORM2 reload nodes=%d form1 again same=%d\n",c.n_nodes,same);if(!same)return 2;f=fopen("audit-form2.dat","rb");fseek(f,0,SEEK_END);long n=ftell(f);rewind(f);unsigned char *s=(unsigned char*)malloc(n);if(fread(s,1,n,f)!=(size_t)n)return 2;fclose(f);const long at[4]={30,70,n-10,n-1};int refused=0;for(int k=0;k<5;++k){g=fopen("audit-form2-bad.dat","wb");if(k<4){s[at[k]]^=1;fwrite(s,1,n,g);s[at[k]]^=1;}else fwrite(s,1,n-1,g);fclose(g);Book e={0};if(!book_load(&e,"audit-form2-bad.dat"))++refused;book_free(&e);}free(s);printf("FORM2 damaged files refused=%d/5\n",refused);if(refused!=5)return 2;if(!book_convert("audit-form2.dat","audit-conv1.dat")||!book_load(&d,"audit-conv1.dat")||d.file_format!=1||d.n_nodes!=2)return 2;book_free(&d);puts("FORM2 convert ok");book_free(&b);book_free(&c);}
  else if(!strcmp(t,"evalmobility")){if(eval_mobility_case())return 2;}
+ else if(!strcmp(t,"evalform2mob")){if(eval_form2_mobility_case())return 2;}
  else if(!strcmp(t,"evalform2")){if(!eval_convert(eval_path(),"audit-eval2.dat")||!eval_convert("audit-eval2.dat","audit-eval1.dat"))return 2;FILE *f=fopen(eval_path(),"rb"),*g=fopen("audit-eval1.dat","rb");int same=1;for(int x,y;;){x=fgetc(f);y=fgetc(g);if(x!=y){same=0;break;}if(x==EOF)break;}fclose(f);fclose(g);eval_open(eval_path());size_t z=sizeof *EVAL_WEIGHT;void *w=malloc(z);memcpy(w,EVAL_WEIGHT,z);eval_close();eval_open("audit-eval2.dat");int equal=memcmp(w,EVAL_WEIGHT,z)==0;eval_close();free(w);printf("EVAL form2 round trip same=%d weights equal=%d\n",same,equal);if(!same||!equal)return 2;}
  else if(!strcmp(t,"truncated")){FILE *in=fopen("tests/merge-complete-fixture.dat","rb"),*out=fopen("audit-truncated.dat","wb");fseek(in,0,SEEK_END);long n=ftell(in);rewind(in);for(long i=0;i<n-1;++i)fputc(fgetc(in),out);fclose(in);fclose(out);Book b={0};int ok=book_load(&b,"audit-truncated.dat");printf("TRUNCATED accepted=%d nodes=%d original_expected=2\n",ok,b.n_nodes);book_free(&b);if(ok)return 2;}
  else if(!strcmp(t,"corruptstartup")){FILE *in=fopen("tests/merge-complete-fixture.dat","rb"),*out=fopen("audit-truncated.dat","wb");fseek(in,0,SEEK_END);long n=ftell(in);rewind(in);for(long i=0;i<n-1;++i)fputc(fgetc(in),out);fclose(in);fclose(out);options.n_task=1;options.hash_table_size=10;options.verbosity=0;options.cpu_affinity=false;options.book_file=(char*)"audit-truncated.dat";eval_open(eval_path());search_global_init();UI *ui=(UI*)mm_malloc(sizeof *ui);memset(ui,0,sizeof *ui);event_init(&ui->event);ui->type=UI_GTP;ui_init_gtp(ui);int safe=!ui->book.need_saving;ui_free_gtp(ui);event_free(&ui->event);mm_free(ui);in=fopen("audit-truncated.dat","rb");fseek(in,0,SEEK_END);long after=ftell(in);fclose(in);printf("CORRUPT STARTUP autosave_disabled=%d original_bytes=%ld after_bytes=%ld\n",safe,n-1,after);if(!safe||after!=n-1)return 2;}
