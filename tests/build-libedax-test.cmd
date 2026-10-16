@@ -16,7 +16,7 @@ if not exist "%EDAX_EVAL_FILE%" (
 )
 if not exist tests\libedax\data mkdir tests\libedax\data
 copy /Y "%EDAX_EVAL_FILE%" tests\libedax\data\eval.dat >nul
-cl /nologo /std:c++23preview /Zc:__cplusplus /EHs-c- /D _HAS_EXCEPTIONS=0 /GR- /utf-8 /O2 /fp:fast /GS- /MT /GL /DNDEBUG /D UNICODE /D_CRT_SECURE_NO_DEPRECATE /D HAS_CPU_64 /D LIB_BUILD /LD /Iinclude src\all.cpp ws2_32.lib /Fo:tests\libedax\libedax.obj /Fe:tests\libedax\libedax-x64.dll /link /IMPLIB:tests\libedax\libedax-x64.lib
+cl /nologo /I"..\third_party\boost_1_92_0" /std:c++23preview /Zc:__cplusplus /EHs-c- /D _HAS_EXCEPTIONS=0 /GR- /utf-8 /O2 /fp:fast /GS- /MT /GL /DNDEBUG /D UNICODE /D_CRT_SECURE_NO_DEPRECATE /D HAS_CPU_64 /D LIB_BUILD /LD /Iinclude src\all.cpp ws2_32.lib /Fo:tests\libedax\libedax.obj /Fe:tests\libedax\libedax-x64.dll /link /IMPLIB:tests\libedax\libedax-x64.lib
 if errorlevel 1 exit /b 1
 cl /nologo /utf-8 /O1 /MT /D_CRT_SECURE_NO_DEPRECATE tests\libedax_test.c tests\libedax\libedax-x64.lib /Fo:tests\libedax\libedax_test.obj /Fe:tests\libedax\libedax_test.exe
 if errorlevel 1 exit /b 1

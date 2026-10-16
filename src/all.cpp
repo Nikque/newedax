@@ -8,6 +8,9 @@
  * @version 4.4
  */
 
+/* C++ and Boost headers (before libedax_utf8.h, whose macros would rename names in them) */
+#include "cpp_headers.h"
+
 /* library (LIB_BUILD): file names in UTF-8 on Windows */
 #include "libedax_utf8.h"
 

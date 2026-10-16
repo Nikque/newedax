@@ -15,6 +15,7 @@
  * @version 4.5
  */
 
+#include "cpp_headers.h"
 #include "book.h"
 #include "base.h"
 #include "search.h"
@@ -2492,10 +2493,10 @@ static void book_mark_todo(Book *book, Position *p)
 	if (book->todo_list.valid) book_todo_push(book, position_key(book, p));
 }
 
-static int todo_item_cmp(const void *a, const void *b)
+/** @brief Sort places (see position_key): they are all different, so any sort gives the same order. */
+static inline void todo_items_sort(unsigned long long *item, const long long n)
 {
-	const unsigned long long x = *(const unsigned long long*) a, y = *(const unsigned long long*) b;
-	return (x > y) - (x < y);
+	boost::sort::pdqsort_branchless(item, item + n);
 }
 
 /** @brief Sort places (see position_key) in the order of the book, unless they already are (book_pick_todo sorts them). */
@@ -2503,7 +2504,7 @@ static void todo_sort(unsigned long long *item, const long long n)
 {
 	long long i;
 	for (i = 1; i < n; ++i) if (item[i - 1] > item[i]) {
-		qsort(item, (size_t) n, sizeof *item, todo_item_cmp);
+		todo_items_sort(item, n);
 		return;
 	}
 }
@@ -6171,10 +6172,10 @@ void book_leaf_recalculate(Book *book, Board *board, const int kind, const int x
 			book_clean(book);
 			book_select_deviate(book, root, 0, x, score - y, score + y);
 			if (book->todo_list.valid) {
-				qsort(book->todo_list.item, book->todo_list.n, sizeof *book->todo_list.item, todo_item_cmp);
+				todo_items_sort(book->todo_list.item, book->todo_list.n);
 				if (first) {
 					for (i = n = 0; i < book->todo_list.n; ++i) {
-						if (!bsearch(book->todo_list.item + i, first, n_first, sizeof *first, todo_item_cmp)) book->todo_list.item[n++] = book->todo_list.item[i];
+						if (!std::binary_search(first, first + n_first, book->todo_list.item[i])) book->todo_list.item[n++] = book->todo_list.item[i];
 					}
 					book->todo_list.n = n;
 					book->stats.n_todo = n;
@@ -8271,7 +8272,7 @@ static unsigned long long* book_pick_todo(Book *book, const BookPick *pick, long
 			*n += f[k].n_kept;
 		}
 		// in the order of the book (sorted after the filter: only the positions kept)
-		qsort(keys, (size_t) *n, sizeof *keys, todo_item_cmp);
+		todo_items_sort(keys, *n);
 		book->todo_list.n = *n;
 		if (*n < book->todo_list.size / 4) { // most positions were left out: the memory of the list is given back while the positions are searched
 			unsigned long long *item = (unsigned long long*) realloc(keys, (size_t) (*n + 1) * sizeof *keys);

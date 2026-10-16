@@ -27,5 +27,5 @@ set "PATH=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer;%PATH%"
 call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=%ARCH% -host_arch=x64 >nul
 if errorlevel 1 exit /b %errorlevel%
 cd /d "%HERE%..\..\src"
-cl /nologo /std:c++23preview /Zc:__cplusplus /EHs-c- /D _HAS_EXCEPTIONS=0 /GR- /D UNICODE /utf-8 /D _CRT_SECURE_NO_DEPRECATE /I"..\include" /O2 /fp:fast /GS- /D NDEBUG /MT /GL %EXTRA% all.cpp ws2_32.lib /Fo"%TEMP%\\" /Fe"%OUT%" /link /VERSION:4.5
+cl /nologo /I"%HERE%..\..\..\third_party\boost_1_92_0" /std:c++23preview /Zc:__cplusplus /EHs-c- /D _HAS_EXCEPTIONS=0 /GR- /D UNICODE /utf-8 /D _CRT_SECURE_NO_DEPRECATE /I"..\include" /O2 /fp:fast /GS- /D NDEBUG /MT /GL %EXTRA% all.cpp ws2_32.lib /Fo"%TEMP%\\" /Fe"%OUT%" /link /VERSION:4.5
 exit /b %errorlevel%

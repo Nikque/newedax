@@ -8,6 +8,7 @@
  * @version 4.4
  */
 
+#include "cpp_headers.h"
 #include "base.h"
 #include "options.h"
 #include "search.h"
@@ -786,7 +787,8 @@ void base_unique(Base *base)
 			ref[i].game = base->game + i;
 			ref[i].i = i;
 		}
-		qsort(ref, base->n_games, sizeof (BaseGameRef), base_game_compare);
+		// (base_game_compare ends with the place in the base: a total order, any sort gives the same order)
+		boost::sort::pdqsort(ref, ref + base->n_games, [](const BaseGameRef &a, const BaseGameRef &b) { return base_game_compare(&a, &b) < 0; });
 		for (i = 0; i < base->n_games; ++i) {
 			keep[ref[i].i] = (i == 0 || !game_equals(ref[i - 1].game, ref[i].game));
 		}
