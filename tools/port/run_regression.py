@@ -3,7 +3,7 @@
 
 usage: run_regression.py <regression.exe> <work dir> <eval.dat> <fixture.dat> [case ...]
 Each case runs in <work dir> (with tests/merge-complete-fixture.dat copied there), with
-EDAX_EVAL_FILE set, a time limit of 60 s, and the output saved as <case>.out. A summary
+EDAX_EVAL_FILE set, a time limit of 60 s (REGRESSION_TIMEOUT changes it), and the output saved as <case>.out. A summary
 line per case gives the exit code and the time.
 """
 
@@ -41,7 +41,7 @@ def main(argv):
                     h = ctypes.windll.kernel32.OpenProcess(0x0200 | 0x0400, False, p.pid)
                     ctypes.windll.kernel32.SetProcessAffinityMask(h, 1)
                     ctypes.windll.kernel32.CloseHandle(h)
-                code = p.wait(timeout=60)
+                code = p.wait(timeout=int(os.environ.get('REGRESSION_TIMEOUT', '60')))
             except subprocess.TimeoutExpired:
                 p.kill()
                 p.wait()
