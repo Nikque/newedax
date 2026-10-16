@@ -1,9 +1,10 @@
 # Build the evaluation tools of tools\eval with MSVC (x64 AVX-512, the options of the C tools: /O2 /MT, no /fp:fast),
 # one tool after another on one logical CPU.
-# usage: pwsh -File build-evtools.ps1 -Out <directory> [-Tools evsearch,w2dat2,...] [-Tree <source tree>] [-Extra '<cl options>']
-#   tools that include the search (all.cpp of -Tree, default: this repository) are built with /openmp and the options of
-#   the x64 AVX-512 build (HAS_CPU_64, POPCOUNT); -Extra adds options to every tool (e.g. '/D EVAL_MOBILITY=1').
-param([string]$Out, [string]$Tools = '', [string]$Tree = '', [string]$Extra = '')
+# usage: pwsh -File build-evtools.ps1 -Out <directory> [-Tools evsearch,w2dat2,...] [-Tree <source tree>] [-Extra '<cl options>'] [-Cpu n]
+#   tools that include the search (all.cpp of -Tree, default: this repository) are built with /openmp, the options of
+#   the x64 AVX-512 build (HAS_CPU_64, POPCOUNT) and EVAL_MOBILITY=1 (they read the mobility weights of eval2);
+#   leafgen also with EVAL_LEAF_HOOK. -Extra adds options to every tool.
+param([string]$Out, [string]$Tools = '', [string]$Tree = '', [string]$Extra = '', [int]$Cpu = 0)
 $here = $PSScriptRoot
 $root = Split-Path -Parent (Split-Path -Parent $here)
 if (-not $Tree) { $Tree = $root }
@@ -24,16 +25,17 @@ foreach ($t in $list) {
 	if ($omp -contains $t) { $o += ' /openmp' }
 	$libs = ''
 	if ($engine -contains $t) {
-		$o += " /I`"$boost`" /I`"$Tree\include`" /I`"$Tree\src`" /D HAS_CPU_64 /vlen=256 /D POPCOUNT"
+		$o += " /I`"$boost`" /I`"$Tree\include`" /I`"$Tree\src`" /D HAS_CPU_64 /vlen=256 /D POPCOUNT /D EVAL_MOBILITY=1"
+		if ($t -eq 'leafgen') { $o += ' /D EVAL_LEAF_HOOK' }
 		$libs = 'ws2_32.lib psapi.lib'
 	}
 	$obj = Join-Path $Out "obj-$t"
 	New-Item -ItemType Directory -Force $obj | Out-Null
 	$cl = "cl $o $Extra /I`"$here`" `"$src`" $libs /Fo`"$obj\\`" /Fe`"$Out\$t.exe`""
 	$p = Start-Process cmd.exe -ArgumentList '/c', "call `"$vsdev`" -arch=x64 -host_arch=x64 >nul && $cl" -NoNewWindow -PassThru -RedirectStandardOutput "$Out\$t.log"
-	try { $p.ProcessorAffinity = 1 } catch {}
+	try { $p.ProcessorAffinity = [IntPtr](1L -shl $Cpu) } catch {}
 	$p.WaitForExit()
-	$warn = @(Get-Content "$Out\$t.log" | Select-String ' (error|warning) ')
+	$warn = @(Get-Content "$Out\$t.log" | Select-String ' (error|warning) ' | Where-Object { $_.Line -notmatch 'C4805' })
 	"build $t exit $($p.ExitCode) warnings/errors $($warn.Count)"
 	$warn | Select-Object -First 8 | ForEach-Object { "  $($_.Line.Trim())" }
 	if ($p.ExitCode -ne 0) { $failed++ }

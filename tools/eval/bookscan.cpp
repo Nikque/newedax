@@ -10,10 +10,12 @@ using namespace evtool;
 
 int main(int argc, char **argv)
 {
-	(void) argc;
-	FILE *f = fopen(argv[1], "rb"); _fseeki64(f, 0, SEEK_SET); if (!f) return 1;
+	if (argc < 2) die("usage: bookscan book.dat");
+	FILE *f = xfopen(argv[1], "rb");
 	setvbuf(f, nullptr, _IOFBF, 1 << 24);
-	unsigned char hdr[42]; fread(hdr, 1, 42, f);
+	unsigned char hdr[42];
+	if (fread(hdr, 1, 42, f) != 42) die("cannot read %s", argv[1]);
+	book_form1_check(hdr, argv[1]);
 	unsigned int n; memcpy(&n, hdr + 38, 4);
 	printf("positions %u level %d n_empties %d\n", n, hdr[18], hdr[22]);
 	static long long cnt[61], leafok[61], lv[61][61], exact[61];

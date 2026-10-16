@@ -10,12 +10,13 @@ using namespace evtool;
 
 int main(int argc, char **argv)
 {
-	(void) argc;
-	FILE *f = fopen(argv[1], "rb");
+	if (argc < 4) die("usage: sample <file.bin> <n> <seed>");
+	FILE *f = xfopen(argv[1], "rb");
 	const int n = atoi(argv[2]);
+	if (n < 1) die("bad n %s", argv[2]);
 	const uint64_t seed = strtoull(argv[3], nullptr, 10);
 	uint64_t k = 0;
-	Rec *res = (Rec *) malloc(n * sizeof *res), r;
+	Rec *res = (Rec *) xmalloc(n * sizeof *res), r;
 	setvbuf(f, nullptr, _IOFBF, 1 << 24);
 	while (fread(&r, sizeof r, 1, f) == 1) {
 		const uint64_t h = mix64(r.P * 0x9E3779B97F4A7C15ULL ^ r.O);

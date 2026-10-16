@@ -1,7 +1,10 @@
 # Run the C tools (built from D:\edaxwork\ev, sources unchanged) and the C++ tools of tools\eval with the same inputs,
 # on one logical CPU, and compare their outputs byte for byte (output files, standard output and error).
 # usage: py -3 compare_c.py --c <dir of the C exes> --cpp <dir of the C++ exes> --work <empty work dir>
+#                           [--c2 <dir of the C exes built with the eval2 sources>] [--eval2 <eval.dat of eval2>]
 #                           [--ev D:\edaxwork\ev] [--cases E1,T1,...] [--repeat n]
+#   The cases of the tools with the search are run with the C tools of --c (sources of nikque.17, evaluation file of
+#   Edax 4.5) and, with the evaluation file of eval2 (mobility weights), with the C tools of --c2.
 #   --repeat n: run each case n times more, alternating C and C++, and print the CPU cycles and peak memory of both.
 import argparse, ctypes, filecmp, os, random, re, shutil, struct, subprocess, sys
 from ctypes import wintypes
@@ -69,6 +72,12 @@ def prepare(a):
             open(os.path.join(wd, name + '.scl'), 'wb').write(struct.pack(f'<{len(scl)}i', *scl))
             for ply in range(2, 54):
                 shutil.copy(os.path.join(pr, f'Rm_l100_{ply:02d}.w'), os.path.join(wd, f'{name}_{ply:02d}.w'))
+    # small start files for the tools with the search: the first records of book40.bin and book20.bin
+    for name, src, n in (('b40s.bin', 'book40.bin', 2000), (os.path.join('leafdata', 'book20.bin'), 'book20.bin', 20000)):
+        p = os.path.join(w, name)
+        if not os.path.exists(p):
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            open(p, 'wb').write(open(os.path.join(a.ev, 'data', src), 'rb').read(17 * n))
     # evsearch configurations
     open(os.path.join(w, 'cfg_E1.txt'), 'w').write('Rt c9 c10 s100 s101 l2 l3 l4 d8 d7 d6 d5 d4 mob\n')
     open(os.path.join(w, 'cfg_E2.txt'), 'w').write('Rs c9 l2 d4 mob mobp cmob qpar stab front disc estab mobhv mobd mob2d\n# comment\nRs2 c10 s101 mob\n')
@@ -77,37 +86,60 @@ def prepare(a):
 
 
 def cases(a):
-    """name, tool, arguments ({OUT}: the output directory of the side, {W}: the work directory), working directory,
-    regular expression of the parts of the standard output that may differ (times)"""
-    w, ev = a.work, a.ev
-    common = ['-lib', 'patterns.txt', '-threads', '1']
+    """name, tool, arguments ({OUT}: the output directory of the side, which is also the working directory, so that
+    a file written there is compared too), regular expression of the parts of the standard output that may differ
+    (times). The data of ev are given by paths relative to {OUT} (the data sources "prefix:dir:weight" of the C tools
+    do not take a drive letter); label and gen read eval_orig.dat in the working directory: a copy is put there."""
+    w = a.work
+    e = os.path.relpath(a.ev, os.path.join(w, 'X', 'c'))         # ev seen from {OUT} (all at the same depth)
+    common = ['-lib', f'{e}/patterns.txt', '-threads', '1']
+    eo = f'{e}/eval_orig.dat'
     return [
-        ('E1', 'evsearch', common + ['-configs', f'{w}/cfg_E1.txt', '-plies', '20,21', '-src', 'ss:sp8:1:100000', '-src', 'ega:egd:1:100000',
-                                     '-iter', '10', '-prior', 'eval_orig.dat', '-lambda-prior', '100', '-dump', '{OUT}'], ev, None),
-        ('E2', 'evsearch', common + ['-configs', f'{w}/cfg_E2.txt', '-plies', '30', '-src', 'ss:sp8:1:60000', '-src', 'book:data:1:60000',
-                                     '-iter', '10', '-teacher', 'eval_orig.dat', '-alpha', '0.5', '-dump', '{OUT}'], ev, None),
-        ('E3', 'evsearch', common + ['-configs', f'{w}/cfg_E3.txt', '-plies', '20,21', '-src', 'ss:sp8:1:80000',
-                                     '-iter', '8', '-base', os.path.relpath(os.path.join(w, 'E1base'), ev) + ':Rt', '-dump', '{OUT}'], ev, None),
-        ('E4', 'evsearch', common + ['-configs', f'{w}/cfg_E4.txt', '-plies', '2,3,44', '-src', 'ss:sp8:1:50000', '-src', 'ega:egd:2:50000',
-                                     '-iter', '6', '-notie', '-lambda', '50', '-prior', 'eval_orig.dat', '-dump', '{OUT}'], ev, None),
-        ('T1', 'evtrain', ['-init', 'eval_orig.dat', '-out', '{OUT}/t.dat', '-src', 'ss:sp8:1:50000', '-src', 'ega:egd:1:50000',
-                           '-plies', '20-21', '-window', '1', '-iter', '10', '-calib', '0', '-threads', '1'], ev, r'\s+\d+s$'),
-        ('T2', 'evtrain', ['-init', 'eval_orig.dat', '-src', 'ss:sp8:1', '-plies', '30-30', '-eval', '-threads', '1', '-test', '16'], ev, r'\s+\d+s$'),
-        ('W1', 'w2dat2', ['eval_orig.dat', 'pr', 'Rm_l100', '{OUT}/m.dat', '4.5.5'], ev, None),
-        ('W2', 'w2dat2', ['eval_orig.dat', f'{w}/w2in', 'Vp', '{OUT}/p.dat'], ev, None),
-        ('W3', 'w2dat2', ['eval_orig.dat', f'{w}/w2in', 'Vn', '{OUT}/n.dat'], ev, None),
-        ('S1', 'sprepair', [f'{w}/spbroken', '{OUT}', 'ss'], ev, None),
-        ('P1', 'sample', ['sp8/ss20.bin', '200', '7'], ev, None),
-        ('B1', 'bookdump', [f'{w}/A_head.dat', '{OUT}'], ev, None),
-        ('B2', 'bookscan', [f'{w}/A_head.dat'], ev, None),
+        ('E1', 'evsearch', common + ['-configs', f'{w}/cfg_E1.txt', '-plies', '20,21', '-src', f'ss:{e}/sp8:1:100000', '-src', f'ega:{e}/egd:1:100000',
+                                     '-iter', '10', '-prior', eo, '-lambda-prior', '100', '-dump', '{OUT}'], None),
+        ('E2', 'evsearch', common + ['-configs', f'{w}/cfg_E2.txt', '-plies', '30', '-src', f'ss:{e}/sp8:1:60000', '-src', f'book:{e}/data:1:60000',
+                                     '-iter', '10', '-teacher', eo, '-alpha', '0.5', '-dump', '{OUT}'], None),
+        ('E3', 'evsearch', common + ['-configs', f'{w}/cfg_E3.txt', '-plies', '20,21', '-src', f'ss:{e}/sp8:1:80000',
+                                     '-iter', '8', '-base', '../../E1base/c:Rt', '-dump', '{OUT}'], None),
+        ('E4', 'evsearch', common + ['-configs', f'{w}/cfg_E4.txt', '-plies', '2,3,44', '-src', f'ss:{e}/sp8:1:50000', '-src', f'ega:{e}/egd:2:50000',
+                                     '-iter', '6', '-notie', '-lambda', '50', '-prior', eo, '-dump', '{OUT}'], None),
+        ('T1', 'evtrain', ['-init', eo, '-out', '{OUT}/t.dat', '-src', f'ss:{e}/sp8:1:50000', '-src', f'ega:{e}/egd:1:50000',
+                           '-plies', '20-21', '-window', '1', '-iter', '10', '-calib', '0', '-threads', '1'], r'\s+\d+s$'),
+        ('T2', 'evtrain', ['-init', eo, '-src', f'ss:{e}/sp8:1', '-plies', '30-30', '-eval', '-threads', '1', '-test', '16'], r'\s+\d+s$'),
+        ('W1', 'w2dat2', [eo, f'{e}/pr', 'Rm_l100', '{OUT}/m.dat', '4.5.5'], None),
+        ('W2', 'w2dat2', [eo, f'{w}/w2in', 'Vp', '{OUT}/p.dat'], None),
+        ('W3', 'w2dat2', [eo, f'{w}/w2in', 'Vn', '{OUT}/n.dat'], None),
+        ('S1', 'sprepair', [f'{w}/spbroken', '{OUT}', 'ss'], None),
+        ('P1', 'sample', [f'{e}/sp8/ss20.bin', '200', '7'], None),
+        ('B1', 'bookdump', [f'{w}/A_head.dat', '{OUT}'], None),
+        ('B2', 'bookscan', [f'{w}/A_head.dat'], None),
+        # tools with the search (C side: --c, or --c2 for the cases ending with 'e', which use the evaluation file of eval2)
+        ('G1', 'selfplay3', ['{OUT}', '20', '5', '1', '-level', '4', '-exact', '10', '-eval', eo], r' in \d+ s$'),
+        ('G1e', 'selfplay3', ['{OUT}', '20', '5', '1', '-level', '4', '-exact', '10', '-eval', a.eval2], r' in \d+ s$'),
+        ('L1', 'label', [f'{e}/sp8/ss20.bin', '{OUT}/l.bin', '300', '1', '-seed', '3', '-level', '6'], r' in \d+ s$'),
+        ('L1e', 'label', [f'{e}/sp8/ss20.bin', '{OUT}/l.bin', '300', '1', '-seed', '3', '-level', '6', '-eval', a.eval2], r' in \d+ s$'),
+        ('O1', 'playout', [f'{e}/sp8/ss40.bin', '{OUT}', '30', '3', '1', '-level', '4', '-exact', '14', '-eval', eo], r' in \d+ s$'),
+        ('O1e', 'playout', [f'{e}/sp8/ss40.bin', '{OUT}', '30', '3', '1', '-level', '4', '-exact', '14', '-eval', a.eval2], r' in \d+ s$'),
+        ('N1', 'gen', [f'{w}/b40s.bin', '{OUT}', '5', '7', '1', '-last', '44'], r' in \d+ s$'),
+        ('N1e', 'gen', [f'{w}/b40s.bin', '{OUT}', '5', '7', '1', '-last', '44', '-eval', a.eval2], r' in \d+ s$'),
+        ('F1', 'leafgen', [f'{w}/leafdata', '20', '20', '10', '50', '1', '{OUT}', '-level', '6', '-eval', eo], r', \d+ s$'),
+        ('F1e', 'leafgen', [f'{w}/leafdata', '20', '20', '10', '50', '1', '{OUT}', '-level', '6', '-eval', a.eval2], r', \d+ s$'),
+        ('K1', 'evcheck', [eo, '300'], None),
     ]
 
 
-def side_run(a, exe_dir, side, name, tool, args, cwd):
+NEEDS_EVAL_ORIG = {'label', 'gen'}	# the C tools open eval_orig.dat in the working directory (no -eval option)
+
+
+def side_run(a, exe_dir, side, name, tool, args):
     out = os.path.join(a.work, name, side)
-    os.makedirs(out, exist_ok=True)
+    if os.path.exists(out):
+        shutil.rmtree(out)
+    os.makedirs(out)
+    if tool in NEEDS_EVAL_ORIG:	# the evaluation file of the case under that name (the same on both sides)
+        shutil.copy(a.eval2 if name.endswith('e') else os.path.join(a.ev, 'eval_orig.dat'), os.path.join(out, 'eval_orig.dat'))
     cmd = [os.path.join(exe_dir, tool + '.exe')] + [x.replace('{OUT}', out) for x in args]
-    rc, cyc, peak = run1(cmd, cwd, os.path.join(a.work, name, side + '.out'), os.path.join(a.work, name, side + '.err'))
+    rc, cyc, peak = run1(cmd, out, os.path.join(a.work, name, side + '.out'), os.path.join(a.work, name, side + '.err'))
     return out, rc, cyc, peak
 
 
@@ -126,21 +158,32 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--c', required=True); ap.add_argument('--cpp', required=True); ap.add_argument('--work', required=True)
     ap.add_argument('--ev', default=r'D:\edaxwork\ev'); ap.add_argument('--cases', default=''); ap.add_argument('--repeat', type=int, default=0)
+    ap.add_argument('--c2', default=''); ap.add_argument('--eval2', default='')
     a = ap.parse_args()
     prepare(a)
     want = set(a.cases.split(',')) if a.cases else None
-    if (want is None or 'E3' in want) and not os.path.exists(os.path.join(a.work, 'E1base', 'Rt_21.w')):
-        # the base of E3: the weights of E1 trained by the C tool
-        os.makedirs(os.path.join(a.work, 'E1base'), exist_ok=True)
+    base = os.path.join(a.work, 'E1base', 'c')
+    if (want is None or 'E3' in want) and not os.path.exists(os.path.join(base, 'Rt_21.w')):
+        # the base of E3 (-base ../../E1base/c:Rt): the weights of E1 trained by the C tool
+        os.makedirs(base, exist_ok=True)
         e1 = [c for c in cases(a) if c[0] == 'E1'][0]
-        run1([os.path.join(a.c, 'evsearch.exe')] + [x.replace('{OUT}', os.path.join(a.work, 'E1base')) for x in e1[2]], e1[3],
-             os.path.join(a.work, 'E1base.out'), os.path.join(a.work, 'E1base.err'))
+        run1([os.path.join(a.c, 'evsearch.exe')] + [x.replace('{OUT}', base) for x in e1[2]], base,
+             os.path.join(a.work, 'E1base', 'c.out'), os.path.join(a.work, 'E1base', 'c.err'))
     bad = 0
-    for name, tool, args, cwd, mask in cases(a):
+    for name, tool, args, mask in cases(a):
         if want is not None and name not in want:
             continue
-        oc, rcc, cc, pc = side_run(a, a.c, 'c', name, tool, args, cwd)
-        op, rcp, cp, pp = side_run(a, a.cpp, 'cpp', name, tool, args, cwd)
+        cdir = a.c
+        if name.endswith('e'):
+            if not (a.c2 and a.eval2):
+                print(f'{name:3s} {tool:9s} skipped (no --c2 / --eval2)')
+                continue
+            cdir = a.c2
+        if not os.path.exists(os.path.join(cdir, tool + '.exe')) or not os.path.exists(os.path.join(a.cpp, tool + '.exe')):
+            print(f'{name:3s} {tool:9s} skipped (no exe)')
+            continue
+        oc, rcc, cc, pc = side_run(a, cdir, 'c', name, tool, args)
+        op, rcp, cp, pp = side_run(a, a.cpp, 'cpp', name, tool, args)
         diffs = []
         if rcc != rcp:
             diffs.append(f'exit {rcc} / {rcp}')
@@ -161,9 +204,9 @@ def main():
             cyc = {'c': [], 'cpp': []}
             peak = {'c': [], 'cpp': []}
             for r in range(a.repeat):
-                order = (('c', a.c), ('cpp', a.cpp)) if r % 2 == 0 else (('cpp', a.cpp), ('c', a.c))
+                order = (('c', cdir), ('cpp', a.cpp)) if r % 2 == 0 else (('cpp', a.cpp), ('c', cdir))
                 for side, d in order:
-                    _, _, cy, pk = side_run(a, d, side, name, tool, args, cwd)
+                    _, _, cy, pk = side_run(a, d, side, name, tool, args)
                     cyc[side].append(cy); peak[side].append(pk)
             mc, mp = sorted(cyc['c'])[len(cyc['c']) // 2], sorted(cyc['cpp'])[len(cyc['cpp']) // 2]
             print(f'    cycles median C {mc / 1e9:.3f}G  C++ {mp / 1e9:.3f}G  (C++/C {mp / mc:.3f}); min C {min(cyc["c"]) / 1e9:.3f}G  C++ {min(cyc["cpp"]) / 1e9:.3f}G;'

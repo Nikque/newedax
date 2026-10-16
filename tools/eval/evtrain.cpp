@@ -33,11 +33,10 @@ struct Set {
 static void set_push(Set *s, const Rec *r, float c)
 {
 	if (s->n == s->cap) {
-		s->cap = s->cap ? s->cap * 2 : 1 << 20;
-		s->idx = (unsigned int *) realloc(s->idx, (size_t) s->cap * ET_NF * sizeof *s->idx);
-		s->y = (float *) realloc(s->y, (size_t) s->cap * sizeof *s->y);
-		s->c = (float *) realloc(s->c, (size_t) s->cap * sizeof *s->c);
-		if (!s->idx || !s->y || !s->c) { fprintf(stderr, "out of memory\n"); exit(1); }
+		s->cap = grow(s->cap, 1 << 20);
+		s->idx = (unsigned int *) xrealloc(s->idx, (size_t) s->cap * ET_NF * sizeof *s->idx);
+		s->y = (float *) xrealloc(s->y, (size_t) s->cap * sizeof *s->y);
+		s->c = (float *) xrealloc(s->c, (size_t) s->cap * sizeof *s->c);
 	}
 	int f[ET_NF];
 	et_features(r->P, r->O, f);
@@ -64,7 +63,7 @@ static void load_ply(int q, double c, Set *train, Set *test)
 		const double keep = n > src[d].max ? (double) src[d].max / n : 1.0;
 		const uint64_t thr = keep >= 1.0 ? ~0ULL : (uint64_t) (keep * 18446744073709551615.0);	// (2^64 as a double does not fit)
 		const float w = (float) (c * src[d].weight);
-		Rec *buf = (Rec *) malloc(sizeof (Rec) << 20);
+		Rec *buf = (Rec *) xmalloc(sizeof (Rec) << 20);
 		size_t m;
 		while ((m = fread(buf, sizeof (Rec), 1 << 20, f)) > 0) {
 			for (size_t i = 0; i < m; ++i) {
@@ -158,36 +157,40 @@ int main(int argc, char **argv)
 	const char *init = nullptr, *out = nullptr;
 	int p0 = -1, p1 = -1, window = 0, iter = 60, nt = 24, only_eval = 0, calib = -1;
 	double decay = 0.5, lambda = 1.0;
+	auto value = [&](int &i) -> char * { if (i + 1 >= argc) die("missing value of %s", argv[i]); return argv[++i]; };
 	for (int i = 1; i < argc; ++i) {
-		if (!strcmp(argv[i], "-init")) init = argv[++i];
-		else if (!strcmp(argv[i], "-out")) out = argv[++i];
+		if (!strcmp(argv[i], "-init")) init = value(i);
+		else if (!strcmp(argv[i], "-out")) out = value(i);
 		else if (!strcmp(argv[i], "-src")) {
+			if (n_src == 8) die("too many -src (at most 8)");
 			Source *o = src + n_src++;
 			o->max = 30000000;
-			if (source_parse(argv[++i], o) < 3) { fprintf(stderr, "bad -src\n"); return 1; }
+			if (source_parse(value(i), o) < 3) { fprintf(stderr, "bad -src\n"); return 1; }
 		}
-		else if (!strcmp(argv[i], "-plies")) { if (sscanf(argv[++i], "%d-%d", &p0, &p1) == 1) p1 = p0; }
-		else if (!strcmp(argv[i], "-window")) window = atoi(argv[++i]);
-		else if (!strcmp(argv[i], "-decay")) decay = atof(argv[++i]);
-		else if (!strcmp(argv[i], "-lambda")) lambda = atof(argv[++i]);
-		else if (!strcmp(argv[i], "-iter")) iter = atoi(argv[++i]);
-		else if (!strcmp(argv[i], "-threads")) nt = atoi(argv[++i]);
-		else if (!strcmp(argv[i], "-test")) test_mod = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-plies")) { if (sscanf(value(i), "%d-%d", &p0, &p1) == 1) p1 = p0; }
+		else if (!strcmp(argv[i], "-window")) window = atoi(value(i));
+		else if (!strcmp(argv[i], "-decay")) decay = atof(value(i));
+		else if (!strcmp(argv[i], "-lambda")) lambda = atof(value(i));
+		else if (!strcmp(argv[i], "-iter")) iter = atoi(value(i));
+		else if (!strcmp(argv[i], "-threads")) nt = atoi(value(i));
+		else if (!strcmp(argv[i], "-test")) test_mod = atoi(value(i));
 		else if (!strcmp(argv[i], "-eval")) only_eval = 1;
-		else if (!strcmp(argv[i], "-calib")) calib = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-calib")) calib = atoi(value(i));
 		else { fprintf(stderr, "unknown option %s\n", argv[i]); return 1; }
 	}
 	if (!init || p0 < 0 || !n_src || (!out && (!only_eval || calib >= 0))) { fprintf(stderr, "missing options\n"); return 1; }
+	if (p1 < p0 || p1 > 60) die("bad -plies (a-b, 0 <= a <= b <= 60)");
+	if (nt < 1 || test_mod < 1 || window < 0 || calib >= n_src) die("bad -threads, -test, -window or -calib");
 	omp_set_num_threads(nt);
 	et_init();
 	ET_Eval *e = et_read(init);
 
-	double *w0 = (double *) malloc(ET_NW * sizeof *w0), *w = (double *) malloc(ET_NW * sizeof *w);
-	double *r = (double *) malloc(ET_NW * sizeof *r), *z = (double *) malloc(ET_NW * sizeof *z);
-	double *p = (double *) malloc(ET_NW * sizeof *p), *q = (double *) malloc(ET_NW * sizeof *q);
-	double *M = (double *) malloc(ET_NW * sizeof *M);
-	double **tq = (double **) malloc(nt * sizeof *tq), **td = (double **) malloc(nt * sizeof *td);
-	for (int t = 0; t < nt; ++t) { tq[t] = (double *) malloc(ET_NW * sizeof (double)); td[t] = (double *) malloc(ET_NW * sizeof (double)); }
+	double *w0 = (double *) xmalloc(ET_NW * sizeof *w0), *w = (double *) xmalloc(ET_NW * sizeof *w);
+	double *r = (double *) xmalloc(ET_NW * sizeof *r), *z = (double *) xmalloc(ET_NW * sizeof *z);
+	double *p = (double *) xmalloc(ET_NW * sizeof *p), *q = (double *) xmalloc(ET_NW * sizeof *q);
+	double *M = (double *) xmalloc(ET_NW * sizeof *M);
+	double **tq = (double **) xmalloc(nt * sizeof *tq), **td = (double **) xmalloc(nt * sizeof *td);
+	for (int t = 0; t < nt; ++t) { tq[t] = (double *) xmalloc(ET_NW * sizeof (double)); td[t] = (double *) xmalloc(ET_NW * sizeof (double)); }
 
 	printf("ply    train |");
 	for (int d = 0; d < n_src; ++d) printf(" %-8s    n  prior -> new mse (mae)     |", src[d].prefix);

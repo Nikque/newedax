@@ -11,12 +11,12 @@ using namespace evtool;
 
 int main(int argc, char **argv)
 {
-	(void) argc;
-	FILE *f = fopen(argv[1], "rb");
-	if (!f) return 1;
+	if (argc < 3) die("usage: bookdump book.dat outdir");
+	FILE *f = xfopen(argv[1], "rb");
 	setvbuf(f, nullptr, _IOFBF, 1 << 24);
 	unsigned char hdr[42];
-	if (fread(hdr, 1, 42, f) != 42) return 1;
+	if (fread(hdr, 1, 42, f) != 42) die("cannot read %s", argv[1]);
+	book_form1_check(hdr, argv[1]);
 	unsigned int n; memcpy(&n, hdr + 38, 4);
 	FILE *out[61] = {};
 	long long cnt[61] = {}, skipped = 0;
@@ -33,13 +33,13 @@ int main(int argc, char **argv)
 		const int ply = 60 - (64 - popc(r.P | r.O));
 		if (!out[ply]) {
 			sprintf(name, "%s/book%02d.bin", argv[2], ply);
-			out[ply] = fopen(name, "wb");
+			out[ply] = xfopen(name, "wb");
 			setvbuf(out[ply], nullptr, _IOFBF, 1 << 20);
 		}
 		fwrite(&r, sizeof r, 1, out[ply]);
 		++cnt[ply];
 	}
-	for (int p = 0; p <= 60; ++p) if (out[p]) { fclose(out[p]); printf("ply %2d %lld\n", p, cnt[p]); }
+	for (int p = 0; p <= 60; ++p) if (out[p]) { if (fclose(out[p]) != 0) die("cannot write the files of %s", argv[2]); printf("ply %2d %lld\n", p, cnt[p]); }
 	printf("skipped %lld\n", skipped);
 	return 0;
 }

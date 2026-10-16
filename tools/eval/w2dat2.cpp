@@ -23,23 +23,35 @@ int main(int argc, char **argv)
 	sprintf(name, "%s/%s.pat", dir, cfg);
 	FILE *f = fopen(name, "rb");
 	if (!f) { fprintf(stderr, "cannot open %s\n", name); return 1; }
-	fread(&n_inst, 4, 1, f); fread(&nw, 4, 1, f);
-	int *in = (int *) malloc(n_inst * sizeof *in), *io = (int *) malloc(n_inst * sizeof *io);
-	unsigned char (*isq)[16] = (unsigned char (*)[16]) malloc(n_inst * 16);
-	for (int j = 0; j < n_inst; ++j) { fread(in + j, 4, 1, f); fread(io + j, 4, 1, f); fread(isq[j], 1, 16, f); }
+	xfread(&n_inst, 4, 1, f, name); xfread(&nw, 4, 1, f, name);
+	if (n_inst < 1 || n_inst > 256 || nw < 1) die("bad instances in %s", name);
+	int *in = (int *) xmalloc(n_inst * sizeof *in), *io = (int *) xmalloc(n_inst * sizeof *io);
+	unsigned char (*isq)[16] = (unsigned char (*)[16]) xmalloc(n_inst * 16);
+	for (int j = 0; j < n_inst; ++j) {
+		xfread(in + j, 4, 1, f, name); xfread(io + j, 4, 1, f, name); xfread(isq[j], 1, 16, f, name);
+		int size = 1;
+		for (int i = 0; i < in[j] && i < 16; ++i) size *= 3;
+		if (in[j] < 1 || in[j] > 16 || io[j] < 1 || io[j] > nw - size) die("bad instances in %s", name);
+		for (int i = 0; i < in[j]; ++i) if (isq[j][i] > 63) die("bad instances in %s", name);
+	}
 	fclose(f);
 	sprintf(name, "%s/%s.scl", dir, cfg);
-	if ((f = fopen(name, "rb"))) { fread(sc, 4, 32, f); fclose(f); }
+	if ((f = fopen(name, "rb"))) {
+		const size_t r = fread(sc, 4, 32, f);	// 11 scalar features of evsearch: (used, offset) each
+		fclose(f);
+		if (r < 4 || r % 2) die("bad scalar features in %s", name);
+	}
 	const int has_mob = sc[0] | sc[2], mob_ofs = sc[0] ? sc[1] : sc[3], mob_n = sc[0] ? 64 : 32;	// mob (both sides) or mobp (side to move only)
 	for (int i = 4; i < 32; i += 2) if (sc[i]) { fprintf(stderr, "only the mob / mobp scalars are supported\n"); return 1; }
+	if (has_mob && (mob_ofs < 1 || mob_ofs > nw - mob_n)) die("bad scalar features in %s", name);
 	static short mob[61][64];
-	double *w = (double *) malloc(nw * sizeof *w);
+	double *w = (double *) xmalloc(nw * sizeof *w);
 	double maxdiff = 0;
 	int covered[13] = {0};
 	for (int ply = 2; ply <= 53; ++ply) {
 		sprintf(name, "%s/%s_%02d.w", dir, cfg, ply);
 		if (!(f = fopen(name, "rb"))) { fprintf(stderr, "cannot open %s\n", name); return 1; }
-		fread(w, 8, nw, f);
+		xfread(w, 8, nw, f, name);
 		fclose(f);
 		short *ew = e->w[ply];
 		ew[ET_NW - 1] = (short) lrint(w[0] * 128);
@@ -94,10 +106,10 @@ int main(int argc, char **argv)
 	printf("%s written (largest difference between symmetric entries: %.0f)\n", argv[4], maxdiff);
 	if (has_mob) {	// mobility weights appended to the evaluation file: "MOBW" then 61 x 64 shorts (same byte order as the file)
 		const unsigned int tag = 0x4d4f4257;
-		f = fopen(argv[4], "ab");
+		f = xfopen(argv[4], "ab");
 		fwrite(&tag, 4, 1, f);
 		fwrite(mob, sizeof mob, 1, f);
-		fclose(f);
+		if (fclose(f) != 0) die("cannot write %s", argv[4]);
 		printf("mobility weights appended\n");
 	}
 	return 0;

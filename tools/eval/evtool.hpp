@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include <cctype>
+#include <climits>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -16,6 +18,61 @@
 #endif
 
 namespace evtool {
+
+/** print a message to stderr and exit with 1 */
+[[noreturn]] inline void die(const char *message, const char *what = "")
+{
+	fprintf(stderr, message, what);
+	fputc('\n', stderr);
+	exit(1);
+}
+
+/** allocation that exits with "out of memory" when it fails */
+inline void *xmalloc(size_t size)
+{
+	void *p = malloc(size ? size : 1);
+	if (p == nullptr) die("out of memory");
+	return p;
+}
+
+inline void *xcalloc(size_t n, size_t size)
+{
+	void *p = calloc(n ? n : 1, size ? size : 1);
+	if (p == nullptr) die("out of memory");
+	return p;
+}
+
+inline void *xrealloc(void *old, size_t size)
+{
+	void *p = realloc(old, size ? size : 1);
+	if (p == nullptr) die("out of memory");
+	return p;
+}
+
+/** fopen that exits with "cannot open <file>" (reading) or "cannot create <file>" (writing) when it fails */
+inline FILE *xfopen(const char *file, const char *mode)
+{
+	FILE *f = fopen(file, mode);
+	if (f == nullptr) die(mode[0] == 'r' ? "cannot open %s" : "cannot create %s", file);
+	return f;
+}
+
+/** fread of exactly n items, or exit with "cannot read <file>" */
+inline void xfread(void *p, size_t size, size_t n, FILE *f, const char *file)
+{
+	if (fread(p, size, n, f) != n) die("cannot read %s (file too short)", file);
+}
+
+/** the number of records of a growing array that can still be doubled (the counts are int) */
+inline int grow(int cap, int first)
+{
+	if (cap == 0) return first;
+	if (cap > INT_MAX / 2) {
+		if (cap == INT_MAX) die("too many records (more than %s) for a ply", "2^31 - 1");
+		return INT_MAX;
+	}
+	return 2 * cap;
+}
 
 #ifdef _MSC_VER
 inline int popc(uint64_t x) { return (int) __popcnt64(x); }
@@ -54,13 +111,47 @@ inline long long file_size(FILE *f)
 /** data source: files <dir>/<prefix>NN.bin, weight of their samples, at most max training samples per ply */
 struct Source { char prefix[32], dir[512]; double weight; long long max; };
 
+/** length of a leading drive letter ("C:\", "C:/") of a path, else 0 */
+inline int drive_length(const char *s)
+{
+	return (isalpha((unsigned char) s[0]) && s[1] == ':' && (s[2] == '\\' || s[2] == '/')) ? 2 : 0;
+}
+
 /**
- * @brief Read a data source "prefix:dir:weight[:max]".
- * @return the number of fields read (as sscanf).
+ * @brief Read a data source "prefix:dir:weight[:max]"; dir may begin with a drive letter ("D:\data").
+ * @return the number of fields read (as sscanf: 3 or 4 for a whole source).
  */
 inline int source_parse(const char *s, Source *o)
 {
-	return sscanf(s, "%31[^:]:%511[^:]:%lf:%lld", o->prefix, o->dir, &o->weight, &o->max);
+	const char *c = strchr(s, ':');
+	if (c == nullptr || c == s || c - s > 31) return 0;
+	memcpy(o->prefix, s, c - s); o->prefix[c - s] = '\0';
+	const char *d = c + 1, *e = strchr(d + drive_length(d), ':');
+	if (e == nullptr || e == d || e - d > 511) return 1;
+	memcpy(o->dir, d, e - d); o->dir[e - d] = '\0';
+	const int n = sscanf(e + 1, "%lf:%lld", &o->weight, &o->max);
+	return 2 + (n > 0 ? n : 0);
+}
+
+/**
+ * @brief Read "dir:name" (the name has no ':'; dir may begin with a drive letter).
+ * @return true if both are read.
+ */
+inline bool dir_name_parse(const char *s, char *dir, size_t dir_size, char *name, size_t name_size)
+{
+	const char *c = strrchr(s, ':');
+	if (c == nullptr || c == s || c[1] == '\0' || (size_t) (c - s) >= dir_size || strlen(c + 1) >= name_size || (c == s + 1 && drive_length(s))) return false;
+	memcpy(dir, s, c - s); dir[c - s] = '\0';
+	strcpy(name, c + 1);
+	return true;
+}
+
+/** exit with a message if the header of a book file (its first 8 bytes) is not the one of form 1 ("EDAX" "BOOK") */
+inline void book_form1_check(const unsigned char *header, const char *file)
+{
+	if (!memcmp(header, "XADEKOOB", 8)) return;
+	if (!memcmp(header, "NEDXBOOK", 8)) die("%s is a book of form 2: convert it to form 1 (edax -book-convert with -book-format 1)", file);
+	die("%s is not a book of form 1", file);
 }
 
 enum { ET_NW = 114364, ET_NF = 46, ET_NPLY = 61 };
@@ -218,6 +309,10 @@ inline ET_Eval *et_read(const char *file)
 	ET_Eval *e = (ET_Eval *) calloc(1, sizeof *e);
 	if (e == nullptr) { fprintf(stderr, "out of memory\n"); exit(1); }
 	size_t r = fread(&e->edax, 4, 5, f);
+	if (r >= 2 && !(e->edax == 0x45444158 && e->eval == 0x4556414c)) {	// "EDAX" "EVAL"
+		if (!memcmp(&e->edax, "NEDXEVAL", 8)) die("%s is an evaluation file of form 2: convert it to form 1 (edax -eval-convert)", file);
+		die("%s is not an evaluation file of form 1", file);
+	}
 	r += fread(&e->date, 8, 1, f);
 	int np = 0;
 	while (np < ET_NPLY && fread(e->w[np], 2, ET_NW, f) == ET_NW) ++np;
@@ -233,7 +328,7 @@ inline void et_write(const ET_Eval *e, const char *file)
 	if (!f) { fprintf(stderr, "cannot create %s\n", file); exit(1); }
 	fwrite(&e->edax, 4, 5, f); fwrite(&e->date, 8, 1, f);
 	fwrite(e->w, 2, (size_t) ET_NW * ET_NPLY, f);
-	fclose(f);
+	if (fclose(f) != 0) die("cannot write %s", file);
 }
 
 /** Edax's weight ply for a position with n_empties (accumlate_eval: plies 0/1 use 2/3, >= 54 use 52/53) */

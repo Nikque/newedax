@@ -38,17 +38,23 @@ static int sym(int x, int s)
 
 static void read_lib(const char *file)
 {
+	if (file == nullptr) die("missing -lib");
 	FILE *f = fopen(file, "r");
-	char line[1024];
+	char line[1024], copy[1024];
 	if (!f) { fprintf(stderr, "cannot open %s\n", file); exit(1); }
 	while (fgets(line, sizeof line, f)) {
+		strcpy(copy, line);
 		char *tok = strtok(line, " \t\r\n");
 		if (!tok || tok[0] == '#') continue;
+		if (n_lib == (int) (sizeof lib / sizeof lib[0])) die("too many patterns in the library (at most 8192)");
 		Pattern *p = lib + n_lib;
 		strncpy(p->name, tok, 31);
-		p->n = atoi(strtok(nullptr, " \t\r\n"));
+		const char *n = strtok(nullptr, " \t\r\n");
+		p->n = n ? atoi(n) : 0;
+		if (p->n < 1 || p->n > 16) die("bad pattern line (1 to 16 squares): %s", copy);
 		for (int i = 0; i < p->n; ++i) {
 			char *s = strtok(nullptr, " \t\r\n");
+			if (s == nullptr || s[0] < 'a' || s[0] > 'h' || s[1] < '1' || s[1] > '8' || s[2] != '\0') die("bad pattern line (squares a1 to h8): %s", copy);
 			p->sq[i] = (unsigned char) ((s[0] - 'a') + 8 * (s[1] - '1'));
 		}
 		++n_lib;
@@ -67,7 +73,7 @@ static const int *canon_table(int p)
 	const int n = lib[p].n;
 	int size = 1;
 	for (int i = 0; i < n; ++i) size *= 3;
-	int *t = (int *) malloc(size * sizeof *t);
+	int *t = (int *) xmalloc(size * sizeof *t);
 	for (int x = 0; x < size; ++x) t[x] = x;
 	uint64_t set = 0;
 	for (int i = 0; i < n; ++i) set |= 1ULL << lib[p].sq[i];
@@ -220,10 +226,17 @@ static int parse_config(char *line, Config *c)
 				uint64_t set = 0;
 				int dup = 0;
 				const int k = c->n_inst;
-				c->inst_n[k] = lib[p].n; c->inst_ofs[k] = c->nw; c->inst_canon[k] = canon_table(p);
-				for (int i = 0; i < lib[p].n; ++i) { c->inst_sq[k][i] = (unsigned char) sym(lib[p].sq[i], s); set |= 1ULL << c->inst_sq[k][i]; }
+				if (k == 256) {	// no room: only a duplicate instance is accepted
+					for (int i = 0; i < lib[p].n; ++i) set |= 1ULL << sym(lib[p].sq[i], s);
+				} else {	// written in the next place (kept there only if it is not a duplicate)
+					c->inst_n[k] = lib[p].n; c->inst_ofs[k] = c->nw; c->inst_canon[k] = canon_table(p);
+					for (int i = 0; i < lib[p].n; ++i) { c->inst_sq[k][i] = (unsigned char) sym(lib[p].sq[i], s); set |= 1ULL << c->inst_sq[k][i]; }
+				}
 				for (int j = first; j < k; ++j) { uint64_t o = 0; for (int i = 0; i < c->inst_n[j]; ++i) o |= 1ULL << c->inst_sq[j][i]; if (o == set) dup = 1; }
-				if (!dup) ++c->n_inst;
+				if (!dup) {
+					if (k == 256) die("too many pattern places in configuration %s (at most 256)", c->name);
+					++c->n_inst;
+				}
 			}
 			c->nf += c->n_inst - first; c->nw += size; c->table += size; found = 1;
 		}
@@ -339,10 +352,10 @@ static void prior_weights(const Config *c, int ply, double *w0, char *cov)
 static void push(Data *d, const Rec *r, float c)
 {
 	if (d->n == d->cap) {
-		d->cap = d->cap ? 2 * d->cap : 1 << 16;
-		d->r = (Rec *) realloc(d->r, d->cap * sizeof *d->r);
-		d->c = (float *) realloc(d->c, d->cap * sizeof *d->c);
-		d->t = (float *) realloc(d->t, d->cap * sizeof *d->t);
+		d->cap = grow(d->cap, 1 << 16);
+		d->r = (Rec *) xrealloc(d->r, d->cap * sizeof *d->r);
+		d->c = (float *) xrealloc(d->c, d->cap * sizeof *d->c);
+		d->t = (float *) xrealloc(d->t, d->cap * sizeof *d->t);
 	}
 	d->r[d->n] = *r; d->c[d->n] = c; d->t[d->n] = r->v; ++d->n;
 }
@@ -359,16 +372,23 @@ static void apply_base(int pi, int ply)
 	sprintf(name, "%s/%s.pat", base_dir, base_cfg);
 	FILE *f = fopen(name, "rb");
 	if (!f) { fprintf(stderr, "cannot open %s\n", name); exit(1); }
-	fread(&n_inst, 4, 1, f); fread(&nw, 4, 1, f);
-	int *bn = (int *) malloc(n_inst * sizeof *bn), *bo = (int *) malloc(n_inst * sizeof *bo);
-	unsigned char (*bs)[16] = (unsigned char (*)[16]) malloc(n_inst * 16);
-	for (int j = 0; j < n_inst; ++j) { fread(bn + j, 4, 1, f); fread(bo + j, 4, 1, f); fread(bs[j], 1, 16, f); }
+	xfread(&n_inst, 4, 1, f, name); xfread(&nw, 4, 1, f, name);
+	if (n_inst < 0 || n_inst > 256 || nw < 1) die("bad instances in %s", name);
+	int *bn = (int *) xmalloc(n_inst * sizeof *bn), *bo = (int *) xmalloc(n_inst * sizeof *bo);
+	unsigned char (*bs)[16] = (unsigned char (*)[16]) xmalloc(n_inst * 16);
+	for (int j = 0; j < n_inst; ++j) {
+		xfread(bn + j, 4, 1, f, name); xfread(bo + j, 4, 1, f, name); xfread(bs[j], 1, 16, f, name);
+		int size = 1;
+		for (int i = 0; i < bn[j] && i < 16; ++i) size *= 3;
+		if (bn[j] < 1 || bn[j] > 16 || bo[j] < 1 || bo[j] > nw - size) die("bad instances in %s", name);
+		for (int i = 0; i < bn[j]; ++i) if (bs[j][i] > 63) die("bad instances in %s", name);
+	}
 	fclose(f);
 	sprintf(name, "%s/%s_%02d.w", base_dir, base_cfg, ply);
 	f = fopen(name, "rb");
 	if (!f) { fprintf(stderr, "cannot open %s\n", name); exit(1); }
-	double *w = (double *) malloc(nw * sizeof *w);
-	fread(w, 8, nw, f);
+	double *w = (double *) xmalloc(nw * sizeof *w);
+	xfread(w, 8, nw, f, name);
 	fclose(f);
 	for (int set = -1; set < n_src; ++set) {
 		Data *D = set < 0 ? train + pi : &test[pi][set];
@@ -412,7 +432,7 @@ static void load(int pi, int ply)
 		const long long n = file_size(f) / (long long) sizeof (Rec);
 		const double keep = n > src[d].max ? (double) src[d].max / n : 1.0;
 		const uint64_t thr = keep >= 1.0 ? ~0ULL : (uint64_t) (keep * 18446744073709551615.0);	// (2^64 as a double does not fit)
-		Rec *buf = (Rec *) malloc(sizeof (Rec) << 20);
+		Rec *buf = (Rec *) xmalloc(sizeof (Rec) << 20);
 		size_t m;
 		while ((m = fread(buf, sizeof (Rec), 1 << 20, f)) > 0) {
 			for (size_t i = 0; i < m; ++i) {
@@ -435,15 +455,15 @@ static void run_config(const Config *c, int pi, double *mse)
 {
 	const Data *D = train + pi;
 	const int nf = c->nf, nw = c->nw;
-	unsigned int *idx = (unsigned int *) malloc((size_t) D->n * nf * sizeof *idx);
+	unsigned int *idx = (unsigned int *) xmalloc((size_t) D->n * nf * sizeof *idx);
 	int k;
 	#pragma omp parallel for schedule(static)
 	for (k = 0; k < D->n; ++k) features(c, D->r[k].P, D->r[k].O, idx + (size_t) k * nf);
-	double *w0 = (double *) calloc(nw, 8);
-	float *tt = (float *) malloc((size_t) D->n * sizeof *tt);
-	double *lam = (double *) malloc(nw * sizeof *lam);
+	double *w0 = (double *) xcalloc(nw, 8);
+	float *tt = (float *) xmalloc((size_t) D->n * sizeof *tt);
+	double *lam = (double *) xmalloc(nw * sizeof *lam);
 	{
-		char *cov = (char *) calloc(nw, 1);
+		char *cov = (char *) xcalloc(nw, 1);
 		if (prior) prior_weights(c, plies[pi], w0, cov);
 		for (int a = 0; a < nw; ++a) lam[a] = (prior && cov[a] && lambda_prior >= 0) ? lambda_prior : lambda;
 		free(cov);
@@ -455,10 +475,10 @@ static void run_config(const Config *c, int pi, double *mse)
 		for (int j = 0; j < nf; ++j) p0 += w0[x[j]];
 		tt[k] = (float) (D->t[k] - p0);
 	}
-	double *w = (double *) calloc(nw, 8), *r = (double *) calloc(nw, 8), *z = (double *) calloc(nw, 8);
-	double *p = (double *) calloc(nw, 8), *q = (double *) calloc(nw, 8), *M = (double *) calloc(nw, 8);
-	double **tq = (double **) malloc(nt * sizeof *tq), **td = (double **) malloc(nt * sizeof *td);
-	for (int t = 0; t < nt; ++t) { tq[t] = (double *) malloc(nw * 8); td[t] = (double *) malloc(nw * 8); }
+	double *w = (double *) xcalloc(nw, 8), *r = (double *) xcalloc(nw, 8), *z = (double *) xcalloc(nw, 8);
+	double *p = (double *) xcalloc(nw, 8), *q = (double *) xcalloc(nw, 8), *M = (double *) xcalloc(nw, 8);
+	double **tq = (double **) xmalloc(nt * sizeof *tq), **td = (double **) xmalloc(nt * sizeof *td);
+	for (int t = 0; t < nt; ++t) { tq[t] = (double *) xmalloc(nw * 8); td[t] = (double *) xmalloc(nw * 8); }
 	// residual & diagonal at w = 0
 	#pragma omp parallel num_threads(nt)
 	{
@@ -516,9 +536,9 @@ static void run_config(const Config *c, int pi, double *mse)
 	if (dumpdir) {
 		char name[1024];
 		sprintf(name, "%s/%s_%02d.w", dumpdir, c->name, plies[pi]);
-		FILE *g = fopen(name, "wb");
+		FILE *g = xfopen(name, "wb");
 		fwrite(w, 8, nw, g);
-		fclose(g);
+		if (fclose(g) != 0) die("cannot write %s", name);
 	}
 	// test errors
 	for (int d = 0; d < n_src; ++d) {
@@ -551,31 +571,43 @@ static void run_config(const Config *c, int pi, double *mse)
 int main(int argc, char **argv)
 {
 	const char *libf = nullptr, *conff = nullptr;
+	auto value = [&](int &i) -> char * { if (i + 1 >= argc) die("missing value of %s", argv[i]); return argv[++i]; };
 	for (int i = 1; i < argc; ++i) {
-		if (!strcmp(argv[i], "-lib")) libf = argv[++i];
-		else if (!strcmp(argv[i], "-configs")) conff = argv[++i];
-		else if (!strcmp(argv[i], "-plies")) { char *s = argv[++i], *t; for (t = strtok(s, ","); t; t = strtok(nullptr, ",")) plies[n_plies++] = atoi(t); }
+		if (!strcmp(argv[i], "-lib")) libf = value(i);
+		else if (!strcmp(argv[i], "-configs")) conff = value(i);
+		else if (!strcmp(argv[i], "-plies")) {
+			char *s = value(i), *t;
+			for (t = strtok(s, ","); t; t = strtok(nullptr, ",")) {
+				if (n_plies == 64) die("too many plies (at most 64)");
+				plies[n_plies] = atoi(t);
+				if (plies[n_plies] < 0 || plies[n_plies] > 60) die("plies are 0 to 60: %s", t);
+				++n_plies;
+			}
+		}
 		else if (!strcmp(argv[i], "-src")) {
+			if (n_src == 8) die("too many -src (at most 8)");
 			Source *o = src + n_src++;
 			o->max = 1LL << 40;
-			source_parse(argv[++i], o);
+			if (source_parse(value(i), o) < 3) die("bad -src %s (prefix:dir:weight[:max])", argv[i]);
 		}
-		else if (!strcmp(argv[i], "-iter")) iter = atoi(argv[++i]);
-		else if (!strcmp(argv[i], "-lambda")) lambda = atof(argv[++i]);
-		else if (!strcmp(argv[i], "-lambda-prior")) lambda_prior = atof(argv[++i]);
-		else if (!strcmp(argv[i], "-threads")) nt = atoi(argv[++i]);
-		else if (!strcmp(argv[i], "-dump")) dumpdir = argv[++i];
+		else if (!strcmp(argv[i], "-iter")) iter = atoi(value(i));
+		else if (!strcmp(argv[i], "-lambda")) lambda = atof(value(i));
+		else if (!strcmp(argv[i], "-lambda-prior")) lambda_prior = atof(value(i));
+		else if (!strcmp(argv[i], "-threads")) nt = atoi(value(i));
+		else if (!strcmp(argv[i], "-dump")) dumpdir = value(i);
 		else if (!strcmp(argv[i], "-notie")) tie = 0;
-		else if (!strcmp(argv[i], "-base")) sscanf(argv[++i], "%511[^:]:%63s", base_dir, base_cfg);
-		else if (!strcmp(argv[i], "-teacher")) { et_init(); teacher = et_read(argv[++i]); }
-		else if (!strcmp(argv[i], "-alpha")) alpha = atof(argv[++i]);
-		else if (!strcmp(argv[i], "-prior")) { et_init(); prior = et_read(argv[++i]); }
+		else if (!strcmp(argv[i], "-base")) { if (!dir_name_parse(value(i), base_dir, sizeof base_dir, base_cfg, sizeof base_cfg)) die("bad -base %s (dir:cfg)", argv[i]); }
+		else if (!strcmp(argv[i], "-teacher")) { et_init(); teacher = et_read(value(i)); }
+		else if (!strcmp(argv[i], "-alpha")) alpha = atof(value(i));
+		else if (!strcmp(argv[i], "-prior")) { et_init(); prior = et_read(value(i)); }
 	}
+	if (nt < 1) die("bad -threads");
 	omp_set_num_threads(nt);
 	read_lib(libf);
+	if (conff == nullptr) die("missing -configs");
+	FILE *f = xfopen(conff, "r");
 	for (int pi = 0; pi < n_plies; ++pi) { load(pi, plies[pi]); apply_teacher(train + pi); if (base_cfg[0]) apply_base(pi, plies[pi]); }
 	fprintf(stderr, "%d patterns; data loaded\n", n_lib);
-	FILE *f = fopen(conff, "r");
 	char line[4096], copy[4096];
 	while (fgets(line, sizeof line, f)) {
 		Config c;
@@ -584,14 +616,14 @@ int main(int argc, char **argv)
 		if (dumpdir) {	// instances: n_inst, nw, then n, ofs, sq[16] per instance (ints, bytes)
 			char name[1024];
 			sprintf(name, "%s/%s.pat", dumpdir, c.name);
-			FILE *g = fopen(name, "wb");
+			FILE *g = xfopen(name, "wb");
 			fwrite(&c.n_inst, 4, 1, g); fwrite(&c.nw, 4, 1, g);
 			for (int j = 0; j < c.n_inst; ++j) { fwrite(&c.inst_n[j], 4, 1, g); fwrite(&c.inst_ofs[j], 4, 1, g); fwrite(c.inst_sq[j], 1, 16, g); }
-			fclose(g);
+			if (fclose(g) != 0) die("cannot write %s", name);
 			sprintf(name, "%s/%s.scl", dumpdir, c.name);	// scalar features: S_N x (used, offset)
-			g = fopen(name, "wb");
+			g = xfopen(name, "wb");
 			for (int a = 0; a < S_N; ++a) { fwrite(&c.scalar[a], 4, 1, g); fwrite(&c.scalar_ofs[a], 4, 1, g); }
-			fclose(g);
+			if (fclose(g) != 0) die("cannot write %s", name);
 		}
 		printf("%-24s lanes %3d table %7d |", c.name, c.nf, c.table);
 		for (int pi = 0; pi < n_plies; ++pi) {
