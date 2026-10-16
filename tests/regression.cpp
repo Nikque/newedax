@@ -251,6 +251,14 @@ Board pb=b;if(e.n_empties&1){pb.player=b.opponent;pb.opponent=b.player;}for(int 
   c=g;c.initial_board.player^=1ULL<<A1;base_append(&b,&c);base_unique(&b);
   ok=b.n_games==101&&!strcmp(b.game[0].name[0],"p0")&&b.game[0].move[1]==F6&&!strcmp(b.game[1].name[0],"p1")&&b.game[1].move[1]==D6&&!board_equal(&b.game[100].initial_board,&b.game[99].initial_board);
   printf("BASE unique: %d games kept (101 expected) ok=%d\n",b.n_games,ok);base_free(&b);if(!ok)return 2;}
+ else if(!strcmp(t,"newform")){ /* a new book (book new) saved with book-format auto: in form 2 over a book file of form 2, else in form 1 (over a file of form 1, a new file) */
+  Search s;init_search(&s,1);Book b={0};options.book_format=0;
+  if(!book_load(&b,"tests/merge-complete-fixture.dat"))return 2;options.book_format=2;if(!book_save(&b,"audit-newform-2.dat"))return 2;options.book_format=1;if(!book_save(&b,"audit-newform-1.dat"))return 2;options.book_format=0;book_free(&b);
+  auto form=[](const char *f){FILE *g=fopen(f,"rb");char m[8];if(!g)return 0;size_t r=fread(m,1,8,g);fclose(g);return r==8&&!memcmp(m,"NEDXBOOK",8)?2:1;};
+  const char *file[3]={"audit-newform-2.dat","audit-newform-1.dat","audit-newform-new.dat"};int want[3]={2,1,1},got[3];remove(file[2]);
+  for(int i=0;i<3;++i){Book n={0};n.search=&s;book_new(&n,1,40);if(n.file_format!=0||!book_save(&n,file[i]))return 2;got[i]=form(file[i]);Book c={0};if(!book_load(&c,file[i])||c.n_nodes!=n.n_nodes)return 2;book_free(&c);book_free(&n);}
+  printf("NEW BOOK saved over form 2: form %d, over form 1: form %d, new file: form %d (2 1 1 expected)\n",got[0],got[1],got[2]);search_free(&s);
+  if(memcmp(got,want,sizeof got))return 2;}
  else if(!strcmp(t,"mergehint")){ /* book merge keeps the leaves of the source as hints for the positions of the destination (book_link_parallel looks for them): sorted by their places, every one found */
   Book s={0},d={0},*bp=&s;Position *p;PositionArray *a;book_init(&s);book_init(&d);options.verbosity=0;
   for(int k=0;k<2;++k){Book *x=k?&d:&s;Position q;Board ib;position_init(&q);board_init(&ib);board_unique(&ib,&q.board);if(book_add(x,&q)<=0)return 2;}

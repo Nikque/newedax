@@ -1214,12 +1214,24 @@ static bool book_trailer_read_2(BookStream *s)
 /**
  * @brief Form of the file to save a book to.
  * @param book Book.
- * @return 1 or 2: book-format if set, else the form of the file the book was loaded from (1 for a new book).
+ * @param file File the book is saved to.
+ * @return 1 or 2: book-format if set, else the form of the file the book was loaded from; for a new book (book new,
+ *         book import, a book file that could not be loaded), the form of the book file it replaces, else 1.
  */
-static int book_save_format(const Book *book)
+static int book_save_format(const Book *book, const char *file)
 {
+	BookFileHeader h;
+	FILE *f;
+	int format = 1;
+
 	if (options.book_format) return options.book_format;
-	return book->file_format ? book->file_format : 1;
+	if (book->file_format) return book->file_format;
+	f = file_open(file, "rb");
+	if (f) {
+		if (book_file_header_read(f, &h) == BOOK_HEADER_OK) format = h.format;
+		fclose(f);
+	}
+	return format;
 }
 
 /**
@@ -3961,7 +3973,7 @@ static void book_remove_stale_tmp(const char *file)
 static bool book_save_to(Book *book, const char *file, const bool keep_replaced)
 {
 	const bool replaced = (book_replaced_file != NULL && strcmp(file, book_replaced_file) == 0);
-	const int format = book_save_format(book);
+	const int format = book_save_format(book, file);
 	unsigned int header_edax = EDAX, header_book = BOOK;
 	unsigned char header_version = VERSION, header_release = RELEASE;
 	char *tmp_file;

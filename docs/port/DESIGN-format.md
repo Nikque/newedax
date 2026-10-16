@@ -79,7 +79,7 @@
 ### 2.7 保存の形の選び方
 
 - `Book` に `file_format`（読んだ形：1 か 2。新しい book は 0）を持つ。
-- 選択肢 `-book-format <auto|1|2>`（既定 auto）。auto は読んだ形、新しい book は形1。
+- 選択肢 `-book-format <auto|1|2>`（既定 auto）。auto は読んだ形。新しい book（`book new`・`book import`、読めなかったファイル）は、置き換えるファイルが形2 の book なら形2、それ以外（形1、ファイルがない、book でない）は形1（2026-10-17 に変更。それまでは新しい book はいつも形1 で、形2 の book を読んだあと `book new` して同じ名前に保存すると形1 に変わっていた）。
 - `book merge` で読む別のファイルも、どちらの形でもよい。
 - `book_file_positions`（保存の前に、置き換えるファイルの局面数を見る）も両方の形を読む。
 
