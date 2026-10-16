@@ -251,6 +251,18 @@ Board pb=b;if(e.n_empties&1){pb.player=b.opponent;pb.opponent=b.player;}for(int 
   c=g;c.initial_board.player^=1ULL<<A1;base_append(&b,&c);base_unique(&b);
   ok=b.n_games==101&&!strcmp(b.game[0].name[0],"p0")&&b.game[0].move[1]==F6&&!strcmp(b.game[1].name[0],"p1")&&b.game[1].move[1]==D6&&!board_equal(&b.game[100].initial_board,&b.game[99].initial_board);
   printf("BASE unique: %d games kept (101 expected) ok=%d\n",b.n_games,ok);base_free(&b);if(!ok)return 2;}
+ else if(!strcmp(t,"mergehint")){ /* book merge keeps the leaves of the source as hints for the positions of the destination (book_link_parallel looks for them): sorted by their places, every one found */
+  Book s={0},d={0},*bp=&s;Position *p;PositionArray *a;book_init(&s);book_init(&d);options.verbosity=0;
+  for(int k=0;k<2;++k){Book *x=k?&d:&s;Position q;Board ib;position_init(&q);board_init(&ib);board_unique(&ib,&q.board);if(book_add(x,&q)<=0)return 2;}
+  int n_cur=1,n_next;Board *cur=(Board*)malloc(sizeof(Board)),*next;board_init(cur);
+  for(int ply=1;ply<=7;++ply){next=(Board*)malloc((size_t)n_cur*MAX_MOVE*sizeof(Board));n_next=0;
+   for(int i=0;i<n_cur;++i){unsigned long long m=board_get_moves(cur+i);int x;foreach_bit(x,m){Board nb,u;board_next(cur+i,x,&nb);board_unique(&nb,&u);if(book_probe(&s,&u))continue;Position q;position_init(&q);q.board=u;
+    unsigned long long lm=board_get_moves(&u);q.leaf.move=(unsigned char)first_bit(lm);q.leaf.score=(signed char)(rr()%129-64);q.level=10;if(book_add(&s,&q)<=0)return 2;if(rr()%3){position_init(&q);q.board=u;if(book_add(&d,&q)<=0)return 2;}next[n_next++]=u;}}
+   free(cur);cur=next;n_cur=n_next;}
+  free(cur);if(!book_save(&s,"audit-hint-src.dat")||!book_merge_file(&d,"audit-hint-src.dat"))return 2;
+  long long unsorted=0,missing=0;for(long long i=0;i<merge_hint_n;++i){if(i&&merge_hint[i-1].key>=merge_hint[i].key)++unsorted;if(merge_hint_find(merge_hint[i].key)!=merge_hint+i)++missing;}
+  printf("MERGE hints=%lld (source %u positions, destination %u after the merge) unsorted=%d missing=%lld\n",merge_hint_n,s.n_nodes,d.n_nodes,(int)unsorted,missing);
+  bool ok=merge_hint_n>1000&&!unsorted&&!missing;merge_hint_free();book_free(&s);book_free(&d);(void)bp;(void)p;(void)a;if(!ok)return 2;}
  else if(!strcmp(t,"crc32c")){ /* CRC-32C of the book and evaluation files of form 2 (instruction or table: the same values), against a reference computed bit by bit */
   auto reference=[](const unsigned char *p,size_t n){unsigned int c=0xFFFFFFFFu;for(size_t i=0;i<n;++i){c^=p[i];for(int k=0;k<8;++k)c=(c>>1)^(0x82F63B78u&(0u-(c&1)));}return ~c;};
   unsigned char buffer[300];int bad=0;unsigned int check=crc32c_bytes(0,"123456789",9);if(check!=0xE3069283u)++bad;

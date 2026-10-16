@@ -4613,10 +4613,10 @@ static bool merge_hint_add(const unsigned long long key, const Link *leaf, const
 	return true;
 }
 
-static int merge_hint_cmp(const void *a, const void *b)
+/** @brief Sort the hints by their places: a place has one hint at most, so any sort gives the same order. */
+static void merge_hint_sort(void)
 {
-	const unsigned long long x = ((const MergeHint*) a)->key, y = ((const MergeHint*) b)->key;
-	return (x > y) - (x < y);
+	boost::sort::pdqsort(merge_hint, merge_hint + merge_hint_n, [](const MergeHint &a, const MergeHint &b) { return a.key < b.key; });
 }
 
 static const MergeHint* merge_hint_find(const unsigned long long key)
@@ -4918,7 +4918,7 @@ bool book_merge_file(Book *dest, const char *file)
 		}
 	}
 	ok = true;
-	if (merge_hint_n) qsort(merge_hint, merge_hint_n, sizeof *merge_hint, merge_hint_cmp);
+	if (merge_hint_n) merge_hint_sort();
 
 merge_end:
 	book_stream_close(&stream);
