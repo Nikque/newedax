@@ -13,7 +13,7 @@
 !IFNDEF BOOST_DIR
 BOOST_DIR = ..\..\third_party\boost_1_92_0
 !ENDIF
-VC_FLAGS = /I"$(BOOST_DIR)" /std:c++23preview /Zc:__cplusplus /EHs-c- /D _HAS_EXCEPTIONS=0 /GR- /D UNICODE /utf-8 /D _CRT_SECURE_NO_DEPRECATE /I"..\include" /O2 /fp:fast /GS- /D NDEBUG /MT
+VC_FLAGS = /I"$(BOOST_DIR)" /std:c++23preview /Zc:__cplusplus /EHs-c- /D _HAS_EXCEPTIONS=0 /GR- /D UNICODE /utf-8 /D _CRT_SECURE_NO_DEPRECATE /I"..\include" /I. /O2 /fp:fast /GS- /D NDEBUG /MT
 
 vc-x64-v3:
 	cl $(VC_FLAGS) /GL /D HAS_CPU_64 /arch:AVX2 /D POPCOUNT all.cpp ws2_32.lib /Fe..\bin\wEdax-x86-64-v3.exe /link /VERSION:4.5

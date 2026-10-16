@@ -15,7 +15,7 @@
  * @author Nikque
  */
 
-#include "../src/libedax.h"
+#include "../src/api/libedax.h"
 
 #include <stddef.h>
 #include <stdio.h>

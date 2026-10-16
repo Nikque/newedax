@@ -173,6 +173,22 @@ C++ 版（MSVC x64 AVX-512 `/O1`、`tests/build-regression.cmd`）で **PASS**�
   - 649 万局面の book（`data\A_cut40.dat`、286MB。29GB の実 book とは別）：読み込み → 保存が C 版と一致。**最大メモリ 665 → 563 MiB（−102 MiB、−15%）**、`book info` の見積もり 333.8MB → 285.9MB（−14.3%）、CPU 時間 3.7 → 2.7 秒（1回。混んだ PC）。
 - 悪くなり得る条件（見立て）：数の大きい局面が非常に多い book では、表の分（その局面だけ、1 つあたり項目 33 バイトを空きを含めて約 40〜75 バイト）が増える。数を読むたびに「印か」の判定が1つ入る（集計と保存だけで、探索の中ではない）。
 
+## 3.17 段階2：`src` をモジュールごとのフォルダに（2026-10-16 夜）
+
+- `tools/port/restructure_src.py` で 108 ファイルを `git mv`：`core/`（`bit`・`board`・`move`・`hash` など）、`core/flip/`（合法手の計算の各版 40 ファイル）、`eval/`、`search/`、`book/`、`game/`、`protocol/`、`util/`、`app/`、`api/`。`all.cpp` と手順書は `src/` に残す。
+- `#include` は `src/` からのパス（`"core/board.h"`）。手順書に `src/` を探す場所として足した（`NMakefile`・`build-msvc.cmd`：`/I.`、`Makefile`：`-I.`、Android：`LOCAL_C_INCLUDES += $(LOCAL_PATH)`、試験の `.cmd`：`/Isrc`）。`Doxyfile` は下のフォルダも読む。
+- 機械語：移動の前と後で、1,223 関数すべて同じ（MSVC x64 AVX-512 `/O2`、`/FAs`）。
+- 確かめたこと：fforum-20-39 の1スレッド（x64 AVX-512、x86 SSE）が記録どおり、API 試験 204 件、回帰 43 ケース。
+
+### Android のリンクの失敗と、実行ファイルが大きくなった件（原因と対処）
+
+- 移動の後、Android の `ndk-build` が実際のリンクで失敗した（`std::mutex`・`operator new` などが見つからない）。**原因は移動ではなく、3.16（局面を 40 バイト）で `std::mutex` と Boost の表を使い始めたこと**。そのときは Android を文法の確認しかしておらず、リンクを確かめていなかった（見落とし）。
+- `APP_STL := c++_static`（C++ の標準ライブラリを実行ファイルに入れる）でリンクは通ったが、**実行ファイルが arm64 で 565,056 → 794,976 バイト（+41%）、armeabi-v7a で 384,788 → 519,300 バイト（+35%）に増えた**。
+- 原因（`llvm-nm -u` で確かめた）：`all.o` が使う C++ の実行時の部品は `operator new`・`operator delete`・`std::mutex`・`__cxa_atexit` だけ。`operator new` は失敗すると例外を投げる実装なので、例外の仕組み・型情報・スタックの巻き戻しなどが一緒に入る。
+- 対処：表のロックを `std::atomic_flag` のスピンロックに（ヘッダーだけ、後始末なし）、表と入れ物の確保を `malloc` の確保器 `util/allocator.h`（`HeapAllocator`。失敗したら `fatal_error`、C の部分と同じ）に。これで `all.o` が使う C++ の実行時の部品は 0 になった（`llvm-nm -u` で確かめた）。
+- 対処の後の大きさ：**Android arm64 576,752 バイト（C 版 565,056 より +11,696、+2.1%）、armeabi-v7a 395,884 バイト（384,788 より +11,096、+2.9%）、Windows x64 AVX-512 802,816 バイト（C 版の同じ設定 792,064 より +10,752、+1.4%）、x86 SSE 694,784 バイト（C++ への移行直後 681,984 より +12,800）**。残る増えは、3.16 の表（`boost::unordered_flat_map` の実体）と並べ替えのコード。局面のメモリの減り（649 万局面で −102 MiB）の代わりとして残す。小さくする道：表の操作を1か所の関数にまとめ、実体を1つにする（未実施）。
+- 対処の後も、`base12.dat` の読み込み・negamax・fix・merge と、左右反転の book の fix・negamax の保存が C 版と一致（`P40-S2B`・`M40-S2B`）。fforum（x64・x86）、API 204 件、回帰 43 ケースも通った。
+
 ## 4. まだのこと
 
 - Linux（WSL に gcc 13 が入ってから）、32ビット Linux。macOS は最後。

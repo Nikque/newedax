@@ -49,7 +49,7 @@ BOOST_DIR ?= ../../third_party/boost_1_92_0
 
 # gcc 4.x (x >= 7)
 ifeq ($(COMP),gcc)
-	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -isystem $(BOOST_DIR) -pedantic -W -Wall -Wextra -pipe -D_GNU_SOURCE=1 -DUNICODE
+	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -isystem $(BOOST_DIR) -I. -pedantic -W -Wall -Wextra -pipe -D_GNU_SOURCE=1 -DUNICODE
 	PGO_GEN = -fprofile-generate
 	PGO_USE = -fprofile-correction -fprofile-use
 
@@ -142,7 +142,7 @@ endif
 
 #icc
 ifeq ($(COMP),icc)
-	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -isystem $(BOOST_DIR) -Wall -Wcheck -wd2259 -D_GNU_SOURCE=1 -DUNICODE -Qoption,cpp,--unicode_source_kind,"UTF-8"
+	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -isystem $(BOOST_DIR) -I. -Wall -Wcheck -wd2259 -D_GNU_SOURCE=1 -DUNICODE -Qoption,cpp,--unicode_source_kind,"UTF-8"
 	PGO_GEN = -prof_gen
 	PGO_USE = -prof_use -wd11505
 
@@ -174,7 +174,7 @@ endif
 
 #clang
 ifeq ($(COMP),clang)
-	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -isystem $(BOOST_DIR) -pedantic -W -Wall -D_GNU_SOURCE=1 -DUNICODE
+	CFLAGS = -std=c++23 -fno-exceptions -fno-rtti -isystem $(BOOST_DIR) -I. -pedantic -W -Wall -D_GNU_SOURCE=1 -DUNICODE
 	PGO_GEN = -fprofile-instr-generate
 	PGO_USE = -fprofile-instr-use=edax.profdata
 	PGO = llvm-profdata merge -output=edax.profdata $(BIN)/*.profraw
@@ -289,9 +289,9 @@ endif
 
 
 #SRC
-SRC= bit.cpp board.cpp move.cpp hash.cpp ybwc.cpp eval.cpp endgame.cpp midgame.cpp root.cpp search.cpp \
-book.cpp opening.cpp game.cpp base.cpp bench.cpp perft.cpp obftest.cpp util.cpp event.cpp histogram.cpp \
-stats.cpp options.cpp play.cpp ui.cpp edax.cpp cassio.cpp gtp.cpp ggs.cpp nboard.cpp xboard.cpp main.cpp   
+SRC= core/bit.cpp core/board.cpp core/move.cpp core/hash.cpp search/ybwc.cpp eval/eval.cpp search/endgame.cpp search/midgame.cpp search/root.cpp search/search.cpp \
+book/book.cpp game/opening.cpp game/game.cpp game/base.cpp app/bench.cpp app/perft.cpp app/obftest.cpp util/util.cpp protocol/event.cpp app/histogram.cpp \
+util/stats.cpp util/options.cpp protocol/play.cpp protocol/ui.cpp protocol/edax.cpp protocol/cassio.cpp protocol/gtp.cpp protocol/ggs.cpp protocol/nboard.cpp protocol/xboard.cpp app/main.cpp   
 
 # RULES
 help:
@@ -398,8 +398,8 @@ noip:
 	$(CC) -g $(CFLAGS) $(LTOFLAG) $(SRC) -o $(BIN)/$(EXE) $(LIBS)
 
 code:
-	$(CC) $(CFLAGS) $(LTOFLAG) generate_flip.cpp -o generate_flip
-	$(CC) $(CFLAGS) $(LTOFLAG) generate_count_flip.cpp -o generate_count_flip
+	$(CC) $(CFLAGS) $(LTOFLAG) core/flip/generate_flip.cpp -o generate_flip
+	$(CC) $(CFLAGS) $(LTOFLAG) core/flip/generate_count_flip.cpp -o generate_count_flip
 	generate_flip
 	generate_count_flip
 

@@ -9,61 +9,61 @@
  */
 
 /* C++ and Boost headers (before libedax_utf8.h, whose macros would rename names in them) */
-#include "cpp_headers.h"
+#include "util/cpp_headers.h"
 
 /* library (LIB_BUILD): file names in UTF-8 on Windows */
-#include "libedax_utf8.h"
+#include "api/libedax_utf8.h"
 
 /* miscellaneous utilities */
-#include "options.cpp"
-#include "util.cpp"
-#include "stats.cpp"
-#include "bit.cpp"
+#include "util/options.cpp"
+#include "util/util.cpp"
+#include "util/stats.cpp"
+#include "core/bit.cpp"
 
 /* move generation */
-#include "board.cpp"
-#include "move.cpp"
+#include "core/board.cpp"
+#include "core/move.cpp"
 
 /* eval & search */
-#include "eval.cpp"
-#include "hash.cpp"
-#include "ybwc.cpp"
-#include "search.cpp"
-#include "endgame.cpp"
-#include "midgame.cpp"
-#include "root.cpp"
+#include "eval/eval.cpp"
+#include "core/hash.cpp"
+#include "search/ybwc.cpp"
+#include "search/search.cpp"
+#include "search/endgame.cpp"
+#include "search/midgame.cpp"
+#include "search/root.cpp"
 
 /* miscellaneous tests */
-#include "perft.cpp"
-#include "obftest.cpp"
-#include "histogram.cpp"
-#include "bench.cpp"
+#include "app/perft.cpp"
+#include "app/obftest.cpp"
+#include "app/histogram.cpp"
+#include "app/bench.cpp"
 
 /* opening book & game database */
-#include "book.cpp"
-#include "game.cpp"
-#include "base.cpp"
-#include "opening.cpp"
+#include "book/book.cpp"
+#include "game/game.cpp"
+#include "game/base.cpp"
+#include "game/opening.cpp"
 
 /* game play with various protocols */
-#include "play.cpp"
-#include "event.cpp"
-#include "ui.cpp"
-#include "edax.cpp"
-#include "cassio.cpp"
-#include "ggs.cpp"
-#include "gtp.cpp"
-#include "nboard.cpp"
-#include "xboard.cpp"
+#include "protocol/play.cpp"
+#include "protocol/event.cpp"
+#include "protocol/ui.cpp"
+#include "protocol/edax.cpp"
+#include "protocol/cassio.cpp"
+#include "protocol/ggs.cpp"
+#include "protocol/gtp.cpp"
+#include "protocol/nboard.cpp"
+#include "protocol/xboard.cpp"
 
 /* library: Edax api (not compiled in the edax program) */
 #ifdef LIB_BUILD
-	#include "libedax.cpp"
+	#include "api/libedax.cpp"
 #endif
 
 /* what Boost needs without exceptions */
-#include "boost_support.cpp"
+#include "util/boost_support.cpp"
 
 /* main */
-#include "main.cpp"
+#include "app/main.cpp"
 
