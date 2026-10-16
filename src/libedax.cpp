@@ -2760,28 +2760,26 @@ static int lib_last_bit(unsigned long long b)
 	#else
 		#define LIB_EXPORT(name) __pragma(comment(linker, "/EXPORT:" #name "=libedax_" #name))
 	#endif
-	#define LIB_UTILITY(type, name, args) LIB_EXPORT(name) type libedax_##name args
+	#define LIB_UTILITY(type, name, args) LIB_EXPORT(name) extern "C" type libedax_##name args
+
+	LIB_UTILITY(int, bit_count, (unsigned long long b)) { return lib_bit_count(b); }
+	LIB_UTILITY(int, first_bit, (unsigned long long b)) { return lib_first_bit(b); }
+	LIB_UTILITY(int, last_bit, (unsigned long long b)) { return lib_last_bit(b); }
+	LIB_UTILITY(unsigned long long, get_moves, (const unsigned long long P, const unsigned long long O)) { return get_moves(P, O); }
+	// returned as an int (0 or 1), the size of bool in the C builds of MSVC (include/stdbool.h)
+	LIB_UTILITY(int, can_move, (const unsigned long long P, const unsigned long long O)) { return can_move(P, O) ? 1 : 0; }
+
+#elif defined(__GNUC__)
+
+	// the functions of Edax have C++ names: all five are exported under their C names from here
+	#define LIB_UTILITY(type, name, args) \
+		extern "C" LIBEDAX_API type libedax_##name args __asm__(LIB_STRING(__USER_LABEL_PREFIX__) #name); \
+		extern "C" type libedax_##name args
 
 	LIB_UTILITY(int, bit_count, (unsigned long long b)) { return lib_bit_count(b); }
 	LIB_UTILITY(int, first_bit, (unsigned long long b)) { return lib_first_bit(b); }
 	LIB_UTILITY(int, last_bit, (unsigned long long b)) { return lib_last_bit(b); }
 	LIB_UTILITY(unsigned long long, get_moves, (const unsigned long long P, const unsigned long long O)) { return get_moves(P, O); }
 	LIB_UTILITY(bool, can_move, (const unsigned long long P, const unsigned long long O)) { return can_move(P, O); }
-
-#elif defined(__GNUC__)
-
-	// a function of Edax with the same name is already exported: only the macros need a function
-	#define LIB_UTILITY(type, name, args) \
-		LIBEDAX_API type libedax_##name args __asm__(LIB_STRING(__USER_LABEL_PREFIX__) #name); \
-		type libedax_##name args
-
-	LIB_UTILITY(int, bit_count, (unsigned long long b)) { return lib_bit_count(b); }	// (a macro or an inlined function in Edax)
-	#ifdef first_bit
-	LIB_UTILITY(int, first_bit, (unsigned long long b)) { return lib_first_bit(b); }
-	LIB_UTILITY(int, last_bit, (unsigned long long b)) { return lib_last_bit(b); }
-	#endif
-	#ifdef get_moves
-	LIB_UTILITY(unsigned long long, get_moves, (const unsigned long long P, const unsigned long long O)) { return get_moves(P, O); }
-	#endif
 
 #endif
