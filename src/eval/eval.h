@@ -27,6 +27,16 @@
 	#define VECTOR_EVAL_UPDATE	// (the update square by square of eval.cpp knows the 47 features of Edax 4.5 only)
 #endif
 
+/**
+ * Mobility weights (EVAL_MOBILITY=1, as v4.5.5-eval2): the weights of the numbers of legal moves (0 to 31) of the side
+ * to move and of the opponent, for each ply, are read from the end of an evaluation file of form 1 ("MOBW", then 61 x 64
+ * shorts) and added to the evaluation. Without them in the file, the evaluation is the one of Edax 4.5.
+ * 0 (the default): they are not read.
+ */
+#ifndef EVAL_MOBILITY
+	#define EVAL_MOBILITY 0
+#endif
+
 /** number of features */
 enum { EVAL_N_FEATURE = 47 };
 
@@ -80,6 +90,11 @@ typedef struct Eval_weight {
 enum { EVAL_N_2PLY = 54 / 2 };	// decreased from 60 in 4.5.1
 
 extern Eval_weight (*EVAL_WEIGHT)[EVAL_N_2PLY - 1];	// for 2..53, interleaved
+
+#if EVAL_MOBILITY
+extern short EVAL_MOBILITY_WEIGHT[61][64];	// for each ply: side to move [0..31], opponent [32..63]
+extern bool EVAL_HAS_MOBILITY;	// the evaluation file has mobility weights
+#endif
 
 /* function declaration */
 void eval_open(const char*);

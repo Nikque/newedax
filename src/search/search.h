@@ -197,6 +197,9 @@ int NWS_endgame(Search*, const int);
 
 int search_eval_0(Search*);
 int search_eval_1(Search*, int, int, unsigned long long);
+#ifdef EVAL_LEAF_HOOK
+extern void (*eval_leaf_hook)(const Board *board);	// (midgame.cpp)
+#endif
 int search_eval_2(Search*, int, int, unsigned long long);
 int NWS_midgame(Search*, const int, int, struct Node*);
 int PVS_midgame(Search*, const int, const int, int, struct Node*);

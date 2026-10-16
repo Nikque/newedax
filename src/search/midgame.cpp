@@ -172,6 +172,29 @@ static int accumlate_eval(int ply, Eval *eval)
 	return sum + *(w->S8x4[f[28]]) + *(w->S8x4[f[29]]) + *(w->S0);
 }
 
+#if EVAL_MOBILITY
+/**
+ * @brief Mobility part of the evaluation (when the evaluation file has mobility weights).
+ *
+ * @param ply	60 - n_empties
+ * @param P	the side to move
+ * @param O	the opponent
+ * @return weights of the numbers of legal moves of both sides (x 128).
+ */
+static inline int mobility_eval(int ply, const unsigned long long P, const unsigned long long O)
+{
+	int p = bit_count(get_moves(P, O)), o = bit_count(get_moves(O, P));
+	if (p > 31) p = 31;
+	if (o > 31) o = 31;
+	return EVAL_MOBILITY_WEIGHT[ply][p] + EVAL_MOBILITY_WEIGHT[ply][32 + o];
+}
+#endif
+
+#ifdef EVAL_LEAF_HOOK
+/** called with each position evaluated by search_eval_0 and search_eval_1 (side to move view), when set */
+void (*eval_leaf_hook)(const Board *board) = NULL;
+#endif
+
 /**
  * @brief evaluate a midgame position with the evaluation function.
  *
@@ -185,7 +208,13 @@ int search_eval_0(Search *search)
 	SEARCH_STATS(++statistics.n_search_eval_0);
 	SEARCH_UPDATE_EVAL_NODES(search->n_nodes);
 
+#ifdef EVAL_LEAF_HOOK
+	if (eval_leaf_hook) eval_leaf_hook(&search->board);
+#endif
 	score = accumlate_eval(60 - search->eval.n_empties,  &search->eval);
+#if EVAL_MOBILITY
+	if (EVAL_HAS_MOBILITY) score += mobility_eval(60 - search->eval.n_empties, search->board.player, search->board.opponent);
+#endif
 
 	if (score > 0) score += 64;	else score -= 64;
 	score /= 128;
@@ -238,7 +267,13 @@ int search_eval_1(Search *search, int alpha, int beta, unsigned long long moves)
 			eval_update_leaf(x, flipped, &Ev, &search->eval);
 			SEARCH_UPDATE_EVAL_NODES(search->n_nodes);
 
+#ifdef EVAL_LEAF_HOOK
+			if (eval_leaf_hook) { Board child; board_next(&board0.board, x, &child); eval_leaf_hook(&child); }
+#endif
 			score = accumlate_eval(60 - search->eval.n_empties + 1, &Ev);
+#if EVAL_MOBILITY
+			if (EVAL_HAS_MOBILITY) score += mobility_eval(60 - search->eval.n_empties + 1, search->board.opponent ^ flipped, search->board.player ^ (flipped | x_to_bit(x)));
+#endif
 
 			if (score < bestscore)
 				bestscore = score;

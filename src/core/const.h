@@ -91,6 +91,8 @@ constexpr int EDAX = 0x45444158;
 constexpr int EVAL = 0x4556414c;
 constexpr int XADE = 0x58414445;
 constexpr int LAVE = 0x4c415645;
+constexpr int MOBW = 0x4d4f4257;	// mobility weights in an evaluation file (EVAL_MOBILITY)
+constexpr int WBOM = 0x57424f4d;
 
 /**
  * Edax state.
