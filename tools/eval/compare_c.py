@@ -2,7 +2,7 @@
 # on one logical CPU, and compare their outputs byte for byte (output files, standard output and error).
 # usage: py -3 compare_c.py --c <dir of the C exes> --cpp <dir of the C++ exes> --work <empty work dir>
 #                           [--c2 <dir of the C exes built with the eval2 sources>] [--eval2 <eval.dat of eval2>]
-#                           [--ev D:\edaxwork\ev] [--cases E1,T1,...] [--repeat n]
+#                           [--ev D:\edaxwork\ev] [--cases E1,T1,...] [--repeat n] [--cpu n]
 #   The cases of the tools with the search are run with the C tools of --c (sources of nikque.17, evaluation file of
 #   Edax 4.5) and, with the evaluation file of eval2 (mobility weights), with the C tools of --c2.
 #   --repeat n: run each case n times more, alternating C and C++, and print the CPU cycles and peak memory of both.
@@ -19,12 +19,15 @@ class PMC(ctypes.Structure):
         'QuotaPeakNonPagedPoolUsage', 'QuotaNonPagedPoolUsage', 'PagefileUsage', 'PeakPagefileUsage')]
 
 
+CPU = 0
+
+
 def run1(cmd, cwd, stdout, stderr):
-    """Run cmd on logical CPU 0 at below-normal priority; return (exit code, cycles, peak working set in bytes)."""
+    """Run cmd on logical CPU --cpu at below-normal priority; return (exit code, cycles, peak working set in bytes)."""
     with open(stdout, 'wb') as o, open(stderr, 'wb') as e:
         p = subprocess.Popen(cmd, cwd=cwd, stdout=o, stderr=e, creationflags=0x4000)
         h = wintypes.HANDLE(int(p._handle))
-        k32.SetProcessAffinityMask(h, ctypes.c_size_t(1))
+        k32.SetProcessAffinityMask(h, ctypes.c_size_t(1 << CPU))
         rc = p.wait()
         c = ctypes.c_ulonglong(0)
         k32.QueryProcessCycleTime(h, ctypes.byref(c))
@@ -158,8 +161,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--c', required=True); ap.add_argument('--cpp', required=True); ap.add_argument('--work', required=True)
     ap.add_argument('--ev', default=r'D:\edaxwork\ev'); ap.add_argument('--cases', default=''); ap.add_argument('--repeat', type=int, default=0)
-    ap.add_argument('--c2', default=''); ap.add_argument('--eval2', default='')
+    ap.add_argument('--c2', default=''); ap.add_argument('--eval2', default=''); ap.add_argument('--cpu', type=int, default=0)
     a = ap.parse_args()
+    global CPU
+    CPU = a.cpu
     prepare(a)
     want = set(a.cases.split(',')) if a.cases else None
     base = os.path.join(a.work, 'E1base', 'c')
@@ -209,8 +214,12 @@ def main():
                     _, _, cy, pk = side_run(a, d, side, name, tool, args)
                     cyc[side].append(cy); peak[side].append(pk)
             mc, mp = sorted(cyc['c'])[len(cyc['c']) // 2], sorted(cyc['cpp'])[len(cyc['cpp']) // 2]
+            # ratio of the two runs of each repetition (next to each other in time), then their median and quartiles
+            pr = sorted(p / c for c, p in zip(cyc['c'], cyc['cpp']))
+            q = lambda f: pr[min(len(pr) - 1, int(f * len(pr)))]
             print(f'    cycles median C {mc / 1e9:.3f}G  C++ {mp / 1e9:.3f}G  (C++/C {mp / mc:.3f}); min C {min(cyc["c"]) / 1e9:.3f}G  C++ {min(cyc["cpp"]) / 1e9:.3f}G;'
                   f'  peak MiB C {max(peak["c"]) / 2**20:.1f}  C++ {max(peak["cpp"]) / 2**20:.1f}', flush=True)
+            print(f'    C++/C of each repetition: median {q(0.5):.3f}, quartiles {q(0.25):.3f} - {q(0.75):.3f}, {sum(r < 1 for r in pr)} of {len(pr)} below 1', flush=True)
     print(f'cases different: {bad}')
     return 1 if bad else 0
 
