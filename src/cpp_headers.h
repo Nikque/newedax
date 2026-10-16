@@ -7,15 +7,20 @@
  * remove by macros, which would rename std::remove and other names in the headers read after it.
  * The sources that use these headers also include this file (it is read once).
  *
- * Edax is built without exceptions: the Boost code used here must not throw (pdqsort does not
- * allocate memory and does not throw).
+ * Edax is built without exceptions: where Boost would throw, it calls boost::throw_exception, defined in
+ * boost_support.cpp (it prints the error and aborts). pdqsort neither allocates memory nor throws.
  */
 
 #ifndef EDAX_CPP_HEADERS_H
 #define EDAX_CPP_HEADERS_H
 
 #include <algorithm>
+#include <array>
+#include <mutex>
+#include <type_traits>
 
+#include <boost/assert/source_location.hpp>
 #include <boost/sort/pdqsort/pdqsort.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #endif /* EDAX_CPP_HEADERS_H */

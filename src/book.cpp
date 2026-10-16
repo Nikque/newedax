@@ -130,10 +130,7 @@ typedef struct Position {
 		Link *array;           /**< heap array, used when n_link > POSITION_INLINE_LINKS */
 		Link in[POSITION_INLINE_LINKS]; /**< in-place storage for up to POSITION_INLINE_LINKS links */
 	} links;                   /**< linking moves (use position_links()) */
-	unsigned int n_wins;       /**< game win count */
-	unsigned int n_draws;      /**< game draw count */
-	unsigned int n_losses;     /**< game loss count */
-	unsigned int n_lines;      /**< unterminated line count */
+	unsigned short count[4];   /**< game win, draw and loss counts, unterminated line count (see position_get_counts) */
 	struct {
 		signed char value, lower, upper;
 	} score;                   /**< Position value & bounds (saved as 16-bit values; see score_char()) */
@@ -141,9 +138,149 @@ typedef struct Position {
 	unsigned char n_link;      /**< linking moves number */
 	unsigned char level;       /**< search level */
 	unsigned char state;       /**< book epoch and done/todo flags (see below) */
-} Position;                    /* 48 bytes on 64-bit targets (56 in v4.5.5-nikque.4, 64 before) */
+} Position;                    /* 40 bytes on 64-bit targets (48 up to v4.5.5-nikque.17, 56 in v4.5.5-nikque.4, 64 before) */
 
-typedef char position_size_check[(sizeof (void*) != 8 || sizeof (Position) == 48) ? 1 : -1];
+static_assert(sizeof (void*) != 8 || sizeof (Position) == 40, "Position is 40 bytes on 64-bit targets");
+
+/*
+ * Game counts of a position.
+ *
+ * A position holds its 4 counts (wins, draws, losses, unterminated lines) on 16 bits each. When one of them
+ * does not fit (above 65534: a few positions near the root of a large book), the 4 counts are kept on 32 bits
+ * in the table of the book (book->counts), and the 16-bit counts of the position are all POSITION_COUNTS_IN_TABLE.
+ * The key of the table is the (unique) board: a position keeps its entry when it moves inside the book.
+ * The book file keeps the 4 counts on 32 bits (see position_read and position_write).
+ */
+
+/** 16-bit counts of a position whose counts are in the table of its book. */
+#define POSITION_COUNTS_IN_TABLE 0xFFFF
+
+/** Board as the key of the table of counts. */
+struct BookCountsKey {
+	unsigned long long player, opponent;
+	bool operator==(const BookCountsKey &k) const { return player == k.player && opponent == k.opponent; }
+};
+
+/** Hash of a board (board_get_hash_code mixes its bits). */
+struct BookCountsHash {
+	using is_avalanching = std::true_type;
+	size_t operator()(const BookCountsKey &k) const {
+		const Board b = {k.player, k.opponent};
+		return (size_t) board_get_hash_code(&b);
+	}
+};
+
+/** Counts of the positions of a book that do not fit 16 bits. */
+struct BookCounts {
+	boost::unordered_flat_map<BookCountsKey, std::array<unsigned int, 4>, BookCountsHash> map;
+};
+
+/** Lock of the tables of counts (they are rarely used: a lock for all of them). */
+static std::mutex book_counts_lock;
+
+/** @return true if the counts of a position are in the table of its book. */
+static inline bool position_counts_in_table(const Position *position)
+{
+	return position->count[0] == POSITION_COUNTS_IN_TABLE;
+}
+
+/**
+ * @brief Keep the counts of a board in the table of a book.
+ * @param book Opening book.
+ * @param board Unique board.
+ * @param n Counts (wins, draws, losses, lines).
+ */
+static void book_counts_put(Book *book, const Board *board, const unsigned int n[4])
+{
+	std::lock_guard<std::mutex> guard(book_counts_lock);
+	if (book->counts == NULL) book->counts = new BookCounts();
+	book->counts->map[BookCountsKey{board->player, board->opponent}] = {n[0], n[1], n[2], n[3]};
+}
+
+/**
+ * @brief Remove the counts of a board from the table of a book.
+ * @param book Opening book.
+ * @param board Unique board.
+ */
+static void book_counts_erase(Book *book, const Board *board)
+{
+	std::lock_guard<std::mutex> guard(book_counts_lock);
+	if (book->counts) book->counts->map.erase(BookCountsKey{board->player, board->opponent});
+}
+
+/**
+ * @brief Memory of the table of counts of a book (slots and their metadata).
+ * @param book Opening book.
+ * @return size in bytes.
+ */
+static unsigned long long book_counts_memory(const Book *book)
+{
+	std::lock_guard<std::mutex> guard(book_counts_lock);
+	if (book->counts == NULL) return 0;
+	return (unsigned long long) book->counts->map.bucket_count() * (sizeof (decltype(book->counts->map)::value_type) + 1);
+}
+
+/**
+ * @brief Counts of a position.
+ * @param position Position of the book.
+ * @param book Opening book.
+ * @param n Counts (wins, draws, losses, lines).
+ */
+static void position_get_counts_n(const Position *position, const Book *book, unsigned int n[4])
+{
+	if (position_counts_in_table(position)) {
+		std::lock_guard<std::mutex> guard(book_counts_lock);
+		if (book->counts == NULL) fatal_error("the game counts of a position are missing\n");
+		const auto i = book->counts->map.find(BookCountsKey{position->board.player, position->board.opponent});
+		if (i == book->counts->map.end()) fatal_error("the game counts of a position are missing\n");
+		for (int k = 0; k < 4; ++k) n[k] = i->second[k];
+	} else {
+		for (int k = 0; k < 4; ++k) n[k] = position->count[k];
+	}
+}
+
+/**
+ * @brief Counts of a position, as game statistics.
+ * @param position Position of the book.
+ * @param book Opening book.
+ * @param stat Counts.
+ */
+static void position_get_counts(const Position *position, const Book *book, GameStats *stat)
+{
+	unsigned int n[4];
+	position_get_counts_n(position, book, n);
+	stat->n_wins = n[0]; stat->n_draws = n[1]; stat->n_losses = n[2]; stat->n_lines = n[3];
+}
+
+/**
+ * @brief Set the counts of a position (each one up to UINT_MAX).
+ * @param position Position of the book.
+ * @param book Opening book.
+ * @param n Counts (wins, draws, losses, lines).
+ */
+static void position_set_counts_n(Position *position, Book *book, const unsigned int n[4])
+{
+	if (n[0] < POSITION_COUNTS_IN_TABLE && n[1] < POSITION_COUNTS_IN_TABLE && n[2] < POSITION_COUNTS_IN_TABLE && n[3] < POSITION_COUNTS_IN_TABLE) {
+		if (position_counts_in_table(position)) book_counts_erase(book, &position->board);
+		for (int k = 0; k < 4; ++k) position->count[k] = (unsigned short) n[k];
+	} else {
+		book_counts_put(book, &position->board, n);
+		for (int k = 0; k < 4; ++k) position->count[k] = POSITION_COUNTS_IN_TABLE;
+	}
+}
+
+/**
+ * @brief Set the counts of a position from game statistics (each one up to UINT_MAX).
+ * @param position Position of the book.
+ * @param book Opening book.
+ * @param stat Counts.
+ */
+static void position_set_counts(Position *position, Book *book, const GameStats *stat)
+{
+	const unsigned int n[4] = {(unsigned int) MIN(UINT_MAX, stat->n_wins), (unsigned int) MIN(UINT_MAX, stat->n_draws),
+		(unsigned int) MIN(UINT_MAX, stat->n_losses), (unsigned int) MIN(UINT_MAX, stat->n_lines)};
+	position_set_counts_n(position, book, n);
+}
 
 /*
  * The state of a position holds the book epoch at which its done/todo flags were set, so that
@@ -366,7 +503,7 @@ static void position_init(Position *position)
 	position->leaf = BAD_LINK;
 	position->links.array = NULL;
 
-	position->n_wins = position->n_draws = position->n_losses = position->n_lines = 0;
+	position->count[0] = position->count[1] = position->count[2] = position->count[3] = 0;
 	position->score.value = position->score.lower = -SCORE_INF;
 	position->score.upper = +SCORE_INF;
 
@@ -511,8 +648,10 @@ static bool position_read_is_sound(const int n_link, const Link *links, const Li
  *
  * @param position Position to read in.
  * @param s Input stream.
+ * @param book Book that will hold the position: it keeps the counts too large for the position
+ *             (see position_get_counts). NULL: the counts are not kept (0).
  */
-static bool position_read(Position *position, BookStream *s)
+static bool position_read(Position *position, BookStream *s, Book *book)
 {
 	unsigned char h[POSITION_FIXED_SIZE];
 	Link links[256];
@@ -520,10 +659,12 @@ static bool position_read(Position *position, BookStream *s)
 	if (!book_stream_read(s, h, sizeof h)) return false;
 	memcpy(&position->board.player, h, 8);
 	memcpy(&position->board.opponent, h + 8, 8);
-	memcpy(&position->n_wins, h + 16, 4);
-	memcpy(&position->n_draws, h + 20, 4);
-	memcpy(&position->n_losses, h + 24, 4);
-	memcpy(&position->n_lines, h + 28, 4);
+	position->count[0] = position->count[1] = position->count[2] = position->count[3] = 0;
+	if (book) {
+		unsigned int n[4];
+		memcpy(n, h + 16, 16);
+		position_set_counts_n(position, book, n);
+	}
 	{
 		short value, lower, upper;
 		memcpy(&value, h + 32, 2);
@@ -620,19 +761,21 @@ static int position_import(Position *position, FILE *f, const bool verbose, int 
  * @brief Write a position.
  *
  * @param position position to write out.
+ * @param book Book of the position (for its counts).
  * @param f output stream.
  */
-static bool position_write(const Position *position, BookStream *s)
+static bool position_write(const Position *position, const Book *book, BookStream *s)
 {
 	unsigned char h[POSITION_FIXED_SIZE + 2 * 257];
 	const int n = position->n_link;
 
 	memcpy(h, &position->board.player, 8);
 	memcpy(h + 8, &position->board.opponent, 8);
-	memcpy(h + 16, &position->n_wins, 4);
-	memcpy(h + 20, &position->n_draws, 4);
-	memcpy(h + 24, &position->n_losses, 4);
-	memcpy(h + 28, &position->n_lines, 4);
+	{
+		unsigned int n[4];
+		position_get_counts_n(position, book, n);
+		memcpy(h + 16, n, 16);
+	}
 	{
 		const short value = position->score.value, lower = position->score.lower, upper = position->score.upper;
 		memcpy(h + 32, &value, 2);
@@ -1177,16 +1320,17 @@ static int position_negamax(Position *position, Book *book)
 			if (-child->score.upper > position->score.lower) position->score.lower = -child->score.upper;
 			if (-child->score.lower > position->score.upper) position->score.upper = -child->score.lower;
 
-			stat.n_wins += child->n_losses;
-			stat.n_draws += child->n_draws;
-			stat.n_losses += child->n_wins;
-			stat.n_lines += child->n_lines;
+			{
+				GameStats c;
+				position_get_counts(child, book, &c);
+				stat.n_wins += c.n_losses;
+				stat.n_draws += c.n_draws;
+				stat.n_losses += c.n_wins;
+				stat.n_lines += c.n_lines;
+			}
 		}
 
-		position->n_wins = (unsigned int) MIN(UINT_MAX, stat.n_wins);
-		position->n_draws = (unsigned int) MIN(UINT_MAX, stat.n_draws);
-		position->n_losses = (unsigned int) MIN(UINT_MAX, stat.n_losses);
-		position->n_lines = (unsigned int) MIN(UINT_MAX, stat.n_lines);
+		position_set_counts(position, book, &stat);
 	}
 
 	return position->score.value;
@@ -1311,16 +1455,17 @@ static void position_negamax_compute(Position *position, Book *book, Position **
 		if (-child->score.upper > position->score.lower) position->score.lower = -child->score.upper;
 		if (-child->score.lower > position->score.upper) position->score.upper = -child->score.lower;
 
-		stat.n_wins += child->n_losses;
-		stat.n_draws += child->n_draws;
-		stat.n_losses += child->n_wins;
-		stat.n_lines += child->n_lines;
+		{
+			GameStats c;
+			position_get_counts(child, book, &c);
+			stat.n_wins += c.n_losses;
+			stat.n_draws += c.n_draws;
+			stat.n_losses += c.n_wins;
+			stat.n_lines += c.n_lines;
+		}
 	}
 
-	position->n_wins = (unsigned int) MIN(UINT_MAX, stat.n_wins);
-	position->n_draws = (unsigned int) MIN(UINT_MAX, stat.n_draws);
-	position->n_losses = (unsigned int) MIN(UINT_MAX, stat.n_losses);
-	position->n_lines = (unsigned int) MIN(UINT_MAX, stat.n_lines);
+	position_set_counts(position, book, &stat);
 }
 
 struct PositionArray;
@@ -2589,6 +2734,7 @@ void book_init(Book *book)
 	book->pool_unused = 0;
 	book->visit = NULL;
 	book->visit_first = NULL;
+	book->counts = NULL;
 	random_seed(&book->random, book_random_seed());
 	book->need_saving = false;
 }
@@ -2678,6 +2824,8 @@ void book_free(Book *book)
 	book->todo_list.item = NULL;
 	book->todo_list.n = book->todo_list.size = 0;
 	book->todo_list.valid = false;
+	delete book->counts;
+	book->counts = NULL;
 	book_store_release();
 }
 
@@ -3014,7 +3162,7 @@ bool book_load(Book *book, const char *file)
 		loaded.pool_size = pool ? expected : 0;
 		pooling = (pool != NULL);
 		for (i = 0; i < expected; ++i) {
-			if (!position_read(&p, &stream)) {
+			if (!position_read(&p, &stream, &loaded)) {
 				error("Truncated or damaged opening book %s at position %u/%u\n", file, i, expected);
 				goto book_load_failed;
 			}
@@ -3323,7 +3471,7 @@ static bool book_save_to(Book *book, const char *file, const bool keep_replaced)
 		if (!book_stream_open(&stream, f)) r = 0;
 		else {
 			foreach_position(p, a, book) {
-				if (!position_write(p, &stream)) {
+				if (!position_write(p, book, &stream)) {
 					r = 0;
 					break;
 				}
@@ -4169,7 +4317,7 @@ bool book_merge_file(Book *dest, const char *file)
 		next = real_clock() + 1000;
 		for (i = 0; i < expected; ++i) {
 			if ((i & 0xffff) == 0 && i && book_progress_due(&next)) bprint("%s book %s...%u/%u positions\r", pass ? "Merging" : "Checking", file, i, expected);
-			if (!position_read(&p, &stream)) {
+			if (!position_read(&p, &stream, NULL)) { // (position_merge does not copy the counts)
 				error("Truncated or damaged opening book %s at position %u/%u\n", file, i, expected);
 				goto merge_end;
 			}
@@ -4386,8 +4534,15 @@ static void book_fix_unique_boards(Book *book, int *n_fix)
 			book_detach_at(book, a, TASK_INDEX(item));
 		}
 		for (j = 0; j < n; ++j) {
+			unsigned int counts[4];
+			const bool in_table = position_counts_in_table(moved + j);
+			if (in_table) { // (the key of the table is the board, which changes)
+				position_get_counts_n(moved + j, book, counts);
+				book_counts_erase(book, &moved[j].board);
+			}
 			position_unique(moved + j);
 			if (book_probe(book, &moved[j].board) != NULL || book_add(book, moved + j) <= 0) position_free(moved + j);
+			else if (in_table) book_counts_put(book, &moved[j].board, counts);
 			++*n_fix;
 		}
 		free(moved);
@@ -6522,7 +6677,7 @@ void book_info(Book *book)
 		}
 	}
 	bprint("Depth: %d\n", 61 - book->options.n_empties);
-	bprint("Memory occupation: %llu\n", (unsigned long long) book->n_nodes * sizeof (Position) + (unsigned long long) book->n * sizeof (PositionArray) + n_links * sizeof (Link));
+	bprint("Memory occupation: %llu\n", (unsigned long long) book->n_nodes * sizeof (Position) + (unsigned long long) book->n * sizeof (PositionArray) + n_links * sizeof (Link) + book_counts_memory(book));
 	bprint("Hash balance: %d < %d < %d\n", min_array, (int) (book->n_nodes / book->n), max_array);
 }
 
@@ -6682,9 +6837,12 @@ static GameStatsMemoEntry* game_stats_memo_find(GameStatsMemo *memo, const Posit
 
 static void position_get_game_stats(Book *book, Position *position, GameStats *stat, GameStatsMemo *memo)
 {
-	stat->n_wins = stat->n_losses = stat->n_draws = stat->n_lines = 0;
+	GameStats own;
 
-	if (position->n_wins == UINT_MAX || position->n_losses == UINT_MAX || position->n_draws == UINT_MAX || position->n_lines == UINT_MAX) {
+	stat->n_wins = stat->n_losses = stat->n_draws = stat->n_lines = 0;
+	position_get_counts(position, book, &own);
+
+	if (own.n_wins == UINT_MAX || own.n_losses == UINT_MAX || own.n_draws == UINT_MAX || own.n_lines == UINT_MAX) {
 		Board target;
 		Link *l;
 		GameStats child;
@@ -6723,10 +6881,7 @@ static void position_get_game_stats(Book *book, Position *position, GameStats *s
 			e->done = true;
 		}
 	} else {
-		stat->n_wins = position->n_wins;
-		stat->n_draws = position->n_draws;
-		stat->n_losses = position->n_losses;
-		stat->n_lines = position->n_lines;
+		*stat = own;
 	}
 }
 

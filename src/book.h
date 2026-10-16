@@ -57,6 +57,7 @@ typedef struct Book {
 	} todo_list;
 	unsigned char *visit;        /**< visit marks of a deviate walk (one byte per position), NULL outside a walk */
 	unsigned int *visit_first;   /**< first visit mark of each bucket */
+	struct BookCounts *counts;   /**< game counts of the positions too large for 16 bits (see position_get_counts), NULL if none */
 	Random random;
 	Search *search;
 } Book;

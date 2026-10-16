@@ -404,10 +404,14 @@ static void lib_position_set(LibedaxPosition *dst, const Position *p, const Book
 	}
 	dst->link = link;
 
-	dst->n_wins = p->n_wins;
-	dst->n_draws = p->n_draws;
-	dst->n_losses = p->n_losses;
-	dst->n_lines = p->n_lines;
+	{
+		unsigned int n[4];
+		position_get_counts_n(p, book, n);
+		dst->n_wins = n[0];
+		dst->n_draws = n[1];
+		dst->n_losses = n[2];
+		dst->n_lines = n[3];
+	}
 	dst->score.value = p->score.value;
 	dst->score.lower = p->score.lower;
 	dst->score.upper = p->score.upper;

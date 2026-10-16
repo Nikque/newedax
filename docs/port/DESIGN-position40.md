@@ -43,3 +43,12 @@
 ## 6. 規模
 
 book.cpp の約 70 か所と libedax.cpp。1〜2 回の作業（見積もり）。
+
+## 7. 実装（2026-10-16 夜。結果は `PROGRESS-1.md` 3.16）
+
+- 4つの数は `Position::count[4]`（各 16 ビット）。65,535 は「表にある」の印。表は `Book::counts`（`boost::unordered_flat_map<盤面, 4 × 32 ビット>`、初めて要るときに作る）。表を読む・書くのは1つの `std::mutex` で守る（まれにしか通らない）。
+- 読み書きの関数：`position_get_counts`・`position_get_counts_n`・`position_set_counts`・`position_set_counts_n`、表は `book_counts_put`・`book_counts_erase`・`book_counts_memory`。
+- `position_read(p, stream, book)`：数が大きければ `book` の表に入れる。merge は `NULL`（`position_merge` は数を写さない）。`position_write(p, book, stream)`。
+- `book_fix_unique_boards`：盤面が代表の形に変わるとき、表の項目を新しい盤面へ移す。
+- `book info` のメモリの見積もりに表の分を足した。
+- 設計からの変更：一時的な局面の別の型（`PositionRecord`）は作らなかった。一時的な局面を作るのは `position_read` だけで、そのあと局面を入れる book が決まっている（load）か、数を使わない（merge）ので、読む所で表に入れれば足りた。

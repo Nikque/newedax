@@ -61,6 +61,9 @@
 	#include "libedax.cpp"
 #endif
 
+/* what Boost needs without exceptions */
+#include "boost_support.cpp"
+
 /* main */
 #include "main.cpp"
 
