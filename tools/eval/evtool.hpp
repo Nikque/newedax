@@ -193,7 +193,15 @@ struct BookReader {
 	uint64_t bytes;                 // form 2: bytes of the positions read so far
 };
 
-enum { BOOK_READER_BUFFER = 1 << 24 };
+/** bytes of BookReader::buf (EVTOOL_BOOK_BUFFER), and the stdio buffer of the file (EVTOOL_BOOK_STDIO: 0 none, 1 the default) */
+#ifndef EVTOOL_BOOK_BUFFER
+	#define EVTOOL_BOOK_BUFFER (1 << 24)
+#endif
+#ifndef EVTOOL_BOOK_STDIO
+	#define EVTOOL_BOOK_STDIO 0
+#endif
+enum { BOOK_READER_BUFFER = EVTOOL_BOOK_BUFFER };
+static_assert(BOOK_READER_BUFFER >= 4096, "BookReader needs 4096 bytes at least");
 
 /** the next k bytes of the file (k at most 4096) in the buffer, or fewer at the end of the file */
 inline const unsigned char *book_reader_fill(BookReader *r, size_t k)
@@ -226,7 +234,7 @@ inline void book_reader_open(BookReader *r, const char *file)
 	memset(r, 0, sizeof *r);
 	r->file = file;
 	r->f = xfopen(file, "rb");
-	setvbuf(r->f, nullptr, _IONBF, 0);	// (read in BookReader::buf)
+	if (EVTOOL_BOOK_STDIO == 0) setvbuf(r->f, nullptr, _IONBF, 0);	// (read in BookReader::buf)
 	r->buf = (unsigned char *) xmalloc(BOOK_READER_BUFFER);
 	const unsigned char *h = book_reader_need(r, 8);
 	if (!memcmp(h, "XADEKOOB", 8)) {	// form 1: version, release, date (8), options (20), number of positions (4)

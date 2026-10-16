@@ -20,6 +20,7 @@ class PMC(ctypes.Structure):
 
 
 CPU = 0
+LAST_PRIVATE = 0
 
 
 def run1(cmd, cwd, stdout, stderr):
@@ -33,6 +34,8 @@ def run1(cmd, cwd, stdout, stderr):
         k32.QueryProcessCycleTime(h, ctypes.byref(c))
         m = PMC(); m.cb = ctypes.sizeof(m)
         psapi.GetProcessMemoryInfo(h, ctypes.byref(m), m.cb)
+    global LAST_PRIVATE
+    LAST_PRIVATE = m.PeakPagefileUsage	# peak committed private memory of the run
     return rc, c.value, m.PeakWorkingSetSize
 
 
@@ -211,17 +214,20 @@ def main():
         if a.repeat:
             cyc = {'c': [], 'cpp': []}
             peak = {'c': [], 'cpp': []}
+            priv = {'c': [], 'cpp': []}
             for r in range(a.repeat):
                 order = (('c', cdir), ('cpp', a.cpp)) if r % 2 == 0 else (('cpp', a.cpp), ('c', cdir))
                 for side, d in order:
                     _, _, cy, pk = side_run(a, d, side, name, tool, args)
-                    cyc[side].append(cy); peak[side].append(pk)
+                    cyc[side].append(cy); peak[side].append(pk); priv[side].append(LAST_PRIVATE)
             mc, mp = sorted(cyc['c'])[len(cyc['c']) // 2], sorted(cyc['cpp'])[len(cyc['cpp']) // 2]
             # ratio of the two runs of each repetition (next to each other in time), then their median and quartiles
             pr = sorted(p / c for c, p in zip(cyc['c'], cyc['cpp']))
             q = lambda f: pr[min(len(pr) - 1, int(f * len(pr)))]
             print(f'    cycles median C {mc / 1e9:.3f}G  C++ {mp / 1e9:.3f}G  (C++/C {mp / mc:.3f}); min C {min(cyc["c"]) / 1e9:.3f}G  C++ {min(cyc["cpp"]) / 1e9:.3f}G;'
                   f'  peak MiB C {max(peak["c"]) / 2**20:.1f}  C++ {max(peak["cpp"]) / 2**20:.1f}', flush=True)
+            print(f'    peak working set KiB C {min(peak["c"]) // 1024}-{max(peak["c"]) // 1024}  C++ {min(peak["cpp"]) // 1024}-{max(peak["cpp"]) // 1024};'
+                  f'  peak private KiB C {min(priv["c"]) // 1024}-{max(priv["c"]) // 1024}  C++ {min(priv["cpp"]) // 1024}-{max(priv["cpp"]) // 1024}', flush=True)
             print(f'    C++/C of each repetition: median {q(0.5):.3f}, quartiles {q(0.25):.3f} - {q(0.75):.3f}, {sum(r < 1 for r in pr)} of {len(pr)} below 1', flush=True)
     print(f'cases different: {bad}')
     return 1 if bad else 0
