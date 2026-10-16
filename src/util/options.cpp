@@ -21,83 +21,67 @@
 
 /** global options with default value */
 Options options = {
-	21, // hash table size (2^21 * 24 * 1.125 = 57MB)
-
-	{0,-2,-3}, // inc_sort_depth
-
-	1, // n_task (will be set to system available cpus at run-time)
-	false, // cpu_affinity
-
-	1, // verbosity
-	0, // noise
-	80, // width
-	false, // echo
-	false, // info
-	false, // debug cassio
-	true, // transgress cassio
-
-	18, // level
-	TIME_MAX, // infinite time
-	EDAX_FIXED_LEVEL, // play-type
-	true, // can ponder
-	-1, // depth
-	-1, // selectivity
-
-	3, // mode
-
-	10000000,  // speed (default = 10e6)
-	0,         // nps (default = 0)
-
-	SCORE_MIN, // alpha
-	SCORE_MAX, // beta
-
-	false, // all_best
-
-	NULL, // evaluation function's weights file.
-
-	NULL, // book file
-	true,            // book usage allowed
-	0,               // book randomness
-
-	NULL, // ggs host name
-	NULL, // ggs login name
-	NULL, // ggs password
-	NULL, // port
-	1,    // open
-
-	0.25, // probcut depth reduction (/2)
-	false, // pv debug
-	false, // pv check
-	false, // pv guess
-
-	NULL, // game file.
-
-	NULL, // search log file.
-	NULL, // ui log file.
-	NULL, // ggs log file.
-
-	NULL, // edax name
-
-	false, //auto start
-	false, //auto store
-	false, //auto learn
-	false, //auto quit
-	0, //repeat
-	60, // minutes between timed book saves
-	1, // save after every productive deviate round by default
-	true, // save the merged book after book merge
-	false, // hash table size set by hash-table-size (auto: from the thread count and the memory size)
-	1, // book positions expanded at the same time
-	false, // speed given by the user (else measured)
-	false, // level given by the user (else no level cap with a time control)
-	0, // probcut model: standard
-	0, // book depth: auto (the depth of the loaded book)
-	0, // games learned at the same time: auto
-	true, // save the book to <book-file>.store after book store
-	1, // passes of book leaf recalculate
-	false, // book random numbers from the clock
-	0, // book seed (when set)
-	false, // book functions as fast as possible (not reproducible)
+	.hash_table_size = 21, // hash table size (2^21 * 24 * 1.125 = 57MB)
+	.inc_sort_depth = {0,-2,-3},
+	.n_task = 1, // n_task (will be set to system available cpus at run-time)
+	.cpu_affinity = false,
+	.verbosity = 1,
+	.noise = 0,
+	.width = 80,
+	.echo = false,
+	.info = false,
+	.debug_cassio = false,
+	.transgress_cassio = true,
+	.level = 18,
+	.time = TIME_MAX, // infinite time
+	.play_type = EDAX_FIXED_LEVEL,
+	.can_ponder = true,
+	.depth = -1,
+	.selectivity = -1,
+	.mode = 3,
+	.speed = 10000000, // speed (default = 10e6)
+	.nps = 0, // nps (default = 0)
+	.alpha = SCORE_MIN,
+	.beta = SCORE_MAX,
+	.all_best = false,
+	.eval_file = NULL, // evaluation function's weights file.
+	.book_file = NULL,
+	.book_allowed = true, // book usage allowed
+	.book_randomness = 0,
+	.ggs_host = NULL, // ggs host name
+	.ggs_login = NULL, // ggs login name
+	.ggs_password = NULL,
+	.ggs_port = NULL, // port
+	.ggs_open = 1, // open
+	.probcut_d = 0.25, // probcut depth reduction (/2)
+	.pv_debug = false,
+	.pv_check = false,
+	.pv_guess = false,
+	.game_file = NULL, // game file.
+	.search_log_file = NULL, // search log file.
+	.ui_log_file = NULL, // ui log file.
+	.ggs_log_file = NULL, // ggs log file.
+	.name = NULL, // edax name
+	.auto_start = false,
+	.auto_store = false,
+	.auto_swap = false,
+	.auto_quit = false,
+	.repeat = 0,
+	.book_save_interval = 60, // minutes between timed book saves
+	.book_deviate_save_rounds = 1, // save after every productive deviate round by default
+	.book_merge_auto_save = true, // save the merged book after book merge
+	.hash_table_auto = false, // hash table size set by hash-table-size (auto: from the thread count and the memory size)
+	.book_expand_tasks = 1, // book positions expanded at the same time
+	.speed_set = false, // speed given by the user (else measured)
+	.level_set = false, // level given by the user (else no level cap with a time control)
+	.probcut_model = 0, // probcut model: standard
+	.book_depth = 0, // book depth: auto (the depth of the loaded book)
+	.book_store_tasks = 0, // games learned at the same time: auto
+	.book_store_auto_save = true, // save the book to <book-file>.store after book store
+	.book_leaf_recalculate_rounds = 1, // passes of book leaf recalculate
+	.book_seed_set = false, // book random numbers from the clock
+	.book_seed = 0, // book seed (when set)
+	.book_reproducible = false, // book functions as fast as possible (not reproducible)
 };
 
 /**
@@ -243,6 +227,19 @@ static void option_boolean(const char *option, const char *value, bool *result)
 }
 
 /**
+ * @brief Tell if an option has one of some names.
+ *
+ * @param option Option name.
+ * @param names Names.
+ * @return true if the option is one of the names.
+ */
+template <class... Names>
+static inline bool option_is(const char *option, const Names... names)
+{
+	return ((strcmp(option, names) == 0) || ...);
+}
+
+/**
  * @brief Read an option.
  *
  * @param option Option name.
@@ -258,112 +255,112 @@ int options_read(const char *option, const char *value)
 	if (*option == '\0' || *option == '%' || *option == '#') return read;
 
 	read = 1;
-	if (strcmp(option, "vv") == 0) options.verbosity = 2;
-	else if (strcmp(option, "q") == 0) options.verbosity = 0;
-	else if (strcmp(option, "info") == 0) options.info = true;
-	else if (strcmp(option, "debug-cassio") == 0) options.debug_cassio = true;
-	else if (strcmp(option, "follow-cassio") == 0) options.transgress_cassio = false;
-	else if (strcmp(option, "?") == 0 || strcmp(option, "help") == 0) usage();
-	else if (strcmp(option, "cpu") == 0) options.cpu_affinity = true;
+	if (option_is(option, "vv")) options.verbosity = 2;
+	else if (option_is(option, "q")) options.verbosity = 0;
+	else if (option_is(option, "info")) options.info = true;
+	else if (option_is(option, "debug-cassio")) options.debug_cassio = true;
+	else if (option_is(option, "follow-cassio")) options.transgress_cassio = false;
+	else if (option_is(option, "?", "help")) usage();
+	else if (option_is(option, "cpu")) options.cpu_affinity = true;
 	else {
 		read = 0;
 		if (value == NULL || *value == '\0') return read;
 		read = 2;
-		if (strcmp(option, "verbose") == 0) options.verbosity = option_int(option, value, options.verbosity);
-		else if (strcmp(option, "noise") == 0) options.noise = option_int(option, value, options.noise);
-		else if (strcmp(option, "width") == 0) options.width = option_int(option, value, options.width);
+		if (option_is(option, "verbose")) options.verbosity = option_int(option, value, options.verbosity);
+		else if (option_is(option, "noise")) options.noise = option_int(option, value, options.noise);
+		else if (option_is(option, "width")) options.width = option_int(option, value, options.width);
 
-		else if (strcmp(option, "h") == 0  || strcmp(option, "hash-table-size") == 0) {
+		else if (option_is(option, "h", "hash-table-size")) {
 			options.hash_table_auto = (strcmp(value, "auto") == 0);
 			if (!options.hash_table_auto) options.hash_table_size = option_int(option, value, options.hash_table_size);
 		}
-		else if (strcmp(option, "n") == 0 || strcmp(option, "n-tasks") == 0) options.n_task = option_int_or_auto(option, value, options.n_task, get_cpu_number());
-		else if (strcmp(option, "l") == 0 || strcmp(option, "level") == 0) {
+		else if (option_is(option, "n", "n-tasks")) options.n_task = option_int_or_auto(option, value, options.n_task, get_cpu_number());
+		else if (option_is(option, "l", "level")) {
 			options.level = option_int(option, value, options.level);
 			if (!reading_defaults) {	// a level of edax.ini / config.ini is only the initial level
 				options.level_set = true;
 				options.play_type = EDAX_FIXED_LEVEL;
 			}
-		} else if (strcmp(option, "d") == 0 || strcmp(option, "depth") == 0) {
+		} else if (option_is(option, "d", "depth")) {
 			options.depth = option_int(option, value, options.depth);
 			options.play_type = EDAX_FIXED_LEVEL;
-		} else if (strcmp(option, "selectivity") == 0) {
+		} else if (option_is(option, "selectivity")) {
 			options.selectivity = option_int(option, value, options.selectivity);
 			options.play_type = EDAX_FIXED_LEVEL;
-		} else if (strcmp(option, "t") == 0 || strcmp(option, "game-time") == 0) {
+		} else if (option_is(option, "t", "game-time")) {
 			options.time = string_to_time(value);
 			options.play_type = EDAX_TIME_PER_GAME;
-		} else if (strcmp(option, "move-time") == 0) {
+		} else if (option_is(option, "move-time")) {
 			options.time = string_to_time(value);
 			options.play_type = EDAX_TIME_PER_MOVE;
-		} else if (strcmp(option, "alpha") == 0) options.alpha = option_int(option, value, options.alpha);
-		else if (strcmp(option, "beta") == 0) options.beta = option_int(option, value, options.beta);
-		else if (strcmp(option, "all-best") == 0) option_boolean(option, value, &options.all_best);
+		} else if (option_is(option, "alpha")) options.alpha = option_int(option, value, options.alpha);
+		else if (option_is(option, "beta")) options.beta = option_int(option, value, options.beta);
+		else if (option_is(option, "all-best")) option_boolean(option, value, &options.all_best);
 
-		else if (strcmp(option, "o") == 0 || strcmp(option, "option-file") == 0) options_parse(value);
-		else if (strcmp(option, "speed") == 0) {
+		else if (option_is(option, "o", "option-file")) options_parse(value);
+		else if (option_is(option, "speed")) {
 			options.speed_set = (strcmp(value, "auto") != 0);
 			if (options.speed_set) options.speed = string_to_real(value, options.speed);
 		}
-		else if (strcmp(option, "nps") == 0) options.nps = 0.001 * string_to_real(value, options.nps);
-		else if (strcmp(option, "ponder") == 0) option_boolean(option, value, &options.can_ponder);
-		else if (strcmp(option, "mode") == 0) options.mode = option_int(option, value, options.mode);
+		else if (option_is(option, "nps")) options.nps = 0.001 * string_to_real(value, options.nps);
+		else if (option_is(option, "ponder")) option_boolean(option, value, &options.can_ponder);
+		else if (option_is(option, "mode")) options.mode = option_int(option, value, options.mode);
 
-		else if (strcmp(option, "inc-pvnode-sort-depth") == 0) options.inc_sort_depth[PV_NODE] = option_int(option, value, options.inc_sort_depth[PV_NODE]);
-		else if (strcmp(option, "inc-cutnode-sort-depth") == 0) options.inc_sort_depth[CUT_NODE] = option_int(option, value, options.inc_sort_depth[CUT_NODE]);
-		else if (strcmp(option, "inc-allnode-sort-depth") == 0) options.inc_sort_depth[ALL_NODE] = option_int(option, value, options.inc_sort_depth[ALL_NODE]);
+		else if (option_is(option, "inc-pvnode-sort-depth")) options.inc_sort_depth[PV_NODE] = option_int(option, value, options.inc_sort_depth[PV_NODE]);
+		else if (option_is(option, "inc-cutnode-sort-depth")) options.inc_sort_depth[CUT_NODE] = option_int(option, value, options.inc_sort_depth[CUT_NODE]);
+		else if (option_is(option, "inc-allnode-sort-depth")) options.inc_sort_depth[ALL_NODE] = option_int(option, value, options.inc_sort_depth[ALL_NODE]);
 
-		else if (strcmp(option, "ggs-host") == 0) option_string(&options.ggs_host, value);
-		else if (strcmp(option, "ggs-login") == 0) options.ggs_login = string_duplicate(value); // (kept: the GGS client holds this pointer)
-		else if (strcmp(option, "ggs-password") == 0) option_string(&options.ggs_password, value);
-		else if (strcmp(option, "ggs-port") == 0) option_string(&options.ggs_port, value);
-		else if (strcmp(option, "ggs-open") == 0) option_boolean(option, value, &options.ggs_open);
+		else if (option_is(option, "ggs-host")) option_string(&options.ggs_host, value);
+		else if (option_is(option, "ggs-login")) options.ggs_login = string_duplicate(value); // (kept: the GGS client holds this pointer)
+		else if (option_is(option, "ggs-password")) option_string(&options.ggs_password, value);
+		else if (option_is(option, "ggs-port")) option_string(&options.ggs_port, value);
+		else if (option_is(option, "ggs-open")) option_boolean(option, value, &options.ggs_open);
 
-		else if (strcmp(option, "probcut-d") == 0) parse_real(value, &options.probcut_d);
-		else if (strcmp(option, "probcut-model") == 0) {
+		else if (option_is(option, "probcut-d")) parse_real(value, &options.probcut_d);
+		else if (option_is(option, "probcut-model")) {
 			if (strcmp(value, "standard") == 0) options.probcut_model = 0;
 			else if (strcmp(value, "refit") == 0) options.probcut_model = 1;
 			else warn("probcut-model: unknown value \"%s\" (standard or refit)\n", value);
 		}
 
-		else if (strcmp(option, "pv-debug") == 0) option_boolean(option, value, &options.pv_debug);
-		else if (strcmp(option, "pv-check") == 0) option_boolean(option, value, &options.pv_check);
-		else if (strcmp(option, "pv-guess") == 0) option_boolean(option, value, &options.pv_guess);
+		else if (option_is(option, "pv-debug")) option_boolean(option, value, &options.pv_debug);
+		else if (option_is(option, "pv-check")) option_boolean(option, value, &options.pv_check);
+		else if (option_is(option, "pv-guess")) option_boolean(option, value, &options.pv_guess);
 
-		else if (strcmp(option, "game-file") == 0) option_string(&options.game_file, value);
+		else if (option_is(option, "game-file")) option_string(&options.game_file, value);
 
-		else if (strcmp(option, "eval-file") == 0) option_string(&options.eval_file, value);	// 11/13/2015
+		else if (option_is(option, "eval-file")) option_string(&options.eval_file, value);	// 11/13/2015
 
-		else if (strcmp(option, "book-file") == 0) {
+		else if (option_is(option, "book-file")) {
 			// the book commands add an extension (".store", ".dev2", ...) to this name, in buffers of FILENAME_MAX characters
 			if (strlen(value) > FILENAME_MAX - 8) warn("the name of the book file is too long: ignored\n");
 			else option_string(&options.book_file, value);
 		}
-		else if (strcmp(option, "book-usage") == 0) option_boolean(option, value, &options.book_allowed);
-		else if (strcmp(option, "book-randomness") == 0) options.book_randomness = option_int(option, value, options.book_randomness);
+		else if (option_is(option, "book-usage")) option_boolean(option, value, &options.book_allowed);
+		else if (option_is(option, "book-randomness")) options.book_randomness = option_int(option, value, options.book_randomness);
 
-		else if (strcmp(option, "search-log-file") == 0) option_string(&options.search_log_file, value);
-		else if (strcmp(option, "ui-log-file") == 0) option_string(&options.ui_log_file, value);
-		else if (strcmp(option, "ggs-log-file") == 0) option_string(&options.ggs_log_file, value);
+		else if (option_is(option, "search-log-file")) option_string(&options.search_log_file, value);
+		else if (option_is(option, "ui-log-file")) option_string(&options.ui_log_file, value);
+		else if (option_is(option, "ggs-log-file")) option_string(&options.ggs_log_file, value);
 
-		else if (strcmp(option, "name") == 0) option_string(&options.name, value);
-		else if (strcmp(option, "echo") == 0) option_boolean(option, value, &options.echo);
+		else if (option_is(option, "name")) option_string(&options.name, value);
+		else if (option_is(option, "echo")) option_boolean(option, value, &options.echo);
 
-		else if (strcmp(option, "auto-start") == 0) option_boolean(option, value, &options.auto_start);
-		else if (strcmp(option, "auto-store") == 0) option_boolean(option, value, &options.auto_store);
-		else if (strcmp(option, "auto-swap") == 0) option_boolean(option, value, &options.auto_swap);
-		else if (strcmp(option, "auto-quit") == 0) option_boolean(option, value, &options.auto_quit);
-		else if (strcmp(option, "repeat") == 0) options.repeat = option_int(option, value, options.repeat);
-		else if (strcmp(option, "book-save-interval") == 0) options.book_save_interval = option_int(option, value, options.book_save_interval);
-		else if (strcmp(option, "book-deviate-save-rounds") == 0) options.book_deviate_save_rounds = option_int(option, value, options.book_deviate_save_rounds);
-		else if (strcmp(option, "book-depth") == 0) options.book_depth = option_int_or_auto(option, value, options.book_depth, 0);	// 0 = auto
-		else if (strcmp(option, "book-expand-tasks") == 0) options.book_expand_tasks = option_int_or_auto(option, value, options.book_expand_tasks, 0);	// 0 = auto
-		else if (strcmp(option, "book-store-tasks") == 0) options.book_store_tasks = option_int_or_auto(option, value, options.book_store_tasks, 0);	// 0 = auto
-		else if (strcmp(option, "book-merge-auto-save") == 0) option_boolean(option, value, &options.book_merge_auto_save);
-		else if (strcmp(option, "book-store-auto-save") == 0) option_boolean(option, value, &options.book_store_auto_save);
-		else if (strcmp(option, "book-leaf-recalculate-rounds") == 0) options.book_leaf_recalculate_rounds = option_int(option, value, options.book_leaf_recalculate_rounds);
-		else if (strcmp(option, "book-seed") == 0) option_seed(option, value);
-		else if (strcmp(option, "book-reproducible") == 0) option_boolean(option, value, &options.book_reproducible);
+		else if (option_is(option, "auto-start")) option_boolean(option, value, &options.auto_start);
+		else if (option_is(option, "auto-store")) option_boolean(option, value, &options.auto_store);
+		else if (option_is(option, "auto-swap")) option_boolean(option, value, &options.auto_swap);
+		else if (option_is(option, "auto-quit")) option_boolean(option, value, &options.auto_quit);
+		else if (option_is(option, "repeat")) options.repeat = option_int(option, value, options.repeat);
+		else if (option_is(option, "book-save-interval")) options.book_save_interval = option_int(option, value, options.book_save_interval);
+		else if (option_is(option, "book-deviate-save-rounds")) options.book_deviate_save_rounds = option_int(option, value, options.book_deviate_save_rounds);
+		else if (option_is(option, "book-depth")) options.book_depth = option_int_or_auto(option, value, options.book_depth, 0);	// 0 = auto
+		else if (option_is(option, "book-expand-tasks")) options.book_expand_tasks = option_int_or_auto(option, value, options.book_expand_tasks, 0);	// 0 = auto
+		else if (option_is(option, "book-store-tasks")) options.book_store_tasks = option_int_or_auto(option, value, options.book_store_tasks, 0);	// 0 = auto
+		else if (option_is(option, "book-merge-auto-save")) option_boolean(option, value, &options.book_merge_auto_save);
+		else if (option_is(option, "book-store-auto-save")) option_boolean(option, value, &options.book_store_auto_save);
+		else if (option_is(option, "book-leaf-recalculate-rounds")) options.book_leaf_recalculate_rounds = option_int(option, value, options.book_leaf_recalculate_rounds);
+		else if (option_is(option, "book-seed")) option_seed(option, value);
+		else if (option_is(option, "book-reproducible")) option_boolean(option, value, &options.book_reproducible);
 
 		else read = 0;
 	}
