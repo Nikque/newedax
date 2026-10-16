@@ -40,18 +40,19 @@ def prepare(a):
     """Inputs made once in the work directory (from the data of ev, which is only read)."""
     w = a.work
     os.makedirs(w, exist_ok=True)
-    # a small book of form 1: the first 20000 positions of A_cut40.dat
-    book = os.path.join(w, 'A_head.dat')
-    if not os.path.exists(book):
-        src = r'D:\edaxwork\data\A_cut40.dat'
-        with open(src, 'rb') as f:
-            hdr = bytearray(f.read(42))
-            body = bytearray()
-            for _ in range(20000):
-                h = f.read(40)
-                body += h + f.read(2 * (h[38] + 1))
-        hdr[38:42] = struct.pack('<I', 20000)
-        open(book, 'wb').write(hdr + body)
+    # books of form 1: the first 20000 and 300000 positions of A_cut40.dat
+    for name, n in (('A_head.dat', 20000), ('A_big.dat', 300000)):
+        book = os.path.join(w, name)
+        if not os.path.exists(book):
+            src = r'D:\edaxwork\data\A_cut40.dat'
+            with open(src, 'rb') as f:
+                hdr = bytearray(f.read(42))
+                body = bytearray()
+                for _ in range(n):
+                    h = f.read(40)
+                    body += h + f.read(2 * (h[38] + 1))
+            hdr[38:42] = struct.pack('<I', n)
+            open(book, 'wb').write(hdr + body)
     # record files whose alignment is broken: junk bytes inserted in records of ss20 and ss21
     sp = os.path.join(w, 'spbroken')
     if not os.path.exists(sp):
@@ -116,6 +117,8 @@ def cases(a):
         ('P1', 'sample', [f'{e}/sp8/ss20.bin', '200', '7'], None),
         ('B1', 'bookdump', [f'{w}/A_head.dat', '{OUT}'], None),
         ('B2', 'bookscan', [f'{w}/A_head.dat'], None),
+        ('B3', 'bookdump', [f'{w}/A_big.dat', '{OUT}'], None),
+        ('B4', 'bookscan', [f'{w}/A_big.dat'], None),
         # tools with the search (C side: --c, or --c2 for the cases ending with 'e', which use the evaluation file of eval2)
         ('G1', 'selfplay3', ['{OUT}', '20', '5', '1', '-level', '4', '-exact', '10', '-eval', eo], r' in \d+ s$'),
         ('G1e', 'selfplay3', ['{OUT}', '20', '5', '1', '-level', '4', '-exact', '10', '-eval', a.eval2], r' in \d+ s$'),

@@ -415,6 +415,8 @@ def main():
     CPU = a.cpu
     a.tool = lambda t: os.path.join(a.exe, t + '.exe')
     want = set(a.tests.split(',')) if a.tests else None
+    import compare_c	# the inputs made from the data of ev (A_head.dat, spbroken, leafdata, ...) in the work directory
+    compare_c.prepare(a)
     failed = 0
     for t in TESTS:
         name = t.__name__[2:]
@@ -425,7 +427,10 @@ def main():
             shutil.rmtree(d)
         os.makedirs(d)
         t0 = time.time()
-        ok, detail = t(a, d)
+        try:
+            ok, detail = t(a, d)
+        except Exception as e:	# a test that cannot run fails; the others still run
+            ok, detail = False, f'{type(e).__name__}: {e}'
         status = 'skipped' if ok is None else 'ok' if ok else 'FAILED'
         failed += ok is False
         print(f'{name:22s} {status:7s} ({time.time() - t0:5.1f} s)  {detail[:400]}', flush=True)
