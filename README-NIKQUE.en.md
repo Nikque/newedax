@@ -1,5 +1,7 @@
 # Edax 4.5.5 corrected build
 
+> This repository (newedax) is the C++23 port: see [README.md](README.md). What follows is the README of the C version (the `eval2` line of edax-reversi-AVX, up to v4.5.5-eval2.5). The executables it describes are those of the releases of the C version; `bin` of this repository holds no executable.
+
 [日本語](README-NIKQUE.ja.md) · [Releases](https://github.com/Nikque/edax-reversi-AVX/releases) · [Change list](RELEASE-NOTES.md) · [User manual](manual/en/README.md)
 
 This public fork is based on upstream `v4.5.5` (`4cde6ff588f0eade07fcba0c7f02d5cd0cacd4ee`). It publishes the modified source, rebuilt Windows, Linux, macOS, and Android executables, the original GPL-3.0 [license](LICENSE), and the changes described below. The upstream `master` branch remains available; `edax-4.5.5-fixes` is this fork's default branch.

@@ -1,5 +1,7 @@
 # Edax 4.5.5 修正版
 
+> このリポジトリ（newedax）は、C++23 に移した版です。説明は [README.md](README.md) にあります。以下は C 版（edax-reversi-AVX の `eval2` 系列、v4.5.5-eval2.5 まで）の README です。実行ファイルの記述は C 版の Releases のもので、このリポジトリの `bin` には実行ファイルはありません。
+
 [English](README-NIKQUE.en.md) · [Releases](https://github.com/Nikque/edax-reversi-AVX/releases) · [修正一覧](RELEASE-NOTES.ja.md) · [ユーザーマニュアル](manual/ja/README.md)
 
 この公開forkは上流の `v4.5.5`（`4cde6ff588f0eade07fcba0c7f02d5cd0cacd4ee`）を基点としています。修正後のソース、再ビルドしたWindows・Linux・macOS・Android用実行ファイル、元のGPL-3.0 [ライセンス](LICENSE)を公開しています。上流の `master` ブランチは残し、修正版の `edax-4.5.5-fixes` を既定ブランチに設定しました。

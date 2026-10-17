@@ -1,6 +1,7 @@
 # new edax：C++ への移植の記録（段階0・1、2026-10-16）
 
 設計は `DESIGN-cpp1.md`（第2版）。この資料は、その段階0・1で行ったことと結果の記録。
+- 記録の中の `runs\…`・`baseline\…`・`inputs\…`・`third_party` は、リポジトリの隣の作業フォルダー（公開していない）。`HANDOFF-*.md`・`PROMPT-*.md`・`PLAN-*.md`・`DESIGN-cpp1.md`・`ev`（eval2 の道具の C 版）・`data\A_cut40.dat`（649 万局面の試験用 book）はリポジトリの外のもの。
 
 - 区別：**確かめた**（このセッションで実行した）／**記録にある**（以前の資料）／**見立て**（推測）。
 - CPU の使い方の決まり：ビルドまでと、fforum-20-39 を1スレッドで解く程度の短い試験だけ。すべて1論理CPU（affinity 1）、優先度「通常」。
@@ -305,6 +306,21 @@ C++ 版（MSVC x64 AVX-512 `/O1`、`tests/build-regression.cmd`）で **PASS**�
 - 決定：大きな数の表のメモリ不足で止まる件はそのまま。`book new` のあとの保存は形2 を保つ。NEON は要れば直す。並びの合わない book の読み込みは直したもので終わり。
 - `794792b`：auto のとき、読み込んだファイルのない book（`book new`・`book import`、読めなかったファイル）は、置き換えるファイルが形2 の book なら形2、それ以外は形1 で保存する。回帰 `newform`（直す前に「形2 の上に形1」で失敗することを確かめた）。quick_check が通った（回帰 51 件）。
 - NEON の 64 枠：NDK r27d の clang で、64 枠の回帰の試験（`all.cpp` と NEON の3ファイル）を arm64-v8a・armeabi-v7a 用に機械語まで作り、静的にリンクできた（エラー 0。警告は試験のソースと、armv7a の `midgame.cpp` の `assert` の符号の比べ4件で、C 版からある行）。直す所はなし。実行は qemu がないのでしていない（WSL に `qemu-user-static` を入れれば、`/tmp/neon64/reg-*` を動かせる見込み）。
+
+## 3.22 新しいリポジトリ newedax への公開の準備（2026-10-17）
+
+- 履歴：v4.5.5-eval2.5（`13fbad9`）を 1 つ目の親、移植の `main`（`ce88e20`）を 2 つ目の親とする merge（`72d7fea`）。ソース・試験・道具・ビルドのファイルは移植のもの。eval2 の系列だけが変えたファイル（`bin`、`README-NIKQUE.en.md`・`.ja.md`、`RELEASE-NOTES.md`・`.ja.md`、`package-release.py`）は eval2.5 のもの。eval2 の C の評価関数の変更（`eval.c`・`midgame.c` など）は、移植では選択肢 `EVAL_MOBILITY` として入っている。
+- `EVAL_MOBILITY` の既定を 1 にした（`src/eval/eval.h`）。`bin/data/eval.dat` が eval2 のものなので、既定のビルドでそのまま使える。着手可能数の表のない eval.dat では、評価ごとに分岐が 1 つ増えるだけで、評価は Edax 4.5 と同じ（eval2.5 の C 版と同じ形）。0 にするには `/D EVAL_MOBILITY=0`。`test_evtools.py` の `--edax` は `EVAL_MOBILITY=0` で作ったものを渡す。
+- 確かめた（1 論理CPU、`72d7fea`＋この変更）：
+  - x64 AVX-512・x86 SSE の既定のビルドで新しい警告なし。
+  - fforum-20-39 の 1 スレッド：Edax 4.5 の eval.dat で nikque.17 の記録と同じ（77,639,567 節点）、`bin/data/eval.dat`（eval2）で eval2.5 の記録と同じ（78,733,223 節点）。どちらのビルドも 20 問すべて、深さ・評価値・読み筋も同じ。
+  - API 206 項目・失敗 0、回帰 53 件すべて通過（`evalmobility`・`evalform2`・`evalform2mob` は `EVAL_MOBILITY=1` の道）。`EVAL_MOBILITY=0` のビルド（x64、`/O1`）で同じ 3 件も通過。
+- 大きさ：既定のビルドは x64 AVX-512 で 823,296 → 824,832 バイト（+1,536）、x86 SSE で 705,536 → 706,560 バイト（+1,024）。着手可能数を足すコードの分。
+- 速さは測っていない（eval2 の eval.dat を使う既定のビルド、元の eval.dat で分岐が 1 つ増える分のどちらも）。
+- `bin` の実行ファイル・ライブラリ 23 個（eval2.5 の C 版のビルド）を外した。`bin/data`・`bin/config.ini`・`bin/README.MS-Windows.txt` は残した。
+- `README.md` の先頭に newedax の説明（英語・日本語）を、`README-NIKQUE.en.md`・`.ja.md` の先頭に「以下は C 版の説明」という一文を足した。
+- 記録（`docs/port`）から、決定の経緯の引用と作業 PC の場所を消した（場所は `runs\…` などの相対の名前に）。計測の記録 `MEASURE-1.md` を入れた。
+- 送らないもの：タグ（nikque・eval2 の版のタグは C 版のリポジトリ edax-reversi-AVX にある）。
 
 ## 4. まだのこと
 
