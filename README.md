@@ -15,7 +15,7 @@
 ### Build
 - Boost 1.92 (headers only) in `third_party/boost_1_92_0` next to the folder of the repository (`../third_party/boost_1_92_0`), or `BOOST_DIR=<directory>`.
 - Windows, Visual Studio 2022 (x64 Developer Command Prompt): `build-win-v4.cmd` (x64 AVX-512), or in `src`: `nmake -f NMakefile vc-x64-v3` (other targets, PGO builds `vc-pgo-...`: `src/NMakefile`).
-- Linux and macOS (`src/makefile`, gcc 13 or later, or clang): not built yet. Android (NDK r27d, `ndk-build`): compiled and linked (before the default `EVAL_MOBILITY=1`), not run yet.
+- Linux and macOS (`src/makefile`, gcc 13 or later, or clang): not built yet. Android (NDK r27d, `ndk-build`): compiled and linked (the binaries of v4.5.5-newedax.1, built from `2236dbf` with the default `EVAL_MOBILITY=1`), not run yet.
 
 ### Not checked yet
 Builds other than MSVC on Windows (and the Android link); AddressSanitizer and ThreadSanitizer on the C++ version; real books of billions of positions; a review by a second reader.
@@ -30,7 +30,7 @@ License: GPL-3.0 ([LICENSE](LICENSE)). Boost is under the Boost Software License
 - **C 版と同じ結果**（Windows、MSVC 2022、x64 と x86 で確かめた）：`bin/data/eval.dat`（eval2）では fforum-20-39 の節点数・評価値・読み筋が v4.5.5-eval2.5 と同じ、Edax 4.5 の eval.dat では v4.5.5-nikque.17 と同じ。14 の試験の book（乱数の種をそろえたとき）、libedax の C の API、Cassio の通信も同じ。
 - **速さとメモリ**（Windows、同じコンパイルの選択肢、PGO なし、Edax 4.5 の eval.dat）：C 版より遅い条件は見つかっていません。649 万局面の book の読み込みはメモリが 11〜45% 少ない。eval2 の eval.dat を使う既定のビルドの速さは、まだ測っていません。記録は [docs/port](docs/port)（`PROGRESS-1.md`、`MEASURE-1.md`）。
 - 新しいこと：book と評価ファイルの形2（`-book-format`・`-book-convert`・`-eval-convert`。形1も読む）、book の局面が 40 バイト、`EVAL_MOBILITY`（既定 1）・`EVAL_SLOTS=64` の選択肢、[tools/eval](tools/eval)（eval2 の学習の道具の C++ 版）。
-- まだ確かめていないこと：Windows の MSVC 以外のビルド（Android はリンクまで。`EVAL_MOBILITY` の既定を 1 にする前）、メモリの誤りを検出するビルドでの試験、数十億局面の実 book、別の人による確認。
+- まだ確かめていないこと：Windows の MSVC 以外のビルド（Android はリンクまで。v4.5.5-newedax.1 の配布物は、既定が `EVAL_MOBILITY=1` の `2236dbf` から作った）、メモリの誤りを検出するビルドでの試験、数十億局面の実 book、別の人による確認。
 
 ---
 
