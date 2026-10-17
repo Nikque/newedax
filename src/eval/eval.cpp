@@ -769,6 +769,8 @@ static void eval_file_check_2(FILE *f, const char *file, const EvalFileHeader *h
  * The weights are copied as they are (the weights of every ply of the file, even the ones Edax does not use).
  * The mobility weights go with them: a file of form 1 of 61 plies followed by "MOBW" (or "WBOM": bytes swapped) and
  * 61 x 64 weights becomes a file of form 2 with the mobility group, and back (form 2 of 61 plies).
+ * Refused: a file of form 1 of fewer than 54 plies (form 2 holds plies 0 to 53 at least), a file of form 2 shorter than
+ * the weights of its plies, weights larger than the address space.
  *
  * @param in File to convert.
  * @param out File to write.
@@ -779,7 +781,7 @@ bool eval_convert(const char *in, const char *out)
 	EvalFileHeader h;
 	FILE *f, *g;
 	short *w = NULL, *mob = NULL; // weights: n_plies x n_w; the mobility weights of form 1: 61 x 64
-	long long n_plies = 0, i;
+	long long n_plies = 0, i, here, end;
 	size_t n_w = EVAL_N_PACKED;
 	unsigned int crc = 0, tag = 0;
 	bool ok = false, mobility = false;
@@ -787,21 +789,26 @@ bool eval_convert(const char *in, const char *out)
 	f = file_open(in, "rb");
 	if (f == NULL) { error("Cannot open %s\n", in); return false; }
 	eval_file_header_read(f, in, &h);
+	// the bytes after the header: here to end
+#ifdef _WIN32
+	here = _ftelli64(f); _fseeki64(f, 0, SEEK_END); end = _ftelli64(f); _fseeki64(f, here, SEEK_SET);
+#else
+	here = ftello(f); fseeko(f, 0, SEEK_END); end = ftello(f); fseeko(f, here, SEEK_SET);
+#endif
 	if (h.format == 2) {
 		n_plies = h.n_plies;
 		n_w = h.n_weights;
 		mobility = h.mobility;
 		if (h.n_group != EVAL2_N_GROUP) { error("%s holds weights that form 1 cannot hold\n", in); fclose(f); return false; }
 		if (mobility && n_plies != EVAL_N_MOBILITY_PLY) { error("%s: form 1 holds the mobility weights of %d plies only\n", in, EVAL_N_MOBILITY_PLY); fclose(f); return false; }
+		if (here < 0 || end - here < n_plies * (long long) (n_w * sizeof (short))) { // (the weights of the plies told by the header are not in the file)
+			error("Cannot read evaluation weight from %s\n", in);
+			fclose(f);
+			return false;
+		}
 	} else { // the plies that are left in the file, and the mobility weights or not
 		const long long ply_bytes = EVAL_N_PACKED * sizeof (short);
 		const long long mobility_bytes = sizeof tag + EVAL_N_MOBILITY_PLY * EVAL_N_MOBILITY * sizeof (short);
-		long long here, end;
-#ifdef _WIN32
-		here = _ftelli64(f); _fseeki64(f, 0, SEEK_END); end = _ftelli64(f); _fseeki64(f, here, SEEK_SET);
-#else
-		here = ftello(f); fseeko(f, 0, SEEK_END); end = ftello(f); fseeko(f, here, SEEK_SET);
-#endif
 		if (here >= 0 && end - here == EVAL_N_MOBILITY_PLY * ply_bytes + mobility_bytes) {
 #ifdef _WIN32
 			_fseeki64(f, here + EVAL_N_MOBILITY_PLY * ply_bytes, SEEK_SET);
@@ -822,8 +829,14 @@ bool eval_convert(const char *in, const char *out)
 			}
 			n_plies = (end - here) / ply_bytes;
 			if (n_plies > 65535) { error("%s holds too many plies\n", in); fclose(f); return false; }
+			if (n_plies < EVAL_N_2PLY * 2) { // (form 2 holds plies 0 to 53 at least, as eval_open reads them)
+				error("%s does not hold the weights of plies 0 to %d\n", in, EVAL_N_2PLY * 2 - 1);
+				fclose(f);
+				return false;
+			}
 		}
 	}
+	if ((unsigned long long) n_plies * n_w * sizeof (short) > SIZE_MAX) { error("Cannot allocate the weights of %s\n", in); fclose(f); return false; }
 	w = (short*) malloc((size_t) n_plies * n_w * sizeof (short));
 	if (mobility && h.format == 1) mob = (short*) malloc(EVAL_N_MOBILITY_PLY * EVAL_N_MOBILITY * sizeof (short));
 	if (w == NULL || (mobility && h.format == 1 && mob == NULL)) { error("Cannot allocate the weights of %s\n", in); free(w); free(mob); fclose(f); return false; }
