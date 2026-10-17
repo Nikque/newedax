@@ -2,7 +2,7 @@
 
 **new edax** is [Edax 4.5.5](https://github.com/Nikque/edax-reversi-AVX) (the corrected fork, its `eval2` line: v4.5.5-nikque.17 and v4.5.5-eval2.5) ported to C++23. [日本語](#日本語)
 
-- **Status: in development, no release yet.** `bin/` holds the data only (`bin/data/eval.dat` of eval2, `bin/data/book.dat`, `bin/config.ini`): build the executable yourself (below). The executables of the C version are in the [releases of edax-reversi-AVX](https://github.com/Nikque/edax-reversi-AVX/releases) (v4.5.5-nikque.17, v4.5.5-eval2.5).
+- **Status: in development; the first pre-release is [v4.5.5-newedax.1](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.1)** (Windows x64/x86 and Android executables, libedax DLLs, the eval2 tools; [release notes](RELEASE-NOTES.md)). `bin/` of the repository holds the data only (`bin/data/eval.dat` of eval2, `bin/data/book.dat`, `bin/config.ini`): download the ZIP of the release, or build the executable yourself (below). The executables of the C version are in the [releases of edax-reversi-AVX](https://github.com/Nikque/edax-reversi-AVX/releases) (v4.5.5-nikque.17, v4.5.5-eval2.5).
 - **Same results as the C version**, checked on Windows (MSVC 2022, x64 and x86): with `bin/data/eval.dat` (eval2), fforum-20-39 is solved with the same node counts, scores and lines as v4.5.5-eval2.5; with the eval.dat of Edax 4.5, as v4.5.5-nikque.17. Also the same: the books of 14 test suites (with the same random seed), the C API of libedax, the Cassio protocol.
 - **Speed and memory** (Windows, the same compiler options, no PGO, the eval.dat of Edax 4.5): no case slower than the C version was found; loading a book of 6.5 million positions takes 11 to 45 % less memory. The default build with the eval.dat of eval2 is not measured yet. Records (in Japanese): [docs/port](docs/port) (`PROGRESS-1.md`, `MEASURE-1.md`).
 
@@ -26,7 +26,7 @@ License: GPL-3.0 ([LICENSE](LICENSE)). Boost is under the Boost Software License
 
 **new edax** は、[Edax 4.5.5 の修正版](https://github.com/Nikque/edax-reversi-AVX)（`eval2` の系列：v4.5.5-nikque.17 と v4.5.5-eval2.5）を C++23 に移したものです。
 
-- **開発中で、まだ公開版（Release）はありません。** `bin/` にはデータ（eval2 の `bin/data/eval.dat`、`bin/data/book.dat`、`bin/config.ini`）だけがあり、実行ファイルは自分でビルドします（上の「Build」）。C 版の実行ファイルは [edax-reversi-AVX の Releases](https://github.com/Nikque/edax-reversi-AVX/releases)（v4.5.5-nikque.17、v4.5.5-eval2.5）にあります。
+- **開発中です。最初のプレリリースは [v4.5.5-newedax.1](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.1)**（Windows の x64・x86 と Android の実行ファイル、libedax の DLL、eval2 の道具。[修正一覧](RELEASE-NOTES.ja.md)）。リポジトリの `bin/` にはデータ（eval2 の `bin/data/eval.dat`、`bin/data/book.dat`、`bin/config.ini`）だけがあります。Release の ZIP を使うか、自分でビルドしてください（上の「Build」）。C 版の実行ファイルは [edax-reversi-AVX の Releases](https://github.com/Nikque/edax-reversi-AVX/releases)（v4.5.5-nikque.17、v4.5.5-eval2.5）にあります。
 - **C 版と同じ結果**（Windows、MSVC 2022、x64 と x86 で確かめた）：`bin/data/eval.dat`（eval2）では fforum-20-39 の節点数・評価値・読み筋が v4.5.5-eval2.5 と同じ、Edax 4.5 の eval.dat では v4.5.5-nikque.17 と同じ。14 の試験の book（乱数の種をそろえたとき）、libedax の C の API、Cassio の通信も同じ。
 - **速さとメモリ**（Windows、同じコンパイルの選択肢、PGO なし、Edax 4.5 の eval.dat）：C 版より遅い条件は見つかっていません。649 万局面の book の読み込みはメモリが 11〜45% 少ない。eval2 の eval.dat を使う既定のビルドの速さは、まだ測っていません。記録は [docs/port](docs/port)（`PROGRESS-1.md`、`MEASURE-1.md`）。
 - 新しいこと：book と評価ファイルの形2（`-book-format`・`-book-convert`・`-eval-convert`。形1も読む）、book の局面が 40 バイト、`EVAL_MOBILITY`（既定 1）・`EVAL_SLOTS=64` の選択肢、[tools/eval](tools/eval)（eval2 の学習の道具の C++ 版）。

@@ -2,6 +2,35 @@
 
 [日本語](RELEASE-NOTES.ja.md)
 
+## v4.5.5-newedax.1 (new edax: the C++23 port; pre-release)
+
+The first version of new edax ([README](README.md)): v4.5.5-nikque.17 ported to C++23, with the evaluation of the eval2 line (v4.5.5-eval2.5) as the default: the build option `EVAL_MOBILITY` is 1 and `bin/data/eval.dat` is the one of eval2. **A pre-release**: the code has not been reviewed by a second reader yet, and the speed of the default build with the `eval.dat` of eval2 is not measured.
+
+What is new:
+
+- The same search results as the C version (below), and the same commands and options.
+- Books and evaluation files of form 2 (`NEDXBOOK`, about 33 % smaller; `NEDXEVAL`), with a CRC-32C; `-book-format`, `-book-convert`, `-eval-convert` (both ways). Files of form 1 are still read.
+- Book positions take 40 bytes in memory (48 in the C version): loading a book of 6.5 million positions takes 11 to 45 % less memory.
+- Build options `EVAL_MOBILITY` (0: the mobility weights are not read) and `EVAL_SLOTS=64` (64 feature slots, a base for a stronger evaluation; the default is 48).
+- `tools/eval`: the training tools of the eval2 evaluation in C++ (14 tools; in the ZIP for x64 with AVX-512 only).
+
+Binaries (MSVC 2022 `/O2 /GL`, **without PGO**; Android NDK r27d):
+
+- Windows: `wEdax-x86-64-v4.exe`, `wEdax-x86-64-v3.exe`, `wEdax-x86-64.exe`, `wEdax-x86-sse.exe`, `wEdax-x86.exe`; `libedax-x64-v4.dll`, `libedax-x64-v3.dll`, `libedax-x64.dll`.
+- Android: `aEdax-arm64-v8a`, `aEdax-armeabi-v7a`, `libedax-arm64-v8a.so`, `libedax-armeabi-v7a.so` (not run on a device).
+- No Linux, macOS or Windows ARM64 binaries in this version.
+- Without PGO: in the measurements of the port, the `book deviate` family ran about 1.5 to 2 % faster without PGO than with it (for the C version too); the two were not compared directly on other conditions.
+
+Checks (2026-10-17, one logical CPU):
+
+- The 5 Windows executables: one-thread `-solve` of fforum-20-39 with `bin/data/eval.dat` (eval2) gives the same depths, scores, node counts (78,733,223 in all) and lines as v4.5.5-eval2.5; with the `eval.dat` of Edax 4.5, the same as v4.5.5-nikque.17 (77,639,567). The 7 Cassio EOF cases pass for each.
+- The 3 DLLs: 206 API checks, 0 failures each, with the `eval.dat` of eval2 and with the one of Edax 4.5.
+- The 14 eval2 tools: 22 tests pass; on 26 cases their outputs are the same as those of the C tools (in one case the standard error differs only in the elapsed seconds of a progress line).
+- Android (NDK r27d, armeabi-v7a and arm64-v8a): `aEdax` and `libedax.so` built without warnings or errors; not run (no device).
+- The binaries are built from `2236dbf`; this version adds the release notes and the README only. On the port before (records in `docs/port`): 53 regression cases, the books of 14 test suites, the measurements against the C version.
+
+Not checked: the speed and strength of the default build (eval2), builds other than MSVC on Windows and the Android NDK, Android on a device, AddressSanitizer and ThreadSanitizer, real books of billions of positions, a review by a second reader.
+
 ## v4.5.5-eval2.5 (with the changes of v4.5.5-nikque.16 and 17)
 
 v4.5.5-eval2.4 now holds the changes of v4.5.5-nikque.16 and 17. **The evaluation function and `eval.dat` are those of v4.5.5-eval2.1** (the same file).

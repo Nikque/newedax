@@ -2,6 +2,35 @@
 
 [English](RELEASE-NOTES.md)
 
+## v4.5.5-newedax.1（new edax：C++23 への移植。プレリリース）
+
+new edax の最初の版です（[README](README.md)）。v4.5.5-nikque.17 を C++23 に移し、eval2 の系列（v4.5.5-eval2.5）の評価関数を既定にしました（ビルドの選択肢 `EVAL_MOBILITY` が 1、`bin/data/eval.dat` が eval2 のもの）。**プレリリースです**：別の人によるソースの確認はまだで、eval2 の `eval.dat` を使う既定のビルドの速さは測っていません。
+
+新しいこと：
+
+- 探索の結果は C 版と同じです（下の確認）。命令と選択肢も同じです。
+- book と評価ファイルの形2（`NEDXBOOK`、約 33% 小さい。`NEDXEVAL`）。CRC-32C つき。`-book-format`・`-book-convert`・`-eval-convert`（両方向）。形1も読めます。
+- book の局面がメモリ上で 40 バイト（C 版は 48）。649 万局面の book の読み込みはメモリが 11〜45% 少ない。
+- ビルドの選択肢 `EVAL_MOBILITY`（0：着手可能数の重みを読まない）、`EVAL_SLOTS=64`（64 枠。より強い評価関数の土台。既定は 48）。
+- `tools/eval`：eval2 の評価関数の学習の道具の C++ 版（14 本。ZIP には x64 AVX-512 用だけ）。
+
+実行ファイル（MSVC 2022 `/O2 /GL`、**PGO なし**。Android は NDK r27d）：
+
+- Windows：`wEdax-x86-64-v4.exe`・`wEdax-x86-64-v3.exe`・`wEdax-x86-64.exe`・`wEdax-x86-sse.exe`・`wEdax-x86.exe`、`libedax-x64-v4.dll`・`libedax-x64-v3.dll`・`libedax-x64.dll`。
+- Android：`aEdax-arm64-v8a`・`aEdax-armeabi-v7a`・`libedax-arm64-v8a.so`・`libedax-armeabi-v7a.so`（実機では動かしていません）。
+- この版には Linux・macOS・Windows ARM64 の実行ファイルはありません。
+- PGO なしの理由：移植の計測で、`book deviate` 系は PGO なしの方が約 1.5〜2% 速かった（C 版でも同じ）。ほかの条件では、PGO のあり・なしを直接は比べていない。
+
+確認（2026-10-17、1 論理CPU）：
+
+- Windows の実行ファイル 5 種：fforum-20-39 を 1 スレッドで解くと、`bin/data/eval.dat`（eval2）で深さ・評価値・節点数（合計 78,733,223）・読み筋が v4.5.5-eval2.5 と同じ。Edax 4.5 の `eval.dat` で v4.5.5-nikque.17 と同じ（77,639,567）。Cassio の 7 件もそれぞれ通過。
+- DLL 3 種：eval2 と Edax 4.5 の `eval.dat` のどちらでも、API 試験 206 項目・失敗 0。
+- eval2 の道具 14 本：試験 22 件が通過。26 事例で出力が C の道具と同じ（1 事例は、標準エラーの進み具合の行の経過秒数だけが違う）。
+- Android（NDK r27d、armeabi-v7a・arm64-v8a）：`aEdax` と `libedax.so` を警告・エラーなしでビルド。実機では動かしていない。
+- 実行ファイルは `2236dbf` から作った（この版で足したのは修正一覧と README だけ）。それまでの移植で（記録は `docs/port`）：回帰 53 件、14 の試験の book、C 版との計測。
+
+確かめていないこと：既定のビルド（eval2）の速さと強さ、Windows の MSVC と Android の NDK 以外のビルド、Android の実機、メモリの誤りを検出するビルドでの試験、数十億局面の実 book、別の人によるソースの確認。
+
 ## v4.5.5-eval2.5（v4.5.5-nikque.16・17 の変更を取り込み）
 
 v4.5.5-eval2.4 に、v4.5.5-nikque.16 と 17 の変更を取り込みました。**評価関数と `eval.dat` は v4.5.5-eval2.1 のままです**（同じファイル）。
