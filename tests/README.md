@@ -24,7 +24,7 @@ The final audit of v4.5.5-nikque.8 adds `mergetwice` (a second merge does not ta
 
 `expandredo` searches the second of two expansions before the first, whose new position is a move of the new position of the second: when the first is applied, the second has old links, is searched again, then applied, and the book is the one of `position_expand` (the first, then the second).
 
-Additional case names are listed in `tests/regression.c`. Some cases write small `audit-*` files in the current directory. Run them from a disposable checkout if you want to keep the source directory clean.
+Additional case names are listed in `tests/regression.cpp`. Some cases write small `audit-*` files in the current directory. Run them from a disposable checkout if you want to keep the source directory clean.
 
 To check Cassio's input thread, including EOF immediately after a command with
 no final newline, run `python tests/cassio-eof.py bin/wEdax-x86-64-v4.exe`.
@@ -37,3 +37,11 @@ From a native Visual Studio 2022 x86 Developer Command Prompt, run
 MSVC's x86 optimization of the inlined CRC hash could corrupt a later AVX2
 legal-move calculation, causing wrong scores or repeated passes until stack
 overflow. The `core` case compares 96 exact searches with an independent solver.
+
+`tests/boost_check.cpp` checks that the Boost headers used by new edax build with
+the options of Edax (C++23, no exceptions, no RTTI). It is not part of Edax. The
+build files look for Boost in `third_party/boost_1_92_0` next to the repository
+(`BOOST_DIR` changes it). With MSVC:
+`cl /std:c++23preview /EHs-c- /D _HAS_EXCEPTIONS=0 /GR- /O2 /I <boost> tests\boost_check.cpp`,
+then run `boost_check.exe` (exit code 0). With gcc or clang:
+`g++ -std=c++23 -fno-exceptions -fno-rtti -O2 -I <boost> tests/boost_check.cpp`.

@@ -11,9 +11,12 @@
 #ifndef EDAX_STDBOOL_H
 #define EDAX_STDBOOL_H
 
+/* C++ has bool, false and true as keywords. */
+#ifndef __cplusplus
 typedef enum {
 	false = 0,
 	true = 1
 } bool;
+#endif
 
 #endif // EDAX_STDBOOL_H

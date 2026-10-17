@@ -1,0 +1,121 @@
+/**
+ * @file const.h
+ *
+ * Constants as macros, enums, or global consts.
+ *
+ * @date 1998 - 2025
+ * @author Richard Delorme
+ * @version 4.5
+ */
+
+#ifndef EDAX_CONST_H
+#define EDAX_CONST_H
+
+/** maximal number of threads */
+constexpr int MAX_THREADS = 64;
+
+/** maximal number of moves */
+constexpr int MAX_MOVE = 34; // 33 in reachable positions (https://eukaryote.hateblo.jp/entry/2023/05/23/145945), 34 at most in any position (https://eukaryote.hateblo.jp/entry/2020/04/13/150458)
+
+/** size of the board */
+constexpr int BOARD_SIZE = 64;
+
+/** size of the game including passing moves. We use here an arbitrary big
+ enough value */
+constexpr int GAME_SIZE = 80;
+
+/** constants for square coordinates */
+enum {
+	A1, B1, C1, D1, E1, F1, G1, H1,
+	A2, B2, C2, D2, E2, F2, G2, H2,
+	A3, B3, C3, D3, E3, F3, G3, H3,
+	A4, B4, C4, D4, E4, F4, G4, H4,
+	A5, B5, C5, D5, E5, F5, G5, H5,
+	A6, B6, C6, D6, E6, F6, G6, H6,
+	A7, B7, C7, D7, E7, F7, G7, H7,
+	A8, B8, C8, D8, E8, F8, G8, H8,
+	PASS, NOMOVE
+};
+
+/** constants for colors */
+enum {
+	BLACK = 0,
+	WHITE,
+	EMPTY,
+	OFF_SIDE
+};
+
+/** infinite score: a huge value unreachable as a score and fitting in a char */
+constexpr int SCORE_INF = 127;
+
+/** minimal score */
+constexpr int SCORE_MIN = -64;
+
+/** maximal score */
+constexpr int SCORE_MAX = 64;
+
+/** maximal time (1 millenium) */
+constexpr long long TIME_MAX = 31557600000000LL;
+
+/** 1 hour */
+constexpr long long HOUR = 3600000LL;
+
+/** observers */
+constexpr int MAX_OBSERVER = 2;
+
+/** constants for search interruption */
+typedef enum Stop {
+	RUNNING = 0,
+	STOP_PARALLEL_SEARCH,
+	STOP_PONDERING,
+	STOP_TIMEOUT,
+	STOP_ON_DEMAND,
+	STOP_END,
+	STOP_PARALLEL_CUT /* a slave found a cut at a node of the search: its thread goes back to this node, then runs again (see ybwc.c) */
+} Stop;
+
+/** node type */
+enum {
+	PV_NODE,
+	CUT_NODE,
+	ALL_NODE
+};
+typedef	unsigned char	NodeType;
+
+constexpr int VERSION = 4;
+constexpr int RELEASE = 5;
+#define VERSION_STRING "4.5.5"
+#define EDAX_NAME "Edax 4.5.5"
+constexpr int BOOK = 0x424f4f4b;
+constexpr int EDAX = 0x45444158;
+constexpr int EVAL = 0x4556414c;
+constexpr int XADE = 0x58414445;
+constexpr int LAVE = 0x4c415645;
+constexpr int MOBW = 0x4d4f4257;	// mobility weights in an evaluation file (EVAL_MOBILITY)
+constexpr int WBOM = 0x57424f4d;
+
+/**
+ * Edax state.
+ */
+typedef enum PlayState {
+	IS_WAITING,
+	IS_PONDERING,
+	IS_ANALYZING,
+	IS_THINKING
+} PlayState;
+
+/** Type of User Interface */
+enum {
+	UI_NONE = 0,
+	UI_CASSIO,
+	UI_EDAX,
+	UI_GGS,
+	UI_GTP,
+	UI_NBOARD,
+	UI_XBOARD,
+	UI_LIBEDAX
+};
+
+#endif
+
+
