@@ -1,5 +1,5 @@
 # Build the evaluation tools of tools\eval with MSVC (x64 AVX-512, the options of the C tools: /O2 /MT, no /fp:fast),
-# one tool after another on one logical CPU.
+# one tool after another on one logical CPU; the exit code is 1 when a tool is not built.
 # usage: pwsh -File build-evtools.ps1 -Out <directory> [-Tools evsearch,w2dat2,...] [-Tree <source tree>] [-Extra '<cl options>'] [-Cpu n]
 #   tools that include the search (all.cpp of -Tree, default: this repository) are built with /openmp, the options of
 #   the x64 AVX-512 build (HAS_CPU_64, POPCOUNT) and EVAL_MOBILITY=1 (they read the mobility weights of eval2);
@@ -56,3 +56,4 @@ foreach ($t in $list) {
 	if ($p.ExitCode -ne 0) { $failed++ }
 }
 "failed: $failed"
+if ($failed -ne 0) { exit 1 }

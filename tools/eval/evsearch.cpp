@@ -53,10 +53,13 @@ static void read_lib(const char *file)
 		const char *n = strtok(nullptr, " \t\r\n");
 		p->n = n ? atoi(n) : 0;
 		if (p->n < 1 || p->n > 16) die("bad pattern line (1 to 16 squares): %s", copy);
+		uint64_t used = 0;
 		for (int i = 0; i < p->n; ++i) {
 			char *s = strtok(nullptr, " \t\r\n");
 			if (s == nullptr || s[0] < 'a' || s[0] > 'h' || s[1] < '1' || s[1] > '8' || s[2] != '\0') die("bad pattern line (squares a1 to h8): %s", copy);
 			p->sq[i] = (unsigned char) ((s[0] - 'a') + 8 * (s[1] - '1'));
+			if (used >> p->sq[i] & 1) die("bad pattern line (a square twice): %s", copy);
+			used |= 1ULL << p->sq[i];
 		}
 		++n_lib;
 	}
@@ -225,6 +228,7 @@ static int parse_config(char *line, Config *c)
 	while ((tok = strtok(nullptr, " \t\r\n"))) {
 		int found = 0;
 		for (int s = 0; s < S_N; ++s) if (!strcmp(tok, SCALAR_NAME[s])) {
+			if (c->scalar[s]) { fprintf(stderr, "%s twice in %s\n", tok, c->name); exit(1); }
 			c->scalar[s] = 1; c->scalar_ofs[s] = c->nw; c->nw += SCALAR_SIZE[s]; c->nf += SCALAR_LANES[s]; c->table += SCALAR_SIZE[s]; found = 1;
 		}
 		for (int p = 0; p < n_lib && !found; ++p) if (!strcmp(tok, lib[p].name)) {

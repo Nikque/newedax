@@ -130,9 +130,11 @@ def t_bad_ply_range(a, d):
 
 
 def t_pattern_bad(a, d):
-    """pattern lines with missing or bad squares, or more than 16 squares, are refused (C: crash or overflow)"""
+    """pattern lines with missing or bad squares, more than 16 squares, or a square twice, are refused (C: crash or
+    overflow)"""
     res = []
-    for i, line in enumerate(('bad 3 a1 b1\n', 'bad 2 a1 z9\n', 'big 17 a1 b1 c1 d1 e1 f1 g1 h1 a2 b2 c2 d2 e2 f2 g2 h2 a3\n', 'neg -1\n')):
+    for i, line in enumerate(('bad 3 a1 b1\n', 'bad 2 a1 z9\n', 'big 17 a1 b1 c1 d1 e1 f1 g1 h1 a2 b2 c2 d2 e2 f2 g2 h2 a3\n', 'neg -1\n',
+                              'dup 2 a1 a1\n')):
         lib = os.path.join(d, f'lib{i}.txt'); open(lib, 'w').write('l2 8 a2 b2 c2 d2 e2 f2 g2 h2\n' + line)
         cfg = os.path.join(d, 'cfg.txt'); open(cfg, 'w').write('Rt l2\n')
         rc, out = run([a.tool('evsearch'), '-lib', lib, '-configs', cfg, '-plies', '20', '-threads', '1', '-src', f'ss:{rel_ev(a, d)}/sp8:1:100', '-iter', '1'], d)
@@ -478,10 +480,81 @@ def t_teacher_prior_mob(a, d):
     return ok, f'teacher form 1 / form 2 same {teacher_same}; frozen prior keeps the mobility weights {prior_kept} (exit {rc}); evtrain exit {rc3} {text3.strip()[-60:]!r}'
 
 
+def crc32c(data):
+    """CRC-32C (as crc32c_update of evtool.hpp)"""
+    c = 0xffffffff
+    for v in data:
+        c ^= v
+        for _ in range(8):
+            c = (c >> 1) ^ (0x82f63b78 if c & 1 else 0)
+    return c ^ 0xffffffff
+
+
+START_P, START_O = 0x0000000810000000, 0x0000001008000000	# the initial position, black to move
+
+
+def book1(P, O):
+    """a book of form 1 of one position (no link, no leaf)"""
+    h = bytearray(42); h[:8] = b'XADEKOOB'; h[8] = 4; h[9] = 5; struct.pack_into('<i', h, 18, 1); struct.pack_into('<I', h, 38, 1)
+    return bytes(h) + struct.pack('<QQIIIIhhhBBbB', P, O, 0, 0, 0, 0, 0, 0, 0, 0, 1, -65, 64)
+
+
+def book2(P, O, counts=b'\0' * 4):
+    """a book of form 2 of one position (no link, no leaf) with the counts given as their LEB128 bytes"""
+    h = bytearray(64); h[:8] = b'NEDXBOOK'; struct.pack_into('<HH', h, 8, 2, 64); h[18] = 1; struct.pack_into('<Q', h, 48, 1)
+    struct.pack_into('<I', h, 60, crc32c(h[:60]))
+    b = struct.pack('<QQBBbbbbB', P, O, 0, 1, 0, 0, 0, -65, 64) + counts
+    return bytes(h) + b + struct.pack('<QI', len(b), crc32c(b)) + b'BEND'
+
+
+def t_book_bad_board(a, d):
+    """bookdump and bookscan refuse a book position of fewer than 4 discs or with two discs on a square (C: the ply
+    of the position, below 0, indexes their arrays)"""
+    res = []
+    for form, make in ((1, book1), (2, book2)):
+        for name, P, O in (('start', START_P, START_O), ('empty', 0, 0), ('two', START_P, START_P | START_O)):
+            f = os.path.join(d, f'{name}{form}.dat'); open(f, 'wb').write(make(P, O))
+            out_dir = os.path.join(d, f'dump-{name}{form}'); os.makedirs(out_dir)
+            rc1, out1 = run([a.tool('bookscan'), f], d)
+            rc2, out2 = run([a.tool('bookdump'), f, out_dir], d)
+            want = 0 if name == 'start' else 1
+            res.append((name, form, rc1, rc2, rc1 == want and rc2 == want and (want == 0 or ('damaged' in out1 and 'damaged' in out2))))
+    return all(r[-1] for r in res), repr(res)
+
+
+def t_book_count_33bits(a, d):
+    """bookdump and bookscan refuse a count of form 2 of more than 32 bits, as new edax does; 2^32 - 1 is read"""
+    res = []
+    for name, counts, want in (('max', b'\xff\xff\xff\xff\x0f' + b'\0' * 3, 0), ('over', b'\x80\x80\x80\x80\x10' + b'\0' * 3, 1)):
+        f = os.path.join(d, f'{name}.dat'); open(f, 'wb').write(book2(START_P, START_O, counts))
+        out_dir = os.path.join(d, f'dump-{name}'); os.makedirs(out_dir)
+        rc1, out1 = run([a.tool('bookscan'), f], d)
+        rc2, out2 = run([a.tool('bookdump'), f, out_dir], d)
+        res.append((name, rc1, rc2, rc1 == want and rc2 == want and (want == 0 or ('32 bits' in out1 and '32 bits' in out2))))
+    return all(r[-1] for r in res), repr(res)
+
+
+def t_config_twice(a, d):
+    """evsearch refuses a configuration that names a scalar feature twice (C: the features of the second one are not
+    computed and are read as weight indices)"""
+    cfg = os.path.join(d, 'cfg.txt'); open(cfg, 'w').write('Rt l2 mob mob\n')
+    e = rel_ev(a, d)
+    rc, out = run([a.tool('evsearch'), '-lib', f'{e}/patterns.txt', '-configs', cfg, '-plies', '20', '-threads', '1', '-src', f'ss:{e}/sp8:1:100', '-iter', '1'], d)
+    return rc == 1 and 'twice' in out, f'exit {rc}: {out.strip()[-160:]!r}'
+
+
+def t_build_failure(a, d):
+    """build-evtools.ps1 exits with 1 when a tool is not built"""
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'build-evtools.ps1')
+    rc, out = run(['pwsh', '-NoProfile', '-File', script, '-Out', os.path.join(d, 'out'), '-Tools', 'no_such_tool', '-Cpu', str(CPU)], d)
+    return rc == 1 and 'failed: 1' in out, f'exit {rc}: {out.strip()[-160:]!r}'
+
+
 TESTS = [t_src_drive, t_base_drive, t_src_bad, t_many_instances, t_many_sources, t_many_plies, t_bad_ply_range, t_pattern_bad,
          t_missing_files, t_out_of_memory, t_short_weights, t_book_form2, t_selfplay_random_range, t_gen_low_ply,
          t_gen_no_training, t_leafgen_keep_all, t_trans2rec, t_selfplay_alt, t_evsearch_window,
-         t_eval_form2_mob, t_evcheck_mob, t_teacher_prior_mob]
+         t_eval_form2_mob, t_evcheck_mob, t_teacher_prior_mob, t_book_bad_board, t_book_count_33bits, t_config_twice,
+         t_build_failure]
 
 
 def main():
@@ -493,6 +566,7 @@ def main():
     a = ap.parse_args()
     global CPU
     CPU = a.cpu
+    k32.SetErrorMode(0x8003)	# a tool that crashes exits (no error dialog); inherited by the tools run
     a.tool = lambda t: os.path.join(a.exe, t + '.exe')
     want = set(a.tests.split(',')) if a.tests else None
     import compare_c	# the inputs made from the data of ev (A_head.dat, spbroken, leafdata, ...) in the work directory

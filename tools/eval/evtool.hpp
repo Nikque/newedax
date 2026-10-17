@@ -298,15 +298,16 @@ inline bool book_reader_next(BookReader *r, BookRecord *p)
 		size_t k = 23;
 		for (int i = 0; i < 4; ++i) {
 			int b = 0;
-			do {
+			do {	// (as count_decode of src/book: the 5th byte holds bits 28 to 31 only)
 				if (k >= left) die("%s is truncated", r->file);
-				if (++b > 5) die("%s is damaged (a count of more than 32 bits)", r->file);
+				if (++b == 5 && h[k] > 0x0f) die("%s is damaged (a count of more than 32 bits)", r->file);
 			} while (h[k++] & 0x80);
 		}
 		k += 2 * p->n_link;
 		if (k > left) die("%s is truncated", r->file);
 		book_reader_take(r, k);
 	}
+	if ((p->P & p->O) || popc(p->P | p->O) < 4) die("%s is damaged (a board of fewer than 4 discs, or of two discs on a square)", r->file);
 	return true;
 }
 
