@@ -1,10 +1,10 @@
 # Tests of the evaluation tools with inputs the C tools of D:\edaxwork\ev did not handle (errors, limits, paths),
 # run on one logical CPU. Each test runs a tool of --exe and checks its exit code, messages or outputs.
-# usage: py -3 test_evtools.py --exe <dir of the tools> --work <work dir> [--ev D:\edaxwork\ev] [--edax <new edax exe>]
+# usage: py -3 test_evtools.py --exe <dir of the tools> --work <work dir> [--ev D:\edaxwork\ev] [--edax <new edax exe built with EVAL_MOBILITY=0>]
 #                              [--exe-avx2 <dir of the tools built with /arch:AVX2>] [--tests a,b,...] [--cpu n]
 #                              [--edax-mob <new edax exe built with EVAL_MOBILITY=1>] [--eval2 <eval.dat of eval2>]
 #   --edax: an edax.exe of this repository (to write a book of form 2 with -book-convert, an eval.dat of form 2 with
-#   -eval-convert; a build without EVAL_MOBILITY).
+#   -eval-convert; built with /D EVAL_MOBILITY=0, the default being 1).
 import argparse, ctypes, os, shutil, struct, subprocess, sys, time
 from ctypes import wintypes
 
@@ -432,7 +432,7 @@ def t_eval_form2_mob(a, d):
     rc1, out1 = run([a.edax] + common, d, timeout=60)
     rc2, out2 = run([a.edax_mob] + common, d, timeout=60)
     ok = rc0 == 0 and same and rc1 != 0 and 'EVAL_MOBILITY' in out1 and rc2 == 0
-    return ok, f'convert back exit {rc0} same {same}; default build exit {rc1} {out1.strip()[-80:]!r}; EVAL_MOBILITY build exit {rc2}'
+    return ok, f'convert back exit {rc0} same {same}; EVAL_MOBILITY=0 build exit {rc1} {out1.strip()[-80:]!r}; EVAL_MOBILITY build exit {rc2}'
 
 
 def t_evcheck_mob(a, d):

@@ -30,11 +30,12 @@
 /**
  * Mobility weights (EVAL_MOBILITY=1, as v4.5.5-eval2): the weights of the numbers of legal moves (0 to 31) of the side
  * to move and of the opponent, for each ply, are read from the end of an evaluation file of form 1 ("MOBW", then 61 x 64
- * shorts) and added to the evaluation. Without them in the file, the evaluation is the one of Edax 4.5.
- * 0 (the default): they are not read.
+ * shorts, or the mobility group of form 2) and added to the evaluation. Without them in the file, the evaluation is the
+ * one of Edax 4.5. 1 is the default (bin/data/eval.dat is the one of eval2). 0: they are not read (a file of form 1
+ * is read without them, a file of form 2 with them is refused).
  */
 #ifndef EVAL_MOBILITY
-	#define EVAL_MOBILITY 0
+	#define EVAL_MOBILITY 1
 #endif
 
 /** number of features */
