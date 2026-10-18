@@ -1,12 +1,107 @@
-# Edax 4.5.5 corrected build
+# new edax (the C++23 version of the corrected Edax 4.5.5)
 
-> This repository (newedax) is the C++23 port: see [README.md](README.md). What follows is the README of the C version (the `eval2` line of edax-reversi-AVX, up to v4.5.5-eval2.5). The executables it describes are those of the releases of the C version; `bin` of this repository holds no executable.
+[日本語](README-NIKQUE.ja.md) · [Releases](https://github.com/Nikque/newedax/releases) · [Change list](RELEASE-NOTES.md) · [User manual](manual/en/README.md) · [Records of the port](docs/port) (in Japanese)
 
-[日本語](README-NIKQUE.ja.md) · [Releases](https://github.com/Nikque/edax-reversi-AVX/releases) · [Change list](RELEASE-NOTES.md) · [User manual](manual/en/README.md)
+This repository (newedax) is the `eval2` line of the [corrected Edax 4.5.5](https://github.com/Nikque/edax-reversi-AVX) (the C version) ported to C++23. Its commands, settings, book files and search results are those of the C version; the evaluation function of eval2 (`bin/data/eval.dat`) is the default. It publishes the source and Windows and Android executables ([Releases](https://github.com/Nikque/newedax/releases)) under the original GPL-3.0 [license](LICENSE).
 
-This public fork is based on upstream `v4.5.5` (`4cde6ff588f0eade07fcba0c7f02d5cd0cacd4ee`). It publishes the modified source, rebuilt Windows, Linux, macOS, and Android executables, the original GPL-3.0 [license](LICENSE), and the changes described below. The upstream `master` branch remains available; `edax-4.5.5-fixes` is this fork's default branch.
+**The latest version is v4.5.5-newedax.2 (a pre-release).** "Changes in v4.5.5-newedax.2" and "Changes in v4.5.5-newedax.1" below describe new edax. The sections from "Changes in v4.5.5-eval2.6" on describe the changes made in the C version; new edax holds all of them (up to v4.5.5-eval2.6 and v4.5.5-nikque.18). What they say about executables (Linux and macOS builds, PGO, ...) is about the releases of the C version.
 
-**This branch (`eval2`) is a separate series with a different evaluation function (this version is v4.5.5-eval2.5).** It differs from the default branch `edax-4.5.5-fixes` (v4.5.5-nikque.17) only by the change of the evaluation function described under "Changes in v4.5.5-eval2.1" below.
+## Changes in v4.5.5-newedax.2 (pre-release)
+
+The fixes of a cross-check of v4.5.5-newedax.1, and the programs no longer hold the folder where they were built (the same change as v4.5.5-nikque.18 of the C version). **The search and its results are the same as v4.5.5-newedax.1** (and v4.5.5-eval2.6). It stays a pre-release until the one-thread slowdown below is fixed.
+
+Fixes (the eval2 tools and `-eval-convert`):
+
+- `bookdump`, `bookscan`: a book position with fewer than 4 discs gave a negative ply, used as an index (the C tools have it too). Such a book is refused.
+- A configuration of the tools that gives the same scalar twice counted it twice; a pattern with the same square twice gave a wrong permutation. Both are refused.
+- The 5-byte counts of form 2: the high 4 bits of the fifth byte were not read (2^32 - 1 is read, 2^32 is refused).
+- `build-evtools.ps1` ended with 0 when a tool was not built; now 1.
+- `-eval-convert`: a file of form 1 of fewer than 54 plies was converted (neither form could then be read); a file of form 2 whose plies times weights do not fit in 32 bits overflowed. Both are refused.
+
+Other changes:
+
+- The programs and libraries no longer hold the folder where they were built (`__FILE__`, for the error messages): an error message names the source file only (checked by `tests/check-build-paths.py`).
+- `tools/eval` of the ZIP holds `vcomp140.dll` (the OpenMP runtime of MSVC): 7 tools need it.
+- The scripts of the tools take the folders of their inputs as arguments (`--ev`, `--book40`, `-Inputs`), without defaults.
+
+### Speed and memory (2026-10-19, measured)
+
+Windows, the released `wEdax-x86-64-v4.exe` against each other, 32 threads (32 logical CPUs), the `config.ini` of the release. Ratio of the times (the newer one / the one compared; below 1 is faster): the mean and standard deviation of 6 rounds in the order A B B A.
+
+| Command | against v4.5.5-newedax.1 | against the C version v4.5.5-eval2.6 |
+|---|---|---|
+| suite F (`book deviate`, `deviate2`, `deviate3`, `enhance`, level 21) | 1.006 ± 0.014 | **0.985 ± 0.012** |
+| `book learn` (30 games, level 18) | 0.997 ± 0.009 | 1.001 ± 0.022 |
+| `book fill 2` (level 12, a book of 270,000 positions) | 0.988 ± 0.009 | **0.959 ± 0.008** |
+| `book fill2 2` | 0.999 ± 0.012 | **0.973 ± 0.011** |
+| `book leaf expand` | 0.991 ± 0.012 | **0.967 ± 0.010** |
+| `book fill2 2 5 5` | 0.987 ± 0.013 | 0.979 ± 0.024 |
+| `book import` (a text book of 4 million positions) | 0.996 ± 0.020 | **0.963 ± 0.010** |
+| fforum-20-39 (`-solve`) | — | 0.995 ± 0.028 |
+| 30 middle-game positions (level 18, `-solve`) | — | 0.986 ± 0.011 |
+
+- With 32 threads and `wEdax-x86-64-v4.exe`, **no case slower than v4.5.5-newedax.1 or than the C version was found** (every difference is within the standard deviation or faster; the 1.006 of suite F against newedax.1 has a median of 1.002, 3 of the 6 rounds slower). The C version is a PGO build, new edax is not.
+- Peak memory: the same as v4.5.5-newedax.1 (±1 MiB); the same as the C version v4.5.5-eval2.6 or less (`book import`: 614 MiB → 544 MiB).
+- **With one thread, the 4 executables other than `wEdax-x86-64-v4.exe` are slower than the C version** (one logical CPU, CPU cycles, 16 alternating pairs, ratio to the C version v4.5.5-eval2.6, the same node counts):
+
+  | Executable | fforum-20-39 | 30 middle-game positions (level 18) |
+  |---|---|---|
+  | `wEdax-x86-64-v4.exe` | 1.000 | 0.966 |
+  | `wEdax-x86-64-v3.exe` | **1.008** | **1.017** |
+  | `wEdax-x86-64.exe` | **1.008** | **1.025** |
+  | `wEdax-x86-sse.exe` | **1.010** | **1.116** |
+  | `wEdax-x86.exe` | 0.936 | **1.047** |
+
+  The releases of the C version are PGO builds, new edax is not. Without PGO on both sides (the same options), new edax is as fast or faster (middle game: `-v3` 0.992, `wEdax-x86-64.exe` 0.998). A PGO build of new edax narrows the gap, but the middle game is still slower than the C version (`-v3` 1.008, `wEdax-x86-64.exe` 1.013, `wEdax-x86-sse.exe` 1.026): PGO inlines other functions into their callers than in the C version (`get_moves` and `search_eval_1` are inlined into `NWS_shallow` in the C version, seen by sampling); this is presumably the cause (not checked). The next version fixes it.
+- `wEdax-x86.exe` (32-bit, no SSE) is as fast as in v4.5.5-newedax.1 (0.9995, one logical CPU, 40 pairs).
+- Size: the Windows executables are 74 to 173 KB larger than those of the C version v4.5.5-eval2.6, the DLLs about 27 KB. Most of it comes from the build without PGO (without PGO on both sides: about 32 KB larger: the new features such as the files of form 2, the sort and the tables of Boost).
+
+### Checks
+
+- The 5 Windows executables: one-thread `-solve` of fforum-20-39 gives the same depths, scores, node counts and lines as v4.5.5-eval2.5 with `bin/data/eval.dat` (eval2; 78,733,223 nodes), and as v4.5.5-nikque.17 with the `eval.dat` of Edax 4.5 (77,639,567). The 7 Cassio cases pass.
+- The 3 DLLs: 206 API checks, 0 failures each, with both `eval.dat`.
+- The 14 eval2 tools: 26 tests pass; on 26 cases their outputs are the same as those of the C tools.
+- No executable, library or tool holds a folder of the build machine.
+- Android (NDK r27d, armeabi-v7a and arm64-v8a): built without warnings; not run on a device.
+- Size: the same as v4.5.5-newedax.1 (`libedax-x64.dll` 512 bytes smaller). Android: 288 to 448 bytes larger (the code of the fixes).
+
+## Changes in v4.5.5-newedax.1 (the first version)
+
+v4.5.5-nikque.17 ported to C++23, with the evaluation function of the eval2 line (v4.5.5-eval2.5) as the default (the build option `EVAL_MOBILITY` is 1, `bin/data/eval.dat` is the one of eval2).
+
+New:
+
+- The search gives the same results as the C version; the commands and options are the same.
+- Files of form 2 for books (`NEDXBOOK`, about 33 % smaller) and evaluation files (`NEDXEVAL`), with a CRC-32C. `-book-format`, `-book-convert`, `-eval-convert` (both ways). Files of form 1 are still read.
+- A book position takes 40 bytes in memory (48 in the C version): loading a book of 6.49 million positions takes 11 to 45 % less memory.
+- Build options `EVAL_MOBILITY` (0: the mobility weights are not read) and `EVAL_SLOTS=64` (64 feature slots, a base for a stronger evaluation; the default is 48).
+- `tools/eval`: the training tools of the eval2 evaluation in C++ (14 tools; the ZIP holds the x64 AVX-512 build only).
+
+Executables (MSVC 2022 `/O2 /GL`, **no PGO**; Android: NDK r27d):
+
+- Windows: `wEdax-x86-64-v4.exe`, `wEdax-x86-64-v3.exe`, `wEdax-x86-64.exe`, `wEdax-x86-sse.exe`, `wEdax-x86.exe`, `libedax-x64-v4.dll`, `libedax-x64-v3.dll`, `libedax-x64.dll`.
+- Android: `aEdax-arm64-v8a`, `aEdax-armeabi-v7a`, `libedax-arm64-v8a.so`, `libedax-armeabi-v7a.so`.
+- No Linux, macOS or Windows ARM64 executables (to build from the source: "Build" in the README).
+- Why no PGO: in the measurements of the port, the `book deviate` family was about 1.5 to 2 % faster without PGO (the C version too).
+
+Checks:
+
+- With the same options as the C version v4.5.5-nikque.17 (no PGO): no case slower than the C version in fforum-20-39 (1 and 32 threads), fforum-40-59, 30 middle-game positions (levels 18 and 21), suite F, or the start (`docs/port/MEASURE-1.md`).
+- The same books as the C version in 14 test suites (with the same random seed), the same C API of libedax and Cassio protocol; 53 regression cases.
+
+Not checked yet (also for newedax.2): builds other than MSVC on Windows and the Android NDK, an Android device, AddressSanitizer and ThreadSanitizer, real books of billions of positions, a review by a second reader.
+
+## Changes in v4.5.5-eval2.6
+
+v4.5.5-eval2.5 now holds the changes of v4.5.5-nikque.18 (the nikque.18 entry below): the programs no longer hold the folder where they were built. **The evaluation function and `eval.dat` are those of v4.5.5-eval2.1** (the same file); the search and the results are those of v4.5.5-eval2.5.
+
+Checks (one logical CPU):
+
+- fforum-20-39 with 1 thread: the 5 Windows programs give the same depths, moves, scores, node counts (78,733,223) and principal variations as those of v4.5.5-eval2.5. Cassio: 7 cases. The 3 DLLs: 204 API checks, 0 failures. `book-reproducible`: the books of suite F are those of v4.5.5-eval2.5.
+- Linux (WSL, gcc 11.4, built as the release binaries workflow does): the 4 programs give the same rows as the Windows programs of v4.5.5-eval2.5 (78,733,223 nodes); the 3 libraries: 204 API checks, 0 failures. No build folder in them.
+- Speed (CPU cycles, 12 pairs in alternating order, against v4.5.5-eval2.5): 0.995 to 1.002. The first build of `wEdax-x86-sse.exe` gave 1.0025 (median 1.0009), so it was built again (0.9998); the source of eval2.5 built again gives 1.0006: the speed of a PGO build changes by a few tenths of a percent from a build to the next.
+- Speed with 32 threads (2026-10-19, the released programs, ratio of the times to v4.5.5-eval2.5, mean of 6 alternating rounds): `wEdax-x86-64-v4.exe` suite F 1.004, `book learn` 1.003, `book fill 2` 0.990, `book fill2 2` 0.992, `book leaf expand` 1.001, `book fill2 2 5 5` 0.986, `book import` 0.989 (each within the standard deviation or faster). **`wEdax-x86-sse.exe` tends to be slower**: `book learn` 1.007 and `book leaf expand` 1.013 (5 of the 6 rounds slower each), the other commands 0.997 to 1.007; one-thread `book leaf expand` (one logical CPU, CPU cycles, 12 pairs) 1.058 (all 12 slower; the same number of positions). Presumably the difference of the PGO builds (not checked). The same peak memory (±1 MiB; also in two one-thread test suites of book commands).
+- Size: -1,024 to +512 bytes.
 
 ## Changes in v4.5.5-eval2.5
 
@@ -194,6 +289,26 @@ Conditions where this version (new `eval.dat`) is slower than the release execut
 - **Book regression tests** (upstream `eval.dat`, 1 thread, level 21, `book-store-tasks = 1`, the AVX-512 release executable): in the 8 suites that cover all the book commands, the 84 files produced are identical to those of the v4.5.5-nikque.9 release executable (only the file that holds a date differs). The 8 suites took 172.1 s → 174.1 s in total (1.012 times; single runs, not distinguishable from noise). No book test was run with the new `eval.dat`, nor with several threads.
 - Peak memory (see "Speed").
 - **Not measured or not checked**: the macOS, Android and Windows ARM64 builds (running and speed; the Android and Windows ARM64 builds were only built), the time of book learning, matches at level 24 or more, searches at level 30 or more, book tests with the new `eval.dat` (the book code is the one of v4.5.5-nikque.9), edax_runner with the library of this version.
+## Changes in v4.5.5-nikque.18
+
+The programs no longer hold the folder where they were built. **The search, `eval.dat`, the book file format and the results are the same as v4.5.5-nikque.17.**
+
+What changes:
+
+- The Windows programs and libraries held the full path of the source files on the build machine (`__FILE__`, for the error messages). They now hold only the file name, as the Linux, macOS and Android programs already did: an error message shows `book.c` instead of the build folder and `src\book.c`.
+- `tests/check-build-paths.py` fails on a program that holds such a path. The release binaries workflow runs it on the programs each job builds.
+- The documents no longer name folders of the work machine, nor say what was asked or allowed.
+- The earlier releases were corrected in the same way: the build folders in their Windows programs (the file names are kept, nothing else changes) and the folders of the work machine in their documents. Their ZIP files and `SHA256SUMS` were replaced.
+- edax_runner 5.3.0+nikque.10 (separate release): the libraries of this version. A `book.dat` that could not be read is now kept as `book.dat.damaged` (with `edax_book_keep_unread_file`), and a second edax_runner started in the same folder stops.
+
+Checks (one logical CPU):
+
+- fforum-20-39 with 1 thread: the 5 Windows programs give the same depths, moves, scores, node counts (77,639,567) and principal variations as those of v4.5.5-nikque.17. Cassio: 7 cases. The 3 DLLs: 204 API checks, 0 failures. `book-reproducible`: the books of suite F are those of v4.5.5-nikque.17.
+- Linux (WSL, gcc 11.4, built as the release binaries workflow does): the 4 programs give the same rows as the Windows programs of v4.5.5-nikque.17 (77,639,567 nodes); the 3 libraries: 204 API checks, 0 failures. No build folder in them, nor in the Android programs (NDK r27d).
+- Speed (CPU cycles, 12 pairs in alternating order, against v4.5.5-nikque.17): 0.976 to 1.000.
+- Speed with 32 threads (2026-10-19, the released `wEdax-x86-64-v4.exe`, ratio of the times to v4.5.5-nikque.17, mean of 6 alternating rounds): suite F (the `book deviate` family, level 21) 0.997, `book learn` (30 games, level 18) 1.003, `book fill 2` 1.005, `book fill2 2` 0.987, `book leaf expand` 0.998, `book fill2 2 5 5` 0.993, `book import` (a text book of 4 million positions) 0.988: each within the standard deviation (0.7 to 3.4 %) or faster. The same peak memory (±1 MiB; also in three one-thread test suites of book commands).
+- Size: -3,072 to +512 bytes. The strings of the error messages are about 800 bytes shorter; the code of a PGO build changes by a few hundred bytes from a build to the next (the same source built twice: -512 to 0 bytes).
+
 ## Changes in v4.5.5-nikque.17
 
 Two new settings make a book the same from a run to the next. **The default behaviour is unchanged**: without them, books are made as with v4.5.5-nikque.16, at the same speed and with the same memory. `eval.dat`, the book file format and the search are unchanged.

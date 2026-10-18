@@ -1,12 +1,107 @@
-# Edax 4.5.5 修正版
+# new edax（Edax 4.5.5 修正版の C++23 版）
 
-> このリポジトリ（newedax）は、C++23 に移した版です。説明は [README.md](README.md) にあります。以下は C 版（edax-reversi-AVX の `eval2` 系列、v4.5.5-eval2.5 まで）の README です。実行ファイルの記述は C 版の Releases のもので、このリポジトリの `bin` には実行ファイルはありません。
+[English](README-NIKQUE.en.md) · [Releases](https://github.com/Nikque/newedax/releases) · [修正一覧](RELEASE-NOTES.ja.md) · [ユーザーマニュアル](manual/ja/README.md) · [移植の記録](docs/port)
 
-[English](README-NIKQUE.en.md) · [Releases](https://github.com/Nikque/edax-reversi-AVX/releases) · [修正一覧](RELEASE-NOTES.ja.md) · [ユーザーマニュアル](manual/ja/README.md)
+このリポジトリ（newedax）は、[Edax 4.5.5 の修正版](https://github.com/Nikque/edax-reversi-AVX)（C 版）の `eval2` の系列を C++23 に移したものです。命令・設定・bookのファイル・探索の結果は C 版と同じで、評価関数は eval2 のもの（`bin/data/eval.dat`）が既定です。元の GPL-3.0 [ライセンス](LICENSE)のもとで、ソースと、Windows・Android 用の実行ファイル（[Releases](https://github.com/Nikque/newedax/releases)）を公開しています。
 
-この公開forkは上流の `v4.5.5`（`4cde6ff588f0eade07fcba0c7f02d5cd0cacd4ee`）を基点としています。修正後のソース、再ビルドしたWindows・Linux・macOS・Android用実行ファイル、元のGPL-3.0 [ライセンス](LICENSE)を公開しています。上流の `master` ブランチは残し、修正版の `edax-4.5.5-fixes` を既定ブランチに設定しました。
+**最新の版は v4.5.5-newedax.2（プレリリース）です。** 下の「v4.5.5-newedax.2 の変更点」「v4.5.5-newedax.1 の変更点」が new edax の説明です。そのあとの「v4.5.5-eval2.6 の変更点」から下は、C 版で行った変更の説明で、new edax にもすべて入っています（v4.5.5-eval2.6・v4.5.5-nikque.18 まで）。その中の実行ファイルの記述（Linux・macOS 版、PGO など）は C 版の Releases のものです。
 
-**このブランチ（`eval2`）は、評価関数を変えた別の系列です（この版は v4.5.5-eval2.5）。** 既定のブランチ `edax-4.5.5-fixes`（v4.5.5-nikque.17）との違いは、下の「v4.5.5-eval2.1 の変更点」に書いた評価関数の変更だけです。
+## v4.5.5-newedax.2 の変更点（プレリリース）
+
+v4.5.5-newedax.1 のクロスチェックで見つかった不具合を直し、実行ファイルにビルドしたときのフォルダーが入らないようにしました（C 版の v4.5.5-nikque.18 と同じ直し）。**探索と結果は v4.5.5-newedax.1 と同じです**（v4.5.5-eval2.6 とも同じ）。下の「速さとメモリ」の1スレッドの遅れを直すまで、プレリリースのままです。
+
+不具合の修正（eval2 の道具と `-eval-convert`）：
+
+- `bookdump`・`bookscan`：石が4つ未満の局面のbookで、手数が負になり、配列の添字に使っていました（C の道具にも同じ不具合）。そのようなbookは断ります。
+- 道具の設定で同じスカラーを2回書くと2回数えていました。パターンに同じ升が2つあると、対称の置き換えが壊れていました。どちらも断ります。
+- 形2の5バイトの数：5バイト目の上位4ビットを見ていませんでした（2^32−1は読み、2^32は断ります）。
+- `build-evtools.ps1` は、作れなかった道具があっても終了コード0でした。1を返します。
+- `-eval-convert`：54手数より少ない形1のファイルを変換していました（どちらの形でも読めないファイルになりました）。形2で手数×重みの数が32ビットに入らないと、あふれていました。どちらも断ります。
+
+そのほかの変更：
+
+- 実行ファイルとライブラリに、ビルドしたときのフォルダー（エラーの文言のための `__FILE__`）が入りません。エラーの文言はソースのファイル名だけです（`tests/check-build-paths.py` で確かめます）。
+- ZIP の `tools/eval` に `vcomp140.dll`（MSVC の OpenMP の実行時ライブラリ）を入れました。7つの道具が使います。
+- 道具の台本は、入力のフォルダーを引数で受け取ります（`--ev`・`--book40`・`-Inputs`。既定値なし）。
+
+### 速さとメモリ（2026-10-19、実測）
+
+Windows、配布物の `wEdax-x86-64-v4.exe` どうし、32スレッド（論理CPU 32）、`config.ini` は配布物のもの。時間の比（新しい方 ÷ 比べる相手。1より小さいと速い）は、A B B A の順を6回の平均と標準偏差。
+
+| 命令 | v4.5.5-newedax.1 との比 | C 版 v4.5.5-eval2.6 との比 |
+|---|---|---|
+| suite F（`book deviate`・`deviate2`・`deviate3`・`enhance`、level 21） | 1.006 ± 0.014 | **0.985 ± 0.012** |
+| `book learn`（棋譜30本、level 18） | 0.997 ± 0.009 | 1.001 ± 0.022 |
+| `book fill 2`（level 12、27万局面のbook） | 0.988 ± 0.009 | **0.959 ± 0.008** |
+| `book fill2 2` | 0.999 ± 0.012 | **0.973 ± 0.011** |
+| `book leaf expand` | 0.991 ± 0.012 | **0.967 ± 0.010** |
+| `book fill2 2 5 5` | 0.987 ± 0.013 | 0.979 ± 0.024 |
+| `book import`（400万局面の文字のbook） | 0.996 ± 0.020 | **0.963 ± 0.010** |
+| fforum-20-39（`-solve`） | — | 0.995 ± 0.028 |
+| 中盤30局面（level 18、`-solve`） | — | 0.986 ± 0.011 |
+
+- 32スレッドの `wEdax-x86-64-v4.exe` では、**v4.5.5-newedax.1 より遅い条件、C 版より遅い条件は見つかりませんでした**（差はどれも標準偏差の範囲か、速い向き。newedax.1 との suite F の 1.006 は、中央値 1.002、6回中3回が遅い）。C 版は PGO のビルド、new edax は PGO なしです。
+- 最大メモリ：v4.5.5-newedax.1 と同じ（±1 MiB）。C 版 v4.5.5-eval2.6 と同じか少ない（`book import` は 614 MiB → 544 MiB）。
+- **1スレッドでは、`wEdax-x86-64-v4.exe` 以外の4種が C 版より遅い**（1論理CPU、CPUサイクル、交互に16組、C 版 v4.5.5-eval2.6 との比、節点数は同じ）：
+
+  | 実行ファイル | fforum-20-39 | 中盤30局面（level 18） |
+  |---|---|---|
+  | `wEdax-x86-64-v4.exe` | 1.000 | 0.966 |
+  | `wEdax-x86-64-v3.exe` | **1.008** | **1.017** |
+  | `wEdax-x86-64.exe` | **1.008** | **1.025** |
+  | `wEdax-x86-sse.exe` | **1.010** | **1.116** |
+  | `wEdax-x86.exe` | 0.936 | **1.047** |
+
+  C 版の配布物は PGO のビルド、new edax は PGO なしです。PGO なしどうし（同じ旗）では、new edax は C 版と同じか速い（`-v3` の中盤 0.992、`wEdax-x86-64.exe` 0.998）。new edax を PGO でビルドすると差は縮みますが、中盤はまだ C 版より遅い（`-v3` 1.008、`wEdax-x86-64.exe` 1.013、`wEdax-x86-sse.exe` 1.026）。PGO が呼び出し元に埋め込む関数が C 版と違い（`get_moves`・`search_eval_1` が C 版では `NWS_shallow` に埋め込まれる。サンプリングで確かめた）、これが差の元と見ています（未確認）。次の版で直します。
+- `wEdax-x86.exe`（32ビット、SSEなし）は v4.5.5-newedax.1 と同じ速さです（0.9995、1論理CPU、40組）。
+- 大きさ：C 版 v4.5.5-eval2.6 の配布物より、Windows の実行ファイルが74〜173 KB、DLL が約27 KB 大きい。大部分は PGO なしのためです（PGO なしどうしでは約32 KB 大きい：形2のファイルなどの新しい機能、Boost の並べ替えと表）。
+
+### 確認
+
+- Windowsの5種：fforum-20-39を1スレッドで解いた深さ・評価値・ノード数・読み筋が、`bin/data/eval.dat`（eval2）で v4.5.5-eval2.5 と同じ（78,733,223）、Edax 4.5 の `eval.dat` で v4.5.5-nikque.17 と同じ（77,639,567）。Cassio 7件も通過。
+- DLL 3種：eval2 と Edax 4.5 の `eval.dat` とも、API試験206項目・失敗0。
+- eval2 の道具14本：試験26件通過。26事例で、Cの道具と同じ出力。
+- 実行ファイル・ライブラリ・道具のどれにも、ビルドしたフォルダーは入っていません。
+- Android（NDK r27d、armeabi-v7a と arm64-v8a）：警告なしでビルド。実機では動かしていません。
+- 大きさ：v4.5.5-newedax.1 と同じ（`libedax-x64.dll` だけ512バイト小さい）。Android は288〜448バイト大きい（直しのコードの分）。
+
+## v4.5.5-newedax.1 の変更点（最初の版）
+
+v4.5.5-nikque.17 を C++23 に移し、eval2 の系列（v4.5.5-eval2.5）の評価関数を既定にしました（ビルドの選択肢 `EVAL_MOBILITY` が 1、`bin/data/eval.dat` が eval2 のもの）。
+
+新しいこと：
+
+- 探索の結果は C 版と同じです。命令と選択肢も同じです。
+- book と評価ファイルの形2（`NEDXBOOK`、約33%小さい。`NEDXEVAL`）。CRC-32C つき。`-book-format`・`-book-convert`・`-eval-convert`（両方向）。形1も読めます。
+- book の局面がメモリ上で40バイト（C 版は48）。649万局面のbookの読み込みはメモリが11〜45%少ない。
+- ビルドの選択肢 `EVAL_MOBILITY`（0：着手可能数の重みを読まない）、`EVAL_SLOTS=64`（64枠。より強い評価関数の土台。既定は48）。
+- `tools/eval`：eval2 の評価関数の学習の道具の C++ 版（14本。ZIP には x64 AVX-512 用だけ）。
+
+実行ファイル（MSVC 2022 `/O2 /GL`、**PGO なし**。Android は NDK r27d）：
+
+- Windows：`wEdax-x86-64-v4.exe`・`wEdax-x86-64-v3.exe`・`wEdax-x86-64.exe`・`wEdax-x86-sse.exe`・`wEdax-x86.exe`、`libedax-x64-v4.dll`・`libedax-x64-v3.dll`・`libedax-x64.dll`。
+- Android：`aEdax-arm64-v8a`・`aEdax-armeabi-v7a`・`libedax-arm64-v8a.so`・`libedax-armeabi-v7a.so`。
+- Linux・macOS・Windows ARM64 の実行ファイルはありません（ソースからビルドするときは README の「Build」）。
+- PGO なしの理由：移植の計測で、`book deviate` 系は PGO なしの方が約1.5〜2%速かった（C 版でも同じ）。
+
+確認：
+
+- C 版 v4.5.5-nikque.17 と同じ旗（PGO なし）で、fforum-20-39（1・32スレッド）、fforum-40-59、中盤30局面（level 18・21）、suite F、起動のどれでも、C 版より遅い条件は見つかりませんでした（`docs/port/MEASURE-1.md`）。
+- 14 の試験の book（乱数の種をそろえたとき）、libedax の C の API、Cassio の通信が C 版と同じ。回帰53件。
+
+まだ確かめていないこと（newedax.2 でも同じ）：Windows の MSVC と Android の NDK 以外のビルド、Android の実機、AddressSanitizer・ThreadSanitizer、数十億局面の実book、別の人による読み直し。
+
+## v4.5.5-eval2.6 の変更点
+
+v4.5.5-eval2.5 に、v4.5.5-nikque.18 の変更（下の nikque.18 の項）を取り込みました：実行ファイルに、ビルドしたときのフォルダーが入りません。**評価関数と `eval.dat` は v4.5.5-eval2.1 のままです**（同じファイル）。探索と結果は v4.5.5-eval2.5 と同じです。
+
+確認（1論理CPU）：
+
+- fforum-20-39の1スレッド：Windowsの5種が、v4.5.5-eval2.5 と同じ深さ・手・評価値・ノード数（78,733,223）・最善手順。Cassio 7件。DLL 3種はAPI試験204項目・失敗0。`book-reproducible` のsuite Fのbookは v4.5.5-eval2.5 と同じ。
+- Linux（WSL、gcc 11.4、配布物を作るworkflowと同じ作り方）：4種が v4.5.5-eval2.5 のWindowsの実行ファイルと同じ結果の行（78,733,223ノード）。ライブラリ3種はAPI試験204項目・失敗0。ビルドしたフォルダーは入っていません。
+- 速さ（CPUサイクル、交互に12組、v4.5.5-eval2.5 との比）：0.995〜1.002。`wEdax-x86-sse.exe` は最初のビルドが1.0025（中央値1.0009）だったので、ビルドし直しました（0.9998）。eval2.5 のソースをビルドし直すと1.0006で、PGOのビルドはビルドのたびに速さが0.数%変わります。
+- 32スレッドの速さ（2026-10-19、配布物、v4.5.5-eval2.5 との時間の比、交互に6回の平均）：`wEdax-x86-64-v4.exe` は suite F 1.004、`book learn` 1.003、`book fill 2` 0.990、`book fill2 2` 0.992、`book leaf expand` 1.001、`book fill2 2 5 5` 0.986、`book import` 0.989（どれも標準偏差の範囲か速い向き）。**`wEdax-x86-sse.exe` は遅い向きです**：`book learn` 1.007・`book leaf expand` 1.013（どちらも6回中5回遅い）、ほかの命令は0.997〜1.007。1スレッドの `book leaf expand`（1論理CPU、CPUサイクル、12組）は1.058（12組とも遅い。局面の数は同じ）。PGOのビルドの違いと見ています（未確認）。最大メモリは同じです（±1 MiB。1スレッドの book の命令の2つの試験でも同じ）。
+- 大きさ：−1,024〜+512バイト。
 
 ## v4.5.5-eval2.5 の変更点
 
@@ -194,6 +289,26 @@ v4.5.5-nikque.9 の配布版（上流の `eval.dat`）より、この版（新�
 - **bookの回帰試験**（上流の `eval.dat`、1スレッド、level 21、`book-store-tasks = 1`、配布用のAVX-512版）：全bookコマンドの8組の試験で、できたファイル84個が v4.5.5-nikque.9 の配布版と一致しました（違うのは、日時の入るファイル1種類だけ）。8組の時間の合計は 172.1秒 → 174.1秒（1.012倍。1回ずつの値で、誤差と区別できません）。新しい `eval.dat` でのbookの試験と、複数スレッドのbookの試験は、行っていません。
 - 最大メモリ（上の「速さ」）。
 - **測っていない・確認していないもの**：macOS版・Android版・Windows ARM64版の動作と速さ（Android版と Windows ARM64版はビルドだけ）、bookの学習の時間、level 24 以上の対局、level 30 以上の探索、新しい `eval.dat` でのbookの試験（bookのコードは v4.5.5-nikque.9 から変えていません）、この版のライブラリを入れた edax_runner。
+## v4.5.5-nikque.18 の変更点
+
+実行ファイルに、ビルドしたときのフォルダーが入らないようにしました。**探索・`eval.dat`・bookのファイル形式・結果は v4.5.5-nikque.17 と同じです。**
+
+変わるところ：
+
+- Windowsの実行ファイルとライブラリには、エラーの文言のために、ビルドしたPCのソースのファイルの場所（`__FILE__`）がそのまま入っていました。Linux・macOS・Androidと同じく、ファイル名だけにしました。エラーの文言は、ビルドしたフォルダーと `src\book.c` ではなく `book.c` と表示します。
+- `tests/check-build-paths.py` は、そのような場所が入った実行ファイルで失敗します。Releaseの配布物を作るworkflowは、各ジョブが作った実行ファイルでこれを動かします。
+- 説明の文書から、作業PCのフォルダーと、指示や許可についての書き方をなくしました。
+- 以前のReleaseも同じように直しました：Windowsの実行ファイルのビルドしたフォルダー（ファイル名は残し、ほかは変えていません）と、文書の作業PCのフォルダー。ZIPと `SHA256SUMS` を差し替えました。
+- edax_runner 5.3.0+nikque.10（別の公開）：この版のライブラリ。読めなかった `book.dat` を `book.dat.damaged` として残し（`edax_book_keep_unread_file` を使います）、同じフォルダーで 2 つ目の edax_runner を起動すると止まるようにしました。
+
+確認（1論理CPU）：
+
+- fforum-20-39の1スレッド：Windowsの5種が、v4.5.5-nikque.17 と同じ深さ・手・評価値・ノード数（77,639,567）・最善手順。Cassio 7件。DLL 3種はAPI試験204項目・失敗0。`book-reproducible` のsuite Fのbookは v4.5.5-nikque.17 と同じ。
+- Linux（WSL、gcc 11.4、配布物を作るworkflowと同じ作り方）：4種が v4.5.5-nikque.17 のWindowsの実行ファイルと同じ結果の行（77,639,567ノード）。ライブラリ3種はAPI試験204項目・失敗0。これらとAndroid（NDK r27d）の実行ファイルにも、ビルドしたフォルダーは入っていません。
+- 速さ（CPUサイクル、交互に12組、v4.5.5-nikque.17 との比）：0.976〜1.000。
+- 32スレッドの速さ（2026-10-19、配布物の `wEdax-x86-64-v4.exe`、v4.5.5-nikque.17 との時間の比、交互に6回の平均）：suite F（`book deviate` 系、level 21）0.997、`book learn`（棋譜30本、level 18）1.003、`book fill 2` 1.005、`book fill2 2` 0.987、`book leaf expand` 0.998、`book fill2 2 5 5` 0.993、`book import`（400万局面の文字のbook）0.988。どれも標準偏差（0.7〜3.4%）の範囲か速い向きです。最大メモリは同じです（±1 MiB。1スレッドの book の命令の3つの試験でも同じ）。
+- 大きさ：−3,072〜+512バイト。エラーの文言の文字列は約800バイト短くなりました。PGOのビルドは、ビルドのたびにコードの大きさが数百バイト変わります（同じソースを2回ビルドすると−512〜0バイト）。
+
 ## v4.5.5-nikque.17 の変更点
 
 bookを毎回同じに作るための設定を2つ足しました。**既定の動作は変わりません**（設定を書かなければ、v4.5.5-nikque.16 と同じbookの作り方・速さ・メモリです）。`eval.dat`・bookのファイル形式・探索は変えていません。
