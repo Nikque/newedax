@@ -322,6 +322,26 @@ C++ 版（MSVC x64 AVX-512 `/O1`、`tests/build-regression.cmd`）で **PASS**�
 - 記録（`docs/port`）から、決定の経緯の引用と作業 PC の場所を消した（場所は `runs\…` などの相対の名前に）。計測の記録 `MEASURE-1.md` を入れた。
 - 送らないもの：タグ（nikque・eval2 の版のタグは C 版のリポジトリ edax-reversi-AVX にある）。
 
+## 3.23 v4.5.5-newedax.1 のクロスチェックの受け取り（2026-10-18、ブランチ `xfix2`）
+
+別の読み手のクロスチェックの指摘 16 項目（B7・C5・P3・R1）を、ソースと元の記録で一つずつ確かめた。P1〜P3 は既知の K2〜K5・K8 と同じ。直したものは、失敗する試験を先に書いた。正しい入力の出力・節点数・book は変わらない。
+
+- `ac76ef6`・`87d1922` 道具：
+  - 4 石未満の局面の手数が負になり、`bookdump` の `out[]`・`bookscan` の集計の配列を負の添字で使っていた（B1。C の道具にもある）。`bookscan` は石の数（0〜64）で集計し、読み終えてから 4 石未満があれば壊れた book として止める。`bookdump` は書き出す前に止める。
+  - 初めは `BookReader` で全局面の盤（4 石未満と石の重なり）を確かめたが、649 万局面の book で `bookscan` が 4〜8% 遅くなった（CPU サイクル、1 論理CPU、20 回交互。局面ごとに約 10 命令と分岐、石の数を 2 回数えていた。`/FAs` の一覧で確かめた）。今の形は `1579452` の 0.995 倍（ビルドし直した `1579452` は 0.996 倍）。石の重なりは配列の範囲を外れないので断らない（本体も確かめていない）。
+  - 形2 の数の 5 バイト目は `count_decode` と同じく下位 4 ビットまで（2^32 を通していた。B4）。`evsearch` は同じ scalar の二度目（B2）と、パターンの升の重複（B3）を断る（B2・B3 は C の道具にもある）。`build-evtools.ps1` は失敗で終了コード 1（B5）。
+  - 試験 `book_bad_board`・`book_count_33bits`・`config_twice`・`build_failure`、`pattern_bad` に升の重複。配布の道具と直す前の台本で 5 件とも失敗した。
+- `ee36708` `-eval-convert`：54 手数未満の形1 を断る（形2 にしても `eval_open` が読めなかった。B6）。形2 の手数分の重みがファイルに入らないもの、アドレス空間を超えるものを、確保の前に断る（32 ビットで 56,333 手数が 32,536 バイトにあふれ、x86 で `0xC0000409`。B7）。回帰の件 `evalbadconv`（直す前の x86 で `0xC0000409`）。回帰は 54 件。
+- `ab12092` `tools/port/regression_variant.ps1`：件が失敗しても終了コード 0 だった（そのため quick check が数えなかった）。`-Eval` で eval.dat を選ぶ。`1c85e42` から `bin/data/eval.dat` は着手可能数の重みつきで、`EVAL_MOBILITY=0` のビルドは `evalform2` で仕様（K9）どおり止まる。3.22 の `EVAL_MOBILITY=0` の 3 件は Edax 4.5 の eval.dat で通ったもの。
+- `5407fc2` `build-evtools.ps1`：`/openmp` の道具 7 本（`evsearch`・`evtrain`・`selfplay3`・`label`・`playout`・`gen`・`leafgen`）は `VCOMP140.DLL` を要るのに、v4.5.5-newedax.1 の ZIP にも説明にもなかった（R1）。Visual Studio の再頒布用のファイル（`VC\Redist\MSVC\<最新>\x64\Microsoft.VC143.OpenMP`）の `vcomp140.dll` を出力先に写す。次の版の ZIP に入れる。
+- `9fd0aa3` 記録：README の Android（配布物は既定 `EVAL_MOBILITY=1` の `2236dbf` から作った）。`MEASURE-1.md` 11 章の比は C ÷ C++（0.9970 ± 0.0110。C++ 版が平均約 0.3% 遅い向き、16 組中 10 組、平均の標準誤差は約 0.27% で差の有無は言い切れない。原因を調べる計測は 32 スレッドなので行わない）、10.2 は 8 組中 7 組、6 章は各版・各ファイル 12 回。
+- `6025c13` C 版から引き継いだ日本語の説明（`manual/ja/validation-nikque16.md`・`validation-nikque17.md`・`android-nikque16.md`、`README-NIKQUE.ja.md`、`RELEASE-NOTES.ja.md`）：作業 PC のフォルダーとドライブ（アカウント名を含むもの）を消し、誰が指示・許可したかの書き方を、したことだけに直した（24 行）。
+- GitHub の About を、プレリリースがあることが分かる文言に変えた。
+- 記録だけにしたもの：本体の book の読み込みも盤を確かめない（壊れた book で `LEVEL[level][n_empties]` を範囲の外まで引きうる。C 版から同じ。公開の v4 で `book info`・`negamax`・`fix`・`deviate` を流して止まらなかった）。熱い探索の関数の位置が、前にある関数（今回は `eval_convert`）の大きさで動くこと。まとめの資料の数字（配布の Windows の実行ファイルは eval2.5 の配布版より +11.15〜25.76%、道具 B1〜B4 の最終の比は 0.81・0.78・0.60・0.39 で物差しは CPU サイクル）。
+- 確かめた（1 論理CPU、CPU は混んでいた）：quick check（x64 AVX-512・x86 SSE、fforum-20-39 が Edax 4.5 の eval.dat で nikque.17 と、`bin/data/eval.dat` で eval2.5 と同じ節点数、API 206 項目・失敗 0、回帰 54 件）。`EVAL_MOBILITY=0` の 4 件（Edax 4.5 の eval.dat）。x86 の回帰 `evalbadconv`・`evalform2`・`evalform2mob`。最後の道具 14 本（警告 0、evsearch の置き場所の確かめも通過）で `test_evtools.py` 26 件、`compare_c.py` 26 事例の出力ファイルが C の道具と同じ（L1・L1e は標準エラーの経過秒数だけ、K13）。
+- 大きさ：x64 AVX-512 824,832 → 825,344 バイト、x86 SSE 706,560 → 707,072 バイト（どちらも +512。x64 は `.text` +368、`.rdata` +128）。`eval_convert` の検査の分。`eval_convert` は探索の関数より前に置かれ、`eval_open` 以降の 1,465 個の関数（熱い関数すべて）が 368 バイトずれる（16 バイト境界は同じ）。
+- 速さ（CPU サイクル、1 論理CPU、交互）：本体（`1579452` と `xfix2`）の fforum-20-39（eval2 の eval.dat）16 組で 0.9989 倍（標準誤差 0.0044、節点数は同じ）。道具：E1 evsearch 0.996 倍（12 回）、B1〜B4 は 1.013・0.965・0.997・1.002 倍（20 回、揺れの範囲）、`bookscan` を 649 万局面の book で 0.995 倍（20 回）。
+
 ## 4. まだのこと
 
 **進め方（2026-10-17、段階4の途中）**：CPU 負荷の大きい計測（最後に回したもの）は、この窓ではなく、作業を引き継いだ別の窓で行う。この窓は全段階を仕上げ、最後に記録と引き継ぎ資料を更新し、引き継ぎプロンプトまで作っておく。
