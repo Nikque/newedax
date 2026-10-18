@@ -1,7 +1,8 @@
 # Tests of the evaluation tools with inputs the C tools (--ev: the folder of the C eval2 tools and their data) did
 # not handle (errors, limits, paths), run on one logical CPU. Each test runs a tool of --exe and checks its exit
 # code, messages or outputs.
-# usage: py -3 test_evtools.py --exe <dir of the tools> --work <work dir> --ev <folder of the C tools> [--edax <new edax exe built with EVAL_MOBILITY=0>]
+# usage: py -3 test_evtools.py --exe <dir of the tools> --work <work dir> --ev <folder of the C tools>
+#                              --book40 <A_cut40.dat, a book of form 1> [--edax <new edax exe built with EVAL_MOBILITY=0>]
 #                              [--exe-avx2 <dir of the tools built with /arch:AVX2>] [--tests a,b,...] [--cpu n]
 #                              [--edax-mob <new edax exe built with EVAL_MOBILITY=1>] [--eval2 <eval.dat of eval2>]
 #   --edax: an edax.exe of this repository (to write a book of form 2 with -book-convert, an eval.dat of form 2 with
@@ -561,6 +562,7 @@ TESTS = [t_src_drive, t_base_drive, t_src_bad, t_many_instances, t_many_sources,
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--exe', required=True); ap.add_argument('--work', required=True); ap.add_argument('--ev', required=True)
+    ap.add_argument('--book40', required=True)	# for compare_c.prepare
     ap.add_argument('--edax', default=''); ap.add_argument('--exe-avx2', default=''); ap.add_argument('--tests', default='')
     ap.add_argument('--cpu', type=int, default=0)
     ap.add_argument('--edax-mob', default=''); ap.add_argument('--eval2', default='')
