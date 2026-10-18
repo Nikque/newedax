@@ -1,14 +1,15 @@
 # Quick checks of a change (one logical CPU): builds, fforum-20-39 with one thread against the
 # records of v4.5.5-nikque.17, the regression cases, the C API test.
-# usage: pwsh -File quick_check.ps1 <output directory> [-Asm]
+# usage: pwsh -File quick_check.ps1 <output directory> -Inputs <folder of the inputs> [-Asm]
+#   -Inputs: the inputs of the comparison of v4.5.5-nikque.16 and 17 (eval.dat, the problem files, ...).
 #   -Asm also writes the assembly listing (MSVC x64 AVX-512, /O2 /FAs) to <output directory>\asm\all.asm.
-param([Parameter(Mandatory)][string]$Out, [switch]$Asm)
+param([Parameter(Mandatory)][string]$Out, [Parameter(Mandatory)][string]$Inputs, [switch]$Asm)
 
 $ErrorActionPreference = 'Continue'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $root = Split-Path -Parent $repo
 $records = Join-Path $root 'baseline\release17-windows'
-$inputs = 'D:\CodexEdaxBenchmark-20261016\inputs'
+$inputs = $Inputs
 New-Item -ItemType Directory -Force $Out | Out-Null
 $env:PATH = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer;$env:PATH"
 $vsdev = 'C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat'

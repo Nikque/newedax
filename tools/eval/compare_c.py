@@ -1,8 +1,10 @@
-# Run the C tools (built from D:\edaxwork\ev, sources unchanged) and the C++ tools of tools\eval with the same inputs,
-# on one logical CPU, and compare their outputs byte for byte (output files, standard output and error).
+# Run the C tools (built from the folder of the C eval2 tools, --ev, sources unchanged) and the C++ tools of tools\eval
+# with the same inputs, on one logical CPU, and compare their outputs byte for byte (output files, standard output and
+# error).
 # usage: py -3 compare_c.py --c <dir of the C exes> --cpp <dir of the C++ exes> --work <empty work dir>
+#                           --ev <folder of the C tools> --book40 <A_cut40.dat, a book of form 1>
 #                           [--c2 <dir of the C exes built with the eval2 sources>] [--eval2 <eval.dat of eval2>]
-#                           [--ev D:\edaxwork\ev] [--cases E1,T1,...] [--repeat n] [--cpu n]
+#                           [--cases E1,T1,...] [--repeat n] [--cpu n]
 #   The cases of the tools with the search are run with the C tools of --c (sources of nikque.17, evaluation file of
 #   Edax 4.5) and, with the evaluation file of eval2 (mobility weights), with the C tools of --c2.
 #   --repeat n: run each case n times more, alternating C and C++, and print the CPU cycles and peak memory of both.
@@ -47,7 +49,7 @@ def prepare(a):
     for name, n in (('A_head.dat', 20000), ('A_big.dat', 800000)):
         book = os.path.join(w, name)
         if not os.path.exists(book):
-            src = r'D:\edaxwork\data\A_cut40.dat'
+            src = a.book40
             with open(src, 'rb') as f:
                 hdr = bytearray(f.read(42))
                 body = bytearray()
@@ -166,7 +168,7 @@ def same_text(f1, f2, mask, out1, out2):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--c', required=True); ap.add_argument('--cpp', required=True); ap.add_argument('--work', required=True)
-    ap.add_argument('--ev', default=r'D:\edaxwork\ev'); ap.add_argument('--cases', default=''); ap.add_argument('--repeat', type=int, default=0)
+    ap.add_argument('--ev', required=True); ap.add_argument('--book40', required=True); ap.add_argument('--cases', default=''); ap.add_argument('--repeat', type=int, default=0)
     ap.add_argument('--c2', default=''); ap.add_argument('--eval2', default=''); ap.add_argument('--cpu', type=int, default=0)
     a = ap.parse_args()
     global CPU

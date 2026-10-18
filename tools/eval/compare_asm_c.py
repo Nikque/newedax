@@ -1,7 +1,7 @@
-# Compare the machine code of a C tool (D:\edaxwork\ev\<tool>.c) and its C++ port (tools\eval\<tool>.cpp), function by
-# function, from the assembly listings of MSVC (/FA): the instructions with the labels, addresses and names of the
-# functions normalized. Only builds (no run), on one logical CPU.
-# usage: py -3 compare_asm_c.py --out <dir> --tools evsearch,evtrain,... [--ev D:\edaxwork\ev]
+# Compare the machine code of a C tool (<--ev>\<tool>.c, the folder of the C eval2 tools) and its C++ port
+# (tools\eval\<tool>.cpp), function by function, from the assembly listings of MSVC (/FA): the instructions with the
+# labels, addresses and names of the functions normalized. Only builds (no run), on one logical CPU.
+# usage: py -3 compare_asm_c.py --out <dir> --tools evsearch,evtrain,... --ev <folder of the C tools>
 import argparse, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -62,7 +62,7 @@ def norm_ins(s):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--out', required=True); ap.add_argument('--tools', required=True); ap.add_argument('--ev', default=r'D:\edaxwork\ev')
+    ap.add_argument('--out', required=True); ap.add_argument('--tools', required=True); ap.add_argument('--ev', required=True)
     a = ap.parse_args()
     for t in a.tools.split(','):
         omp = ' /openmp' if t in OMP else ''
