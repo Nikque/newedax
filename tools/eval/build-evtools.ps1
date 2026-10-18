@@ -4,6 +4,8 @@
 #   tools that include the search (all.cpp of -Tree, default: this repository) are built with /openmp, the options of
 #   the x64 AVX-512 build (HAS_CPU_64, POPCOUNT) and EVAL_MOBILITY=1 (they read the mobility weights of eval2);
 #   leafgen also with EVAL_LEAF_HOOK. -Extra adds options to every tool.
+#   The tools built with /openmp need vcomp140.dll (the OpenMP runtime of MSVC): the x64 one of the redistributable
+#   files of Visual Studio (VC\Redist\MSVC\<version>\x64\Microsoft.VC143.OpenMP, the latest version) is copied to -Out.
 param([string]$Out, [string]$Tools = '', [string]$Tree = '', [string]$Extra = '', [int]$Cpu = 0)
 $here = $PSScriptRoot
 $root = Split-Path -Parent (Split-Path -Parent $here)
@@ -54,6 +56,11 @@ foreach ($t in $list) {
 	"build $t exit $($p.ExitCode) warnings/errors $($warn.Count)"
 	$warn | Select-Object -First 8 | ForEach-Object { "  $($_.Trim())" }
 	if ($p.ExitCode -ne 0) { $failed++ }
+}
+if (@($list | Where-Object { $omp -contains $_ }).Count) {
+	$vcomp = Get-ChildItem (Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $vsdev))) 'VC\Redist\MSVC\*\x64\Microsoft.VC143.OpenMP\vcomp140.dll') -ErrorAction SilentlyContinue |
+		Sort-Object { [version]$_.Directory.Parent.Parent.Name } -ErrorAction SilentlyContinue | Select-Object -Last 1
+	if ($vcomp) { Copy-Item $vcomp.FullName $Out -Force; "vcomp140.dll: $($vcomp.FullName)" } else { "no vcomp140.dll in the redistributable files of Visual Studio"; $failed++ }
 }
 "failed: $failed"
 if ($failed -ne 0) { exit 1 }
