@@ -7,13 +7,16 @@
 # add /D POPCOUNT to the compiler option set.
 #
 
+# /d1trimfile removes the build folder ($(MAKEDIR), the src folder) from __FILE__:
+# the error messages name only the source file, and the programs hold no build folder.
+
 # Microsoft Visual C++ 2008 or better for Windows (7 or Vista).
 # VC_FLAGS = /source-charset:.1252 /execution-charset:.1252\
 # Boost (headers only): third_party/boost_1_92_0 next to the repository, or BOOST_DIR=<directory>
 !IFNDEF BOOST_DIR
 BOOST_DIR = ..\..\third_party\boost_1_92_0
 !ENDIF
-VC_FLAGS = /I"$(BOOST_DIR)" /std:c++23preview /Zc:__cplusplus /EHs-c- /D _HAS_EXCEPTIONS=0 /GR- /D UNICODE /utf-8 /D _CRT_SECURE_NO_DEPRECATE /I"..\include" /I. /O2 /fp:fast /GS- /D NDEBUG /MT
+VC_FLAGS = /I"$(BOOST_DIR)" /std:c++23preview /Zc:__cplusplus /EHs-c- /D _HAS_EXCEPTIONS=0 /GR- /D UNICODE /utf-8 /D _CRT_SECURE_NO_DEPRECATE /I"..\include" /I. /O2 /fp:fast /GS- /D NDEBUG /MT "/d1trimfile:$(MAKEDIR)\\"
 
 vc-x64-v3:
 	cl $(VC_FLAGS) /GL /D HAS_CPU_64 /arch:AVX2 /D POPCOUNT all.cpp ws2_32.lib /Fe..\bin\wEdax-x86-64-v3.exe /link /VERSION:4.5

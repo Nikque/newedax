@@ -10,8 +10,7 @@ param([string]$Out, [string]$Tools = '', [string]$Tree = '', [string]$Extra = ''
 $here = $PSScriptRoot
 $root = Split-Path -Parent (Split-Path -Parent $here)
 if (-not $Tree) { $Tree = $root }
-$boost = Join-Path (Split-Path -Parent $root) 'third_party\boost_1_92_0'
-if (-not (Test-Path "$boost\boost\version.hpp")) { $boost = 'D:\newedax\third_party\boost_1_92_0' }	# (a work tree under runs)
+$boost = if ($env:BOOST_DIR) { $env:BOOST_DIR } else { Join-Path (Split-Path -Parent $root) 'third_party\boost_1_92_0' }	# as src\NMakefile
 $all = @('evsearch', 'evtrain', 'w2dat2', 'sprepair', 'sample', 'bookdump', 'bookscan', 'selfplay3', 'label', 'playout', 'gen', 'leafgen', 'evcheck', 'trans2rec')
 $list = if ($Tools) { $Tools -split ',' } else { $all }
 $omp = @('evsearch', 'evtrain', 'selfplay3', 'label', 'playout', 'gen', 'leafgen')
@@ -32,6 +31,9 @@ foreach ($t in $list) {
 		if ($t -eq 'leafgen') { $o += ' /D EVAL_LEAF_HOOK' }
 		$libs = 'ws2_32.lib psapi.lib'
 	}
+	# /d1trimfile: __FILE__ without the folder of the repository (and of -Tree), so the tools hold no build folder
+	$o += " `"/d1trimfile:$root\\`""
+	if ($Tree -ne $root) { $o += " `"/d1trimfile:$Tree\\`"" }
 	$obj = Join-Path $Out "obj-$t"
 	New-Item -ItemType Directory -Force $obj | Out-Null
 	$cl = "cl $o $Extra /I`"$here`" `"$src`" $libs /Fo`"$obj\\`" /Fe`"$Out\$t.exe`""
