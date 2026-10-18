@@ -342,6 +342,20 @@ C++ 版（MSVC x64 AVX-512 `/O1`、`tests/build-regression.cmd`）で **PASS**�
 - 大きさ：x64 AVX-512 824,832 → 825,344 バイト、x86 SSE 706,560 → 707,072 バイト（どちらも +512。x64 は `.text` +368、`.rdata` +128）。`eval_convert` の検査の分。`eval_convert` は探索の関数より前に置かれ、`eval_open` 以降の 1,465 個の関数（熱い関数すべて）が 368 バイトずれる（16 バイト境界は同じ）。
 - 速さ（CPU サイクル、1 論理CPU、交互）：本体（`1579452` と `xfix2`）の fforum-20-39（eval2 の eval.dat）16 組で 0.9989 倍（標準誤差 0.0044、節点数は同じ）。道具：E1 evsearch 0.996 倍（12 回）、B1〜B4 は 1.013・0.965・0.997・1.002 倍（20 回、揺れの範囲）、`bookscan` を 649 万局面の book で 0.995 倍（20 回）。
 
+## 3.24 v4.5.5-newedax.2 の準備（2026-10-18、ブランチ `rel2`）
+
+v4.5.5-newedax.1 のクロスチェックの直し（3.23）に、配布物からビルドしたときのフォルダーを消す直しなどを足して、v4.5.5-newedax.2 を作った。C 版の v4.5.5-nikque.18・eval2.6 と同じ直し。
+
+- `dc45210` `src/NMakefile` の `VC_FLAGS` に `/d1trimfile:$(MAKEDIR)\`、`tools/eval/build-evtools.ps1` にリポジトリの根を除く `/d1trimfile`。`__FILE__`（エラーの文言）がファイル名だけになる（`util/util.cpp` の形）。newedax.1 の Windows の実行ファイル・DLL には、ビルドしたフォルダーが 11〜15 か所入っていた。`tests/check-build-paths.py`（場所の入った実行ファイルで失敗する。newedax.1 の実行ファイルで失敗し、newedax.2 のもので通ることを確かめた）。`build-evtools.ps1` は Boost を `BOOST_DIR` かリポジトリの隣から取る（作業 PC の場所の予備をなくした）。
+- `779cfe1` 道具の台本は、入力のフォルダーを引数で受け取る（`compare_c.py`・`compare_asm_c.py`・`test_evtools.py` の `--ev`、`compare_c.py` の `--book40`、`tools/port/quick_check.ps1` の `-Inputs`。既定値をなくした）。`a762475` `test_evtools.py` にも `--book40`（`compare_c.prepare` が使う。足し忘れで `test_evtools.py` が落ちたのを、流して見つけて直した）。
+- `7fdfbba` `build-win-v4.cmd`・`tools/port/build-msvc.cmd` にも同じ `/d1trimfile`（配布物には使っていない台本。作ったものに場所の文字列がないことを確かめた）。
+- `8bb10e4` C 版から引き継いだ英語の説明の、実 book を「頼まれて」使わなかったという書き方と、Android の直しの「許可を得た」という書き方を消した（日本語は 3.23 の `6025c13`）。
+- 配布物：`8bb10e4` から（`rel2`、ソースは `git archive`）。Windows 5 種と DLL 3 種（`src/NMakefile`、PGO なし）、道具 14 本と `vcomp140.dll`、Android 4 つ（WSL、NDK r27d）。
+- 確かめた（1 論理CPU）：5 種の fforum-20-39 が、`bin/data/eval.dat` で eval2.5 と、Edax 4.5 の eval.dat で nikque.17 と同じ（78,733,223・77,639,567 節点、20 局面）。DLL 3 種は 2 つの eval.dat とも API 206 項目・失敗 0。道具の試験 26 件通過、C の道具との比べ 26 事例とも同じ出力。実行ファイル・DLL・道具のどれにもビルドしたフォルダーなし。警告の数は newedax.1 と同じ。
+- 大きさ：newedax.1 と同じ。`libedax-x64.dll` だけ 512 バイト小さい（3.23 の直しで +512、場所の文字列で −512 前後）。
+- 速さ（CPU サイクル、12 組、1 論理CPU）：v4 0.999、v3 1.001、x64 1.000、x86-sse 0.998、**x86（SSE なし）1.0071・1.0047（2 回）**。`5d9346d` の x86 は newedax.1 の 1.0024 倍、newedax.2 は `5d9346d` の 1.0012 倍（揺れの範囲）。`.text` は newedax.1 → `5d9346d` で +512、`5d9346d` と newedax.2 は同じ。3.23 の直しで後ろの関数の位置がずれるため（3.23 の X6 と同じ）と見ている（x86 で位置は確かめていない）。
+- Android：警告 0、場所の文字列なし。newedax.1 より +288〜+448 バイトで、`5d9346d` のビルドと同じ大きさ（3.23 の直しの分）。中身は数千バイト違い、ビルドしたフォルダーの違いがコードの並びに効いたと見ている（場所の文字列は入っていない）。実機では動かしていない。
+
 ## 4. まだのこと
 
 **進め方（2026-10-17、段階4の途中）**：CPU 負荷の大きい計測（最後に回したもの）は、この窓ではなく、作業を引き継いだ別の窓で行う。この窓は全段階を仕上げ、最後に記録と引き継ぎ資料を更新し、引き継ぎプロンプトまで作っておく。

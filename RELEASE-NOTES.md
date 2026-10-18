@@ -2,6 +2,38 @@
 
 [日本語](RELEASE-NOTES.ja.md)
 
+## v4.5.5-newedax.2 (new edax: the C++23 port; pre-release)
+
+The fixes of a cross-check of v4.5.5-newedax.1, and the programs no longer hold the folder where they were built. **The search and its results are the same as v4.5.5-newedax.1** (and v4.5.5-eval2.6, v4.5.5-nikque.18).
+
+Fixes (the eval2 tools and `-eval-convert`):
+
+- `bookdump`, `bookscan`: a book position with fewer than 4 discs gave a negative ply, used as an index (the C tools have it too). Such a book is refused.
+- A configuration of the tools that gives the same scalar twice counted it twice; a pattern with the same square twice gave a wrong permutation. Both are refused.
+- The 5-byte counts of form 2: the high 4 bits of the fifth byte were not read (2^32 - 1 is read, 2^32 is refused).
+- `build-evtools.ps1` ended with 0 when a tool was not built; now 1.
+- `-eval-convert`: a file of form 1 of fewer than 54 plies was converted (neither form could then be read); a file of form 2 whose plies times weights do not fit in 32 bits overflowed. Both are refused.
+
+Other changes:
+
+- `tools/eval` of the ZIP holds `vcomp140.dll` (the OpenMP runtime of MSVC): 7 tools need it.
+- The programs and libraries no longer hold the folder where they were built (`__FILE__`, for the error messages): an error message names the source file only. `tests/check-build-paths.py` checks it.
+- The scripts of the tools take the folders of their inputs as arguments (`--ev`, `--book40`, `-Inputs`), without defaults.
+- Documents: the README no longer says "before the default became 1"; numbers of `docs/port/MEASURE-1.md` corrected; the documents inherited from the C version no longer name folders of the work machine, nor say what was asked or allowed.
+
+Checks (2026-10-18, one logical CPU):
+
+- The 5 Windows executables: one-thread `-solve` of fforum-20-39 with `bin/data/eval.dat` (eval2) gives the same depths, scores, node counts (78,733,223 in all) and lines as v4.5.5-eval2.5; with the `eval.dat` of Edax 4.5, the same as v4.5.5-nikque.17 (77,639,567). The 7 Cassio EOF cases pass for each.
+- The 3 DLLs: 206 API checks, 0 failures each, with the `eval.dat` of eval2 and with the one of Edax 4.5.
+- The 14 eval2 tools: 26 tests pass; on 26 cases their outputs are the same as those of the C tools.
+- No executable, library or tool holds a folder of the build machine (`tests/check-build-paths.py`).
+- Android (NDK r27d, armeabi-v7a and arm64-v8a): built without warnings; no build folder in them. They are 288 to 448 bytes larger than those of v4.5.5-newedax.1, the same size as a build of `5d9346d` (the code of the fixes). Not run (no device).
+- Sizes: the same as v4.5.5-newedax.1, except `libedax-x64.dll` (512 bytes smaller).
+- Speed (CPU cycles, 12 pairs in alternating order, against v4.5.5-newedax.1): `wEdax-x86-64-v4.exe` 0.999, `-v3` 1.001, `wEdax-x86-64.exe` 1.000, `wEdax-x86-sse.exe` 0.998, **`wEdax-x86.exe` (32-bit, without SSE) 1.005 to 1.007**. The build of `5d9346d` (the fixes of the cross-check, before the build folders were removed) is already 1.002 for it, presumably because the code added to `-eval-convert` (512 bytes) moves the functions after it; removing the build folders changes no code size (1.001 against `5d9346d`).
+- The binaries are built from `8bb10e4`; the later commits change `tools/eval/test_evtools.py` (an argument), `build-win-v4.cmd` and `tools/port/build-msvc.cmd` (not used for these binaries; `/d1trimfile` as `src/NMakefile`), the README and the release notes only.
+
+Not checked: the speed and strength of the default build (eval2) against the C version, builds other than MSVC on Windows and the Android NDK, Android on a device, AddressSanitizer and ThreadSanitizer, real books of billions of positions, a review by a second reader.
+
 ## v4.5.5-newedax.1 (new edax: the C++23 port; pre-release)
 
 The first version of new edax ([README](README.md)): v4.5.5-nikque.17 ported to C++23, with the evaluation of the eval2 line (v4.5.5-eval2.5) as the default: the build option `EVAL_MOBILITY` is 1 and `bin/data/eval.dat` is the one of eval2. **A pre-release**: the code has not been reviewed by a second reader yet, and the speed of the default build with the `eval.dat` of eval2 is not measured.
