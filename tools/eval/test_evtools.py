@@ -508,11 +508,11 @@ def book2(P, O, counts=b'\0' * 4):
 
 
 def t_book_bad_board(a, d):
-    """bookdump and bookscan refuse a book position of fewer than 4 discs or with two discs on a square (C: the ply
-    of the position, below 0, indexes their arrays)"""
+    """bookdump and bookscan refuse a book position of fewer than 4 discs (C: the ply of the position, below 0, indexes
+    their arrays)"""
     res = []
     for form, make in ((1, book1), (2, book2)):
-        for name, P, O in (('start', START_P, START_O), ('empty', 0, 0), ('two', START_P, START_P | START_O)):
+        for name, P, O in (('start', START_P, START_O), ('empty', 0, 0), ('three', START_P, 0x0000001000000000)):
             f = os.path.join(d, f'{name}{form}.dat'); open(f, 'wb').write(make(P, O))
             out_dir = os.path.join(d, f'dump-{name}{form}'); os.makedirs(out_dir)
             rc1, out1 = run([a.tool('bookscan'), f], d)

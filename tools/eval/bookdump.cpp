@@ -22,7 +22,8 @@ int main(int argc, char **argv)
 		if (p.value < -64 || p.value > 64) { ++skipped; continue; }
 		Rec r;
 		r.P = p.P; r.O = p.O; r.v = (signed char) p.value;
-		const int ply = 60 - (64 - popc(r.P | r.O));
+		const int ply = popc(r.P | r.O) - 4;
+		if (ply < 0) die("%s is damaged (a board of fewer than 4 discs)", argv[1]);
 		if (!out[ply]) {
 			sprintf(name, "%s/book%02d.bin", argv[2], ply);
 			out[ply] = xfopen(name, "wb");

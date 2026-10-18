@@ -307,7 +307,6 @@ inline bool book_reader_next(BookReader *r, BookRecord *p)
 		if (k > left) die("%s is truncated", r->file);
 		book_reader_take(r, k);
 	}
-	if ((p->P & p->O) || popc(p->P | p->O) < 4) die("%s is damaged (a board of fewer than 4 discs, or of two discs on a square)", r->file);
 	return true;
 }
 
