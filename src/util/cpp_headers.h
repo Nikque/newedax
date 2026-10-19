@@ -30,6 +30,13 @@
 	#define EDAX_FORCE_INLINE inline
 #endif
 
+/** Put before a statement: the calls in it are inlined (MSVC 19.37 or later; no effect with other compilers). */
+#if defined(_MSC_VER) && _MSC_VER >= 1937 && !defined(__clang__)
+	#define EDAX_INLINE_CALLS [[msvc::forceinline_calls]]
+#else
+	#define EDAX_INLINE_CALLS
+#endif
+
 #include <boost/assert/source_location.hpp>
 #include <boost/sort/pdqsort/pdqsort.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>

@@ -183,7 +183,8 @@ static int accumlate_eval(int ply, Eval *eval)
  */
 static inline int mobility_eval(int ply, const unsigned long long P, const unsigned long long O)
 {
-	int p = bit_count(get_moves(P, O)), o = bit_count(get_moves(O, P));
+	int p, o;
+	EDAX_INLINE_CALLS { p = bit_count(get_moves(P, O)); o = bit_count(get_moves(O, P)); }	// once per leaf: no call
 	if (p > 31) p = 31;
 	if (o > 31) o = 31;
 	return EVAL_MOBILITY_WEIGHT[ply][p] + EVAL_MOBILITY_WEIGHT[ply][32 + o];
@@ -538,7 +539,11 @@ static int NWS_shallow(Search *search, const int alpha, int depth, HashTable *ha
 	V2DI board0;
 	long long nodes_org;
 
-	if (depth == 2) return search_eval_2(search, alpha, alpha + 1, board_get_moves(&search->board));
+	if (depth == 2) {
+		unsigned long long moves;
+		EDAX_INLINE_CALLS moves = board_get_moves(&search->board);
+		return search_eval_2(search, alpha, alpha + 1, moves);
+	}
 
 	SEARCH_STATS(++statistics.n_NWS_midgame);
 	SEARCH_UPDATE_INTERNAL_NODES(search->n_nodes);
