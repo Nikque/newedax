@@ -4,7 +4,57 @@
 
 このリポジトリ（newedax）は、[Edax 4.5.5 の修正版](https://github.com/Nikque/edax-reversi-AVX)（C 版）の `eval2` の系列を C++23 に移したものです。命令・設定・bookのファイル・探索の結果は C 版と同じで、評価関数は eval2 のもの（`bin/data/eval.dat`）が既定です。元の GPL-3.0 [ライセンス](LICENSE)のもとで、ソースと、Windows・Android 用の実行ファイル（[Releases](https://github.com/Nikque/newedax/releases)）を公開しています。
 
-**最新の版は v4.5.5-newedax.2（プレリリース）です。** 下の「v4.5.5-newedax.2 の変更点」「v4.5.5-newedax.1 の変更点」が new edax の説明です。そのあとの「v4.5.5-eval2.6 の変更点」から下は、C 版で行った変更の説明で、new edax にもすべて入っています（v4.5.5-eval2.6・v4.5.5-nikque.18 まで）。その中の実行ファイルの記述（Linux・macOS 版、PGO など）は C 版の Releases のものです。
+**最新の版は v4.5.5-newedax.3 です（最初の正式版）。** 下の「v4.5.5-newedax.3 の変更点」「v4.5.5-newedax.2 の変更点」「v4.5.5-newedax.1 の変更点」が new edax の説明です。そのあとの「v4.5.5-eval2.6 の変更点」から下は、C 版で行った変更の説明で、new edax にもすべて入っています（v4.5.5-eval2.6・v4.5.5-nikque.18 まで）。その中の実行ファイルの記述（Linux・macOS 版、PGO など）は C 版の Releases のものです。
+
+## v4.5.5-newedax.3 の変更点（最初の正式版）
+
+Windows の実行ファイルの組み立て方を変えて、1 スレッドの速さを C 版に合わせました。**探索と結果は v4.5.5-newedax.2 と同じです**（v4.5.5-eval2.6 とも同じ）。プレリリースではありません。
+
+変わるところ：
+
+- v4.5.5-newedax.2 の Windows の実行ファイルは PGO（実行の記録を使う最適化）なしで、1 スレッドの中盤で `wEdax-x86-64-v4.exe` 以外の 4 種が C 版 v4.5.5-eval2.6（PGO）より 1.7〜11.6% 遅かった。この版から、`wEdax-x86-64-v4.exe` は PGO なし、ほかの 4 種は PGO で組み立てます（`tools/port/build-release.cmd`）。`wEdax-x86-64-v4.exe` は PGO なしの方が速いので、v4.5.5-newedax.2 と同じ機械語のままです。
+- PGO の版で MSVC が `get_moves`（着手可能な升）を呼び出し元に埋め込まなかった所（eval2 の着手可能数の評価と、深さ 2 の探索）に、埋め込みの指定 `EDAX_INLINE_CALLS`（MSVC の `[[msvc::forceinline_calls]]`、ほかのコンパイラーでは何もしない）を足しました。PGO なしの組み立て（DLL 3 種、`wEdax-x86-64-v4.exe`、Android）の機械語は変わりません。
+- 計測の記録：`docs/port/MEASURE-2.md`。
+
+### 速さとメモリ（2026-10-19〜20、実測）
+
+1 スレッド（1 論理CPU、CPU サイクル、交互に 16〜48 組、C 版 v4.5.5-eval2.6 との比。かっこは Edax 4.5 の eval.dat で v4.5.5-nikque.18 との比。節点数は同じ）。1 より大きいと new edax が遅い：
+
+| 実行ファイル | fforum-20-39 | 中盤30局面（level 18） |
+|---|---|---|
+| `wEdax-x86-64-v4.exe`（PGO なし） | 1.000 | **0.961〜0.969**（0.979〜0.981） |
+| `wEdax-x86-64-v3.exe`（PGO） | 0.996〜1.007（0.998） | **1.008〜1.011**（1.014〜1.021） |
+| `wEdax-x86-64.exe`（PGO） | 0.999〜1.005（1.002） | 1.000〜1.005（1.004） |
+| `wEdax-x86-sse.exe`（PGO） | 0.990〜0.991（0.989） | 0.934〜0.936（0.953） |
+| `wEdax-x86.exe`（PGO） | 0.921〜0.926（0.988） | 0.992〜0.998（0.985） |
+
+32 スレッド（論理CPU 32、book の命令、C 版 v4.5.5-eval2.6 との時間の比、A B B A の順を 6 回）：
+
+| 命令 | `-v4` | `wEdax-x86-64.exe` | `-v3` |
+|---|---|---|---|
+| suite F（`book deviate` 系、level 21） | 0.978 | 0.987 | 0.999 |
+| `book learn`（棋譜30本、level 18） | 0.993 | 0.998 | **1.014** |
+| `book fill 2`（level 12、27万局面の book） | 0.949 | 0.988 | **1.010** |
+| `book fill2 2` | 0.960 | 0.990 | 1.006 |
+| `book leaf expand` | 0.976 | 1.001 | 1.007 |
+| `book fill2 2 5 5` | 0.978 | 0.999 | **1.013** |
+| `book import`（400万局面の文字の book） | 0.966 | 0.966 | 0.976 |
+
+- **`wEdax-x86-64-v3.exe` は、C 版より約 1% 遅いままです**（1 スレッドの中盤、32 スレッドの `book learn`・`fill` 系）。PGO の版で、石を返す処理など 3 つの関数が埋め込まれずに残り、機械語が同じ評価の関数も C 版より長くかかっています。9 つの直しの案を試しましたが、どれも効きませんでした（`docs/port/MEASURE-2.md` 2 章）。AVX-512 の CPU では `wEdax-x86-64-v4.exe` を使ってください（C 版より速い）。
+- 最大メモリは C 版と同じか少ない（`book import` 614 → 545 MiB）。
+- HDD に置いた 3,473 万局面の book（C 版が作ったもの）の読み込み：C 版の 0.914 倍の時間、CPU 時間 8.3 → 3.8 秒、最大メモリ 3,243 → 1,667 MiB。
+- eval2 の道具：`w2dat2`・`label` が C の道具より約 0.7% 遅い（原因は確かめきれていない）。ほかは同じか速い。
+
+### 確認
+
+- Windows の 5 種：fforum-20-39 を 1 スレッドで解いた深さ・評価値・節点数・読み筋が、`bin/data/eval.dat`（eval2）で v4.5.5-eval2.5 と同じ（78,733,223）、Edax 4.5 の `eval.dat` で v4.5.5-nikque.17 と同じ（77,639,567）。Cassio 7 件も通過。
+- DLL 3 種：eval2 と Edax 4.5 の `eval.dat` とも、API 試験 206 項目・失敗 0。機械語は v4.5.5-newedax.2 と同じ。
+- 14 の試験の book（`wEdax-x86-64-v4.exe` と同じ機械語、1 スレッドと 32 スレッド）：記録と同じ。S3 の既定の設定の 1 スレッドだけ、book の乱数の種が時計なので違う（前の版と同じ）。
+- eval2 の道具 14 本：試験はすべて通過。26 事例で C の道具と同じ出力。
+- Android（NDK r27d、armeabi-v7a と arm64-v8a）：警告なし、v4.5.5-newedax.2 と同じ大きさ。実機では動かしていない。
+- 実行ファイル・DLL・道具・Android の 26 個のどれにも、組み立てたフォルダーの文字列は入っていない（`tests/check-build-paths.py`）。
+- 大きさ：`-v4` 824,832、`-v3` 698,368、`wEdax-x86-64.exe` 715,264、`wEdax-x86-sse.exe` 642,560、`wEdax-x86.exe` 692,224 バイト（PGO の 4 種は v4.5.5-newedax.2 より 48〜144 KB 小さい）。DLL は同じ。C 版 v4.5.5-eval2.6 より、PGO の 4 種は +18〜30 KB、`-v4` は +163 KB（PGO なしのため）。
+- 配布の `-v3`・`wEdax-x86-sse.exe`・`wEdax-x86.exe` は計測した組み立てと機械語が少し違う（PGO は組み立てのたびに変わる）ので、配布するものを C 版と比べ直した（上の表）。`-v4`・`wEdax-x86-64.exe`・DLL は計測したものと同じ機械語。
 
 ## v4.5.5-newedax.2 の変更点（プレリリース）
 

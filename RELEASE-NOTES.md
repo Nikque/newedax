@@ -2,6 +2,56 @@
 
 [日本語](RELEASE-NOTES.ja.md)
 
+## v4.5.5-newedax.3 (new edax: the C++23 port; the first release)
+
+The Windows executables are built another way, to match the one-thread speed of the C version. **The search and its results are the same as v4.5.5-newedax.2** (and v4.5.5-eval2.6). It is not a pre-release.
+
+What changes:
+
+- The Windows executables of v4.5.5-newedax.2 were built without PGO (profile-guided optimization): with one thread, the 4 executables other than `wEdax-x86-64-v4.exe` were 1.7 to 11.6 % slower than the C version v4.5.5-eval2.6 (PGO) in the middle game. From this version on, `wEdax-x86-64-v4.exe` is built without PGO and the other 4 with PGO (`tools/port/build-release.cmd`). `wEdax-x86-64-v4.exe` is faster without PGO, so it keeps the machine code of v4.5.5-newedax.2.
+- Where MSVC's PGO did not inline `get_moves` (the legal moves) into its callers (the mobility part of the eval2 evaluation, the depth-2 search), the calls are marked `EDAX_INLINE_CALLS` (MSVC's `[[msvc::forceinline_calls]]`; nothing with other compilers). The builds without PGO (the 3 DLLs, `wEdax-x86-64-v4.exe`, Android) keep the same machine code.
+- Records of the measurements: `docs/port/MEASURE-2.md` (in Japanese).
+
+Speed and memory (2026-10-19 to 20, measured):
+
+One thread (one logical CPU, CPU cycles, 16 to 48 alternating pairs, ratio to the C version v4.5.5-eval2.6; in parentheses with the eval.dat of Edax 4.5, ratio to v4.5.5-nikque.18; the same node counts). Above 1, new edax is slower:
+
+| Executable | fforum-20-39 | 30 middle-game positions (level 18) |
+|---|---|---|
+| `wEdax-x86-64-v4.exe` (no PGO) | 1.000 | **0.961 to 0.969** (0.979 to 0.981) |
+| `wEdax-x86-64-v3.exe` (PGO) | 0.996 to 1.007 (0.998) | **1.008 to 1.011** (1.014 to 1.021) |
+| `wEdax-x86-64.exe` (PGO) | 0.999 to 1.005 (1.002) | 1.000 to 1.005 (1.004) |
+| `wEdax-x86-sse.exe` (PGO) | 0.990 to 0.991 (0.989) | 0.934 to 0.936 (0.953) |
+| `wEdax-x86.exe` (PGO) | 0.921 to 0.926 (0.988) | 0.992 to 0.998 (0.985) |
+
+32 threads (32 logical CPUs, book commands, ratio of the times to the C version v4.5.5-eval2.6, 6 rounds in the order A B B A):
+
+| Command | `-v4` | `wEdax-x86-64.exe` | `-v3` |
+|---|---|---|---|
+| suite F (the `book deviate` family, level 21) | 0.978 | 0.987 | 0.999 |
+| `book learn` (30 games, level 18) | 0.993 | 0.998 | **1.014** |
+| `book fill 2` (level 12, a book of 270,000 positions) | 0.949 | 0.988 | **1.010** |
+| `book fill2 2` | 0.960 | 0.990 | 1.006 |
+| `book leaf expand` | 0.976 | 1.001 | 1.007 |
+| `book fill2 2 5 5` | 0.978 | 0.999 | **1.013** |
+| `book import` (a text book of 4 million positions) | 0.966 | 0.966 | 0.976 |
+
+- **`wEdax-x86-64-v3.exe` stays about 1 % slower than the C version** (one-thread middle game, 32-thread `book learn` and `fill`). In its PGO build, 3 functions (the flips among them) stay called instead of inlined, and the evaluation function, with the same machine code, takes longer than in the C version. None of 9 tried changes helped (`docs/port/MEASURE-2.md`, chapter 2). On a CPU with AVX-512, use `wEdax-x86-64-v4.exe` (faster than the C version).
+- Peak memory: the same as the C version or less (`book import` 614 -> 545 MiB).
+- Loading a book of 34.7 million positions (made by the C version) from an HDD: 0.914 times the time of the C version, CPU time 8.3 -> 3.8 s, peak memory 3,243 -> 1,667 MiB.
+- The eval2 tools: `w2dat2` and `label` about 0.7 % slower than the C tools (cause not found); the others the same or faster.
+
+Checks:
+
+- The 5 Windows executables: one-thread `-solve` of fforum-20-39 gives the same depths, scores, node counts and lines as v4.5.5-eval2.5 with `bin/data/eval.dat` (eval2; 78,733,223), and as v4.5.5-nikque.17 with the `eval.dat` of Edax 4.5 (77,639,567). The 7 Cassio cases pass.
+- The 3 DLLs: 206 API checks, 0 failures each, with both `eval.dat`. The same machine code as v4.5.5-newedax.2.
+- The books of 14 test suites (the machine code of `wEdax-x86-64-v4.exe`, one thread and 32 threads): the same as the records; only the one-thread run of S3 with the default settings differs, as its book seed is the clock (as before).
+- The 14 eval2 tools: all tests pass; on 26 cases their outputs are the same as those of the C tools.
+- Android (NDK r27d, armeabi-v7a and arm64-v8a): built without warnings, the same size as v4.5.5-newedax.2; not run on a device.
+- None of the 26 executables, libraries, tools and Android binaries holds a folder of the build machine (`tests/check-build-paths.py`).
+- Size: `-v4` 824,832, `-v3` 698,368, `wEdax-x86-64.exe` 715,264, `wEdax-x86-sse.exe` 642,560, `wEdax-x86.exe` 692,224 bytes (the 4 PGO builds 48 to 144 KB smaller than in v4.5.5-newedax.2); the DLLs the same. Against the C version v4.5.5-eval2.6: the 4 PGO builds +18 to 30 KB, `-v4` +163 KB (no PGO).
+- The released `-v3`, `wEdax-x86-sse.exe` and `wEdax-x86.exe` differ a little from the measured builds (a PGO build changes from a build to the next), so the released ones were measured again against the C version (the table above). `-v4`, `wEdax-x86-64.exe` and the DLLs have the machine code of the measured ones.
+
 ## v4.5.5-newedax.2 (new edax: the C++23 port; pre-release)
 
 The fixes of a cross-check of v4.5.5-newedax.1, and the programs no longer hold the folder where they were built. **The search and its results are the same as v4.5.5-newedax.1** (and v4.5.5-eval2.6, v4.5.5-nikque.18).
