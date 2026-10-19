@@ -122,7 +122,11 @@ static void ui_read_input(UI *ui)
 		if (ui->type == UI_GTP) gtp_preprocess(buffer);
 		parse_word(buffer, cmd, 5);
 		string_to_lowercase(cmd);
-		if (string_is(cmd, "stop")) {
+		if (string_is(cmd, "stop") && ui->type == UI_EDAX && book_analysis_stop(buffer)) {
+			// "stop id=<n>": only the book analysis <n> stops (the commands waiting are kept)
+			free(buffer);
+			buffer = NULL;
+		} else if (string_is(cmd, "stop")) {
 			event_clear_messages(event);
 			info("<stop>\n");
 			play_stop(play);
