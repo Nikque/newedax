@@ -2,6 +2,15 @@
 
 [English](RELEASE-NOTES.md)
 
+## v4.5.5-newedax.5（new edax：C++23 への移植）
+
+book を軽くする命令 `book reduce` と、消す前に数える `book reducecount` を足しました。C 版 v4.5.5-nikque.20・v4.5.5-eval2.8 と同じ命令・同じ答えです（[ユーザーマニュアル 8.4](manual/ja/08-book-maintenance.md)・[12.4](manual/ja/12-integration.md)）。**探索と結果は v4.5.5-newedax.4 と同じです。**
+
+確認：
+
+- `book reduce`・`book reducecount` の試験（C 版と同じ試験：試験のために作った小さな book 3 つで、別に書いた計算と照らし合わせ）は 529 通りすべて一致しました。
+- 29GB の実 book では確かめていません。
+
 ## v4.5.5-newedax.4（new edax：C++23 への移植）
 
 GUI のプログラムのための book の解析の命令（`book moveinfo`・`book missing`・`book levels`・`book bestlines`・`book findline`、`stop id=N`）を足しました。C 版 v4.5.5-nikque.19・v4.5.5-eval2.7 と同じ命令・同じ答えです（下の nikque.19 の項、[ユーザーマニュアル 12.4](manual/ja/12-integration.md)）。**探索と結果は v4.5.5-newedax.3 と同じです。** Windows の実行ファイルの組み立て方も v4.5.5-newedax.3 と同じです（`wEdax-x86-64-v4.exe` は PGO なし、ほかの 4 種は PGO）。

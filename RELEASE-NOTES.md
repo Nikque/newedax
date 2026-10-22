@@ -2,6 +2,15 @@
 
 [日本語](RELEASE-NOTES.ja.md)
 
+## v4.5.5-newedax.5 (new edax: the C++23 port)
+
+`book reduce`, which makes the book lighter, and `book reducecount`, which counts before removing: the same commands and the same answers as the C versions v4.5.5-nikque.20 and v4.5.5-eval2.8 ([user manual 8.4](manual/en/08-book-maintenance.md) and [12.4](manual/en/12-integration.md)). **The search and the results are the same as v4.5.5-newedax.4.**
+
+Checks:
+
+- The tests of `book reduce` and `book reducecount` (the tests of the C version: 3 small books made for the tests, compared with a computation written apart) all agree, 529 cases.
+- Not checked with the 29 GB real book.
+
 ## v4.5.5-newedax.4 (new edax: the C++23 port)
 
 Book analysis commands for a GUI program (`book moveinfo`, `book missing`, `book levels`, `book bestlines`, `book findline`, and `stop id=N`): the same commands and the same answers as the C versions v4.5.5-nikque.19 and v4.5.5-eval2.7 (below, the nikque.19 section; [user manual 12.4](manual/en/12-integration.md)). **The search and the results are the same as v4.5.5-newedax.3.** The Windows programs are built as for v4.5.5-newedax.3 (`wEdax-x86-64-v4.exe` without PGO, the 4 others with PGO).
