@@ -2,6 +2,15 @@
 
 [日本語](RELEASE-NOTES.ja.md)
 
+## v4.5.5-newedax.6 (new edax: the C++23 port)
+
+`book reduce` and `book reducecount` run faster and with less memory, as in the C version v4.5.5-nikque.21 (the nikque.21 section below); what they do and their results are those of v4.5.5-newedax.5. **The search and the results are the same as v4.5.5-newedax.5.**
+
+Checks:
+
+- The tests of `book reduce` and `book reducecount` (the tests of the C version) all agree, 546 cases. The books saved after `book reduce` with the executables before and after the change are the same byte for byte in 54 cases (but for the save date).
+- Not checked with the 29 GB real book.
+
 ## v4.5.5-newedax.5 (new edax: the C++23 port)
 
 `book reduce`, which makes the book lighter, and `book reducecount`, which counts before removing: the same commands and the same answers as the C versions v4.5.5-nikque.20 and v4.5.5-eval2.8 ([user manual 8.4](manual/en/08-book-maintenance.md) and [12.4](manual/en/12-integration.md)). **The search and the results are the same as v4.5.5-newedax.4.**

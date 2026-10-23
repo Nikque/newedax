@@ -6,6 +6,15 @@
 
 **最新の版は v4.5.5-newedax.5 です。** 下の「v4.5.5-newedax.5 の変更点」「v4.5.5-newedax.4 の変更点」「v4.5.5-newedax.3 の変更点」「v4.5.5-newedax.2 の変更点」「v4.5.5-newedax.1 の変更点」が new edax の説明です。そのあとの「v4.5.5-eval2.8 の変更点」から下は、C 版で行った変更の説明で、new edax にもすべて入っています（v4.5.5-eval2.8・v4.5.5-nikque.20 まで）。その中の実行ファイルの記述（Linux・macOS 版、PGO など）は C 版の Releases のものです。
 
+## v4.5.5-newedax.6 の変更点
+
+`book reduce`・`book reducecount` を、C 版 v4.5.5-nikque.21 と同じく速く・少ないメモリで動くようにしました（下の nikque.21 の項）。働きと結果は v4.5.5-newedax.5 と同じです。**探索と結果は v4.5.5-newedax.5 と同じです。**
+
+確認：
+
+- `book reduce`・`book reducecount` の試験（C 版と同じ試験）は 546 通りすべて一致しました。直す前と後の実行ファイルで `book reduce` の後に保存したbookは、54 通りすべてバイト単位で同じ（保存日時を除く）。
+- 29GB の実 book では確かめていません。
+
 ## v4.5.5-newedax.5 の変更点
 
 book を軽くする命令 `book reduce` と、消す前に数える `book reducecount` を足しました。C 版 v4.5.5-nikque.20・v4.5.5-eval2.8 と同じ命令・同じ答えです（[ユーザーマニュアル 8.4](manual/ja/08-book-maintenance.md)・[12.4](manual/ja/12-integration.md)）。**探索と結果は v4.5.5-newedax.4 と同じです。**
