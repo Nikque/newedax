@@ -4,7 +4,7 @@
 
 This repository (newedax) is the `eval2` line of the [corrected Edax 4.5.5](https://github.com/Nikque/edax-reversi-AVX) (the C version) ported to C++23. Its commands, settings, book files and search results are those of the C version; the evaluation function of eval2 (`bin/data/eval.dat`) is the default. It publishes the source and Windows and Android executables ([Releases](https://github.com/Nikque/newedax/releases)) under the original GPL-3.0 [license](LICENSE).
 
-**The latest version is v4.5.5-newedax.4.** "Changes in v4.5.5-newedax.4", "Changes in v4.5.5-newedax.3", "Changes in v4.5.5-newedax.2" and "Changes in v4.5.5-newedax.1" below describe new edax. The sections from "Changes in v4.5.5-eval2.7" on describe the changes made in the C version; new edax holds all of them (up to v4.5.5-eval2.7 and v4.5.5-nikque.19). What they say about executables (Linux and macOS builds, PGO, ...) is about the releases of the C version.
+**The latest version is v4.5.5-newedax.5.** "Changes in v4.5.5-newedax.5", "Changes in v4.5.5-newedax.4", "Changes in v4.5.5-newedax.3", "Changes in v4.5.5-newedax.2" and "Changes in v4.5.5-newedax.1" below describe new edax. The sections from "Changes in v4.5.5-eval2.8" on describe the changes made in the C version; new edax holds all of them (up to v4.5.5-eval2.8 and v4.5.5-nikque.20). What they say about executables (Linux and macOS builds, PGO, ...) is about the releases of the C version.
 
 ## Changes in v4.5.5-newedax.5
 
@@ -13,6 +13,11 @@ This repository (newedax) is the `eval2` line of the [corrected Edax 4.5.5](http
 Checks:
 
 - The tests of `book reduce` and `book reducecount` (the tests of the C version: 3 small books made for the tests, compared with a computation written apart) all agree, 529 cases.
+- The tests of the analysis commands (the comparisons on 3 small books, the real `book deviate` family, 40,000 random graphs of positions, the background thread, the lines of `book bestlines` and `book findline`) all pass with the released `wEdax-x86-64-v3.exe`; so do the `book reduce` tests, 500 cases.
+- The answers of 10 commands on the same positions (6,880 answers) are all the same as those of the C version v4.5.5-nikque.20 (except the time).
+- Search: the 5 Windows release programs solve fforum-20-39 with 1 thread with the same results and node counts as v4.5.5-newedax.4: 78,733,223 with the `eval.dat` of eval2, 77,639,567 with that of Edax 4.5; the 7 Cassio cases pass. The 3 DLLs: 206 API checks, 0 failures, with both `eval.dat`. The 14 eval2 tools: built and tested without failure (against the C tools, only the seconds of the progress line of `label` differ; the files made are the same). No program, DLL or Android binary holds a folder of the build machine. The 4 Android binaries: no warning (not run on a device).
+- Speed: the search, the evaluation, the book learning and the file format are not changed (the code added runs only when a new command is typed). The speed of the new commands was not measured.
+- Size (against v4.5.5-newedax.4): `wEdax-x86-64-v4.exe` (no PGO) +7,680 bytes, the 4 PGO programs +3,072 to +4,096 bytes, the 3 DLLs the same size. Android programs +3,120 and +7,056 bytes, libraries +3,248 and +7,104 bytes.
 - Not checked with the 29 GB real book.
 
 ## Changes in v4.5.5-newedax.4
@@ -162,6 +167,17 @@ Checks:
 - The same books as the C version in 14 test suites (with the same random seed), the same C API of libedax and Cassio protocol; 53 regression cases.
 
 Not checked yet (also for newedax.2): builds other than MSVC on Windows and the Android NDK, an Android device, AddressSanitizer and ThreadSanitizer, real books of billions of positions, a review by a second reader.
+
+## Changes in v4.5.5-eval2.8
+
+v4.5.5-eval2.7 with the changes of v4.5.5-nikque.20 (below: `book reduce`, which makes the book lighter, and `book reducecount`, which counts before removing). **The evaluation and `eval.dat` are still those of v4.5.5-eval2.1** (the same file). The search and the results are the same as v4.5.5-eval2.7.
+
+Checks:
+
+- The tests of `book reduce` and `book reducecount` (the tests of nikque.20: 3 small books made for the tests, compared with a computation written apart) all agree, 529 cases.
+- With the released `wEdax-x86-64-v3.exe`: the `book reduce` tests (500 cases on 2 small books) all agree; the earlier tests of the analysis commands (3 small books, the real `book deviate` family, 40,000 random graphs, the background thread, the lines of `book bestlines` and `book findline`) find no error.
+- Search: the 5 Windows release programs (PGO) solve fforum-20-39 with 1 thread with the same results, node counts (78,733,223) and principal variations as v4.5.5-eval2.7; the 7 Cassio cases pass. The 3 DLLs: 204 API checks, 0 failures. The books of suite F of `book-reproducible` are those of v4.5.5-eval2.7. The 4 Linux builds (WSL, gcc 11.4) give the same rows, and the 3 libraries pass 204 API checks, 0 failures. Release workflow (run 39887059716): the API checks of the Linux and macOS libraries, 204, 0 failures; fforum-1-19 on macOS with the same node counts as v4.5.5-eval2.7 (x64 2,192,396, arm64 2,196,096). The Windows x86 and x64 programs are the local PGO builds. No program or library holds a folder of the build machine.
+- Size (against v4.5.5-eval2.7): the 5 Windows programs +3,072 to +5,120 bytes; the 3 DLLs the same size. Built by the release workflow: Linux programs +8,192 to +12,288 bytes and libraries +4,096 to +8,192 bytes, macOS programs +16 and +12,288 bytes and library +32,960 bytes, Android programs +3,120 and +7,136 bytes and libraries +3,216 and +7,216 bytes, Windows ARM64 +5,632 bytes.
 
 ## Changes in v4.5.5-eval2.7
 
@@ -371,6 +387,37 @@ Conditions where this version (new `eval.dat`) is slower than the release execut
 - **Book regression tests** (upstream `eval.dat`, 1 thread, level 21, `book-store-tasks = 1`, the AVX-512 release executable): in the 8 suites that cover all the book commands, the 84 files produced are identical to those of the v4.5.5-nikque.9 release executable (only the file that holds a date differs). The 8 suites took 172.1 s → 174.1 s in total (1.012 times; single runs, not distinguishable from noise). No book test was run with the new `eval.dat`, nor with several threads.
 - Peak memory (see "Speed").
 - **Not measured or not checked**: the macOS, Android and Windows ARM64 builds (running and speed; the Android and Windows ARM64 builds were only built), the time of book learning, matches at level 24 or more, searches at level 30 or more, book tests with the new `eval.dat` (the book code is the one of v4.5.5-nikque.9), edax_runner with the library of this version.
+## Changes in v4.5.5-nikque.20
+
+A command that makes the book lighter, `book reduce`, and `book reducecount`, which counts before removing. **The search, `eval.dat`, the book file format and the results are the same as v4.5.5-nikque.19.**
+
+| Command | What it does |
+|---|---|
+| `book reduce X Y` | Keeps only the positions that `book deviate3 X Y` walks from the current position and removes the others (usually typed at the initial position). A move to a removed position may become a leaf (as with `book prune`) |
+| `book reducecount id=N x=X y=Y` | The number of positions that `book reduce X Y` would keep and remove (counted in a background thread; the book is not changed; the answer is `@end id=N kept=… removed=… positions=…`) |
+
+- What is kept: the current position, the positions reached from it by moves that lose at most X discs each with at most Y discs lost in all (the range that `book deviate3 X Y` walks when it looks for the positions to expand; a position reached by several ways counts with the smallest sum of losses), and the positions under the depth of the book and at the end of the game that a walked position reaches by such a move.
+- `book reduce` first computes again the values after the current position (as `book deviate3`). `book reducecount` does the same computation without changing the book before it counts, so the numbers are those of `book reduce`.
+- The values of the positions kept do not change, and `book deviate3 X Y` from the same position afterwards expands the same leaves as before.
+- X is 0 to 129, Y is 0 to 254. Without two numbers, with a number out of range, when the current position is not in the book or is two or more moves beyond the depth of the book, a warning is shown and the book is not changed.
+- As with `book subtree` and `book prune`, a book cut down is saved to the file of `book-file` when Edax is then ended.
+- See the [user manual 8.4](manual/en/08-book-maintenance.md) and [12.4](manual/en/12-integration.md).
+
+Behaviour changes:
+
+- `help book` shows the 2 commands. No other command changed.
+
+Checks:
+
+- On 4 small books made for the tests (about 1,500 to 410,000 positions, with many transpositions and passes), compared with a computation written apart (Python; it reads the book file itself and walks as `book deviate3` does, after computing the values again): the numbers kept and removed by `book reducecount`; the positions of the book saved after `book reduce`, the value, level, links and leaf of each of them; the positions whose leaf `book deviate3 X Y` expands afterwards. All the same in 546 cases. Missing numbers, numbers out of range, a position out of the book, a position beyond the depth and `stop id=N` were checked too.
+- With v4.5.5-nikque.19, from before the change, the same tests all fail (unknown commands).
+- With the released `wEdax-x86-64-v3.exe`: the `book reduce` tests above (500 cases on 2 small books) all agree; the earlier tests of the analysis commands (3 small books, the real `book deviate` family, 40,000 random graphs, the background thread, the lines of `book bestlines` and `book findline`) find no error.
+- Search: the 5 Windows release executables (PGO) solve fforum-20-39 with one thread with the same results, node counts (77,639,567) and principal variations as v4.5.5-nikque.19. The 7 Cassio cases pass. The 3 DLLs pass 204 API checks, 0 failures. The books of suite F of `book-reproducible` are the same as with v4.5.5-nikque.19. The 4 Linux builds (WSL, gcc 11.4, built as the release workflow does) give the same rows, and the 3 libraries pass 204 API checks, 0 failures. Android (NDK r27d): no warning. No program or library holds a folder of the build machine.
+- Speed: the search, the evaluation, the book learning and the file format are not changed (the code added runs only when a new command is typed); the node counts above show that the search is the same. The speed of the new commands was not measured.
+- Size (against v4.5.5-nikque.19): the 5 Windows executables +3,584 to +5,632 bytes, the 3 DLLs the same size. Built by the release workflow: Linux executables +8,192 to +12,288 bytes and libraries +4,096 to +8,192 bytes, macOS executables +16 and +12,288 bytes and library +32,944 bytes, Android executables +3,120 and +7,152 bytes and libraries +3,216 and +7,200 bytes, Windows ARM64 +6,144 bytes.
+- Release workflow (run 39887011040): the API checks of the Linux and macOS libraries, 204 checks, 0 failures; fforum-1-19 on macOS with the same node counts as before (x64 2,175,751, arm64 2,181,259). The Windows x86 and x64 executables and DLLs are the local PGO builds.
+- Not checked with the 29 GB real book.
+
 ## Changes in v4.5.5-nikque.19
 
 Book analysis commands for a GUI program. **The search, `eval.dat`, the book file format and the results are the same as v4.5.5-nikque.18.**

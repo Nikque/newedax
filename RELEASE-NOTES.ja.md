@@ -9,6 +9,11 @@ book を軽くする命令 `book reduce` と、消す前に数える `book reduc
 確認：
 
 - `book reduce`・`book reducecount` の試験（C 版と同じ試験：試験のために作った小さな book 3 つで、別に書いた計算と照らし合わせ）は 529 通りすべて一致しました。
+- これまでの解析の命令の試験（小さな book 3 つでの照らし合わせ、本物の `book deviate` 系、ランダムな局面のつながり 40,000 個、裏のスレッド、`book bestlines`・`book findline` の手順）は、配布物の `wEdax-x86-64-v3.exe` で全部通りました。`book reduce` の試験も配布物で 500 通りすべて一致。
+- C 版と同じ局面・同じ命令（10 種類）の答え 6,880 個が、C 版 v4.5.5-nikque.20 と全部同じ（時間の欄を除く）。
+- 探索：配布物の Windows の 5 種は、fforum-20-39 を 1 スレッドで解いた結果・ノード数が eval2 の `eval.dat` で 78,733,223、Edax 4.5 の `eval.dat` で 77,639,567 と、v4.5.5-newedax.4 と同じ。Cassio 7 件も通過。DLL 3 種は 2 つの `eval.dat` で API 試験 206 項目・失敗 0。eval2 の道具 14 本は組み立て・試験とも失敗 0（C の道具との比べは、`label` の進み具合の行の秒の表示だけが違い、作ったファイルは同じ）。実行ファイル・DLL・Android のどれにも、ビルドしたフォルダーは入っていません。Android 4 つは警告なし（実機では未確認）。
+- 速さ：探索・評価関数・book の学習の処理・ファイルの形は変えていません（足したのは、新しい命令を打ったときだけ動くコードです）。新しい命令の速さは測っていません。
+- 大きさ（v4.5.5-newedax.4 との差）：`wEdax-x86-64-v4.exe`（PGO なし）+7,680 バイト、PGO の 4 種が +3,072〜+4,096 バイト、DLL 3 種は同じ大きさ。Android の実行ファイル +3,120・+7,056 バイト、ライブラリ +3,248・+7,104 バイト。
 - 29GB の実 book では確かめていません。
 
 ## v4.5.5-newedax.4（new edax：C++23 への移植）
@@ -141,6 +146,17 @@ new edax の最初の版です（[README](README.md)）。v4.5.5-nikque.17 を C
 
 確かめていないこと：既定のビルド（eval2）の速さと強さ、Windows の MSVC と Android の NDK 以外のビルド、Android の実機、メモリの誤りを検出するビルドでの試験、数十億局面の実 book、別の人によるソースの確認。
 
+## v4.5.5-eval2.8（v4.5.5-nikque.20 の変更を取り込み）
+
+v4.5.5-eval2.7 に、v4.5.5-nikque.20 の変更（下の nikque.20 の項：book を軽くする `book reduce` と、消す前に数える `book reducecount`）を取り込みました。**評価関数と `eval.dat` は v4.5.5-eval2.1 のままです**（同じファイル）。探索と結果は v4.5.5-eval2.7 と同じです。
+
+確認：
+
+- `book reduce`・`book reducecount` の試験（nikque.20 と同じ試験：試験のために作った小さなbook 3 つで、別に書いた計算と照らし合わせ）は 529 通りすべて一致しました。
+- 配布物の `wEdax-x86-64-v3.exe` で：`book reduce` の試験（小さなbook 2 つで 500 通り）がすべて一致。これまでの解析の命令の試験（小さなbook 3 つ、本物の `book deviate` 系、ランダムな局面のつながり 40,000 個、裏のスレッド、`book bestlines`・`book findline` の手順）も誤り 0。
+- 探索：配布物の Windows の 5 種（PGO）は、fforum-20-39 を 1 スレッドで解いた結果・ノード数（78,733,223）・読み筋が v4.5.5-eval2.7 と同じ。Cassio 7 件も通過。DLL 3 種は API 試験 204 項目・失敗 0。`book-reproducible` の suite F の book は v4.5.5-eval2.7 と同じ。Linux（WSL、gcc 11.4）の 4 種も同じ結果の行、ライブラリ 3 種は API 試験 204 項目・失敗 0。配布物を作る workflow（run 39887059716）：Linux・macOS のライブラリの API 試験 204 項目・失敗 0、macOS の fforum-1-19 のノード数は v4.5.5-eval2.7 と同じ（x64 2,192,396・arm64 2,196,096）。Windows の x86・x64 は手元の PGO の組み立てです。実行ファイルとライブラリに、ビルドしたフォルダーは入っていません。
+- 大きさ（v4.5.5-eval2.7 との差）：Windows の実行ファイル 5 種が +3,072〜+5,120 バイト、DLL 3 種は同じ大きさ。配布物を作る workflow の組み立てで、Linux の実行ファイル +8,192〜+12,288 バイト・ライブラリ +4,096〜+8,192 バイト、macOS の実行ファイル +16・+12,288 バイト・ライブラリ +32,960 バイト、Android の実行ファイル +3,120・+7,136 バイト・ライブラリ +3,216・+7,216 バイト、Windows ARM64 +5,632 バイト。
+
 ## v4.5.5-eval2.7（v4.5.5-nikque.19 の変更を取り込み）
 
 v4.5.5-eval2.6 に、v4.5.5-nikque.19 の変更（下の nikque.19 の項：GUI のための book の解析の命令 `book moveinfo`・`book missing`・`book levels`・`book bestlines`・`book findline`、`stop id=N`）を取り込みました。**評価関数と `eval.dat` は v4.5.5-eval2.1 のままです**（同じファイル）。探索と結果は v4.5.5-eval2.6 と同じです。
@@ -245,6 +261,37 @@ v4.5.5-eval2.1 に、v4.5.5-nikque.10〜13 の変更を全部取り込みまし�
 学習データ：Edax 自身の自己対局（level 8、約84万局）の探索の値、このforkで学習したbookの局面と値、[Egaroucid](https://www.egaroucid.nyanyan.dev/) のサイトで公開されている学習データ。Egaroucid については、公開されているデータを学習に使っただけで、パターンや学習ずみの重みは使っていません。学習データは配布物に入っていません。
 
 確認：上流の `eval.dat` で、Windows 5種・Linux 4種の1スレッドの結果とノード数、bookの回帰試験（1スレッド、84ファイル）が v4.5.5-nikque.9 と一致。新しい `eval.dat` で、Windows 5種・Linux 4種のノード数が互いに一致、完全読みの評価値は上流の `eval.dat` と全問同じ、API試験191項目に合格（Windows 3種・Linux 3種）。 macOS版・Android版・Windows ARM64版は動作を確認していません（Android版・Windows ARM64版はビルドだけ）。
+## v4.5.5-nikque.20
+
+book を軽くする命令 `book reduce` と、消す前に数を数える `book reducecount` を足しました。**探索・`eval.dat`・bookのファイル形式・結果は v4.5.5-nikque.19 と同じです。**
+
+| 命令 | 働き |
+|---|---|
+| `book reduce X Y` | 今の局面から `book deviate3 X Y` がたどる局面だけを残し、ほかを消す（ふつうは初期局面で打つ）。消した局面への手は Leaf の候補になる（`book prune` と同じ） |
+| `book reducecount id=N x=X y=Y` | `book reduce X Y` で残る局面と消える局面の数（裏のスレッドで数える。bookは変えない。答えは `@end id=N kept=… removed=… positions=…`） |
+
+- 残る範囲：今の局面と、1 手の石損が X 以下、石損の合計が Y 以下の手でたどれる局面（`book deviate3 X Y` が広げる局面を探すときに歩く範囲。合流した局面は、石損の合計がいちばん小さい道で決まる）と、歩いた局面からその手で行ける、bookの深さの次の局面と終局の局面です。
+- `book reduce` は、先に今の局面から評価値を計算し直します（`book deviate3` と同じ）。`book reducecount` も、bookを変えずに同じ計算をしてから数えるので、`book reduce` と同じ数になります。
+- 残った局面の評価値は変わらず、その後に同じ局面から `book deviate3 X Y` を打つと、消す前と同じ Leaf を広げます。
+- X は 0〜129、Y は 0〜254 です。数が 2 つない・範囲の外・今の局面がbookにない・bookの深さより 2 つ以上先のときは、警告を出してbookを変えません。
+- 切り詰めたbookは、`book subtree`・`book prune` と同じく、そのまま Edax を終了すると `book-file` のファイルに保存されます。
+- 詳しくは[ユーザーマニュアル 8.4](manual/ja/08-book-maintenance.md)・[12.4](manual/ja/12-integration.md)。
+
+動作が変わるところ：
+
+- `help book` に 2 つの命令を足しました。ほかの命令は変えていません。
+
+確認：
+
+- 試験のために作った小さなbook 4 つ（約 1,500〜41 万局面、合流とパスを多く含む）で、別に書いた計算（Python。bookのファイルを自分で読み、`book deviate3` の歩き方と評価値の計算し直しを書いた）と比べました：`book reducecount` の残る数・消える数、`book reduce` の後に保存したbookの局面の集まり・各局面の評価値・level・Link・Leaf、その後の `book deviate3 X Y` が広げる局面が、546 通りですべて一致。数の欠け・範囲の外・bookにない局面・深さの先の局面・`stop id=N` も確かめました。
+- 直す前の v4.5.5-nikque.19 では、同じ試験がすべて落ちることを確かめました（知らない命令）。
+- 配布物の `wEdax-x86-64-v3.exe` で：上の `book reduce` の試験（小さなbook 2 つで 500 通り）がすべて一致。これまでの解析の命令の試験（小さなbook 3 つ、本物の `book deviate` 系、ランダムな局面のつながり 40,000 個、裏のスレッド、`book bestlines`・`book findline` の手順）も誤り 0。
+- 探索：配布物の Windows の 5 種（PGO）は、fforum-20-39 を 1 スレッドで解いた結果・ノード数（77,639,567）・読み筋が v4.5.5-nikque.19 と同じ。Cassio 7 件も通過。DLL 3 種は API 試験 204 項目・失敗 0。`book-reproducible` の suite F の book は v4.5.5-nikque.19 と同じ。Linux（WSL、gcc 11.4、配布物を作る workflow と同じ作り方）の 4 種も同じ結果の行、ライブラリ 3 種は API 試験 204 項目・失敗 0。Android（NDK r27d）は警告 0。実行ファイルとライブラリに、ビルドしたフォルダーは入っていません。
+- 速さ：探索・評価関数・bookの学習の処理・ファイルの形は変えていません（足したのは、新しい命令を打ったときだけ動くコードです）。上のノード数の確かめで、探索が同じことを確かめました。新しい命令の速さは測っていません。
+- 大きさ（v4.5.5-nikque.19 との差）：Windows の実行ファイル 5 種が +3,584〜+5,632 バイト、DLL 3 種は同じ大きさ。配布物を作る workflow の組み立てで、Linux の実行ファイル +8,192〜+12,288 バイト・ライブラリ +4,096〜+8,192 バイト、macOS の実行ファイル +16・+12,288 バイト・ライブラリ +32,944 バイト、Android の実行ファイル +3,120・+7,152 バイト・ライブラリ +3,216・+7,200 バイト、Windows ARM64 +6,144 バイト。
+- 配布物を作る workflow（run 39887011040）：Linux・macOS のライブラリの API 試験 204 項目・失敗 0、macOS の fforum-1-19 のノード数は前と同じ（x64 2,175,751・arm64 2,181,259）。Windows の x86・x64 の実行ファイルと DLL は手元の PGO の組み立てです。
+- 29GBの実bookでは確かめていません。
+
 ## v4.5.5-nikque.19
 
 GUI のプログラムのための、book の解析の命令を足しました。**探索・`eval.dat`・bookのファイル形式・結果は v4.5.5-nikque.18 と同じです。**
