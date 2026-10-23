@@ -8,7 +8,7 @@
 
 Checks:
 
-- The tests of `book reduce` and `book reducecount` (the tests of the C version) all agree, 546 cases. The books saved after `book reduce` with the executables before and after the change are the same byte for byte in 54 cases (but for the save date).
+- The tests of `book reduce` and `book reducecount` (the tests of the C version) all agree, 546 cases, with 4 threads and with 1 thread. The books saved after `book reduce` with the executables before and after the change are the same byte for byte in 54 cases (but for the save date).
 - Not checked with the 29 GB real book.
 
 ## v4.5.5-newedax.5 (new edax: the C++23 port)

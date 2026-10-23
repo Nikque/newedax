@@ -8,7 +8,7 @@
 
 確認：
 
-- `book reduce`・`book reducecount` の試験（C 版と同じ試験）は 546 通りすべて一致しました。直す前と後の実行ファイルで `book reduce` の後に保存したbookは、54 通りすべてバイト単位で同じ（保存日時を除く）。
+- `book reduce`・`book reducecount` の試験（C 版と同じ試験）は、4 スレッドでも 1 スレッドでも 546 通りすべて一致しました。直す前と後の実行ファイルで `book reduce` の後に保存したbookは、54 通りすべてバイト単位で同じ（保存日時を除く）。
 - 29GB の実 book では確かめていません。
 
 ## v4.5.5-newedax.5（new edax：C++23 への移植）
