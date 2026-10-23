@@ -6,6 +6,15 @@
 
 **最新の版は v4.5.5-newedax.6 です。** 下の「v4.5.5-newedax.6 の変更点」「v4.5.5-newedax.5 の変更点」「v4.5.5-newedax.4 の変更点」「v4.5.5-newedax.3 の変更点」「v4.5.5-newedax.2 の変更点」「v4.5.5-newedax.1 の変更点」が new edax の説明です。そのあとの「v4.5.5-eval2.9 の変更点」から下は、C 版で行った変更の説明で、new edax にもすべて入っています（v4.5.5-eval2.9・v4.5.5-nikque.21 まで）。その中の実行ファイルの記述（Linux・macOS 版、PGO など）は C 版の Releases のものです。
 
+## v4.5.5-newedax.7 の変更点
+
+`book reduce`・`book reducecount` に、C 版 v4.5.5-nikque.22 と同じ変更を入れました（下の nikque.22 の項：時間とメモリを減らし、新しい設定 `book-reduce-index`・`book-reduce-reuse`・`book-reduce-shrink`・`book-reduce-walk`）。残る局面と局面ごとの中身は v4.5.5-newedax.6 と同じです。**探索と結果は v4.5.5-newedax.6 と同じです。**
+
+確認：
+
+- `book reduce`・`book reducecount` の試験（C 版と同じ試験）は 546 通りすべて一致しました（4 スレッドと 1 スレッド、数えてから打つ形、切り替えの値を変えて）。v4.5.5-newedax.5 とこの版の実行ファイルで `book reduce` の後に保存したbookは、数えてから打つ形でも 54 通りすべてバイト単位で同じ（保存日時を除く）。壊れた book と誤った語の試験（14 件）も通過。
+- 29GB の実 book では、C 版でだけ `book reducecount` の速さを測りました（nikque.22 の項）。
+
 ## v4.5.5-newedax.6 の変更点
 
 `book reduce`・`book reducecount` に、C 版 v4.5.5-nikque.21 と同じ変更と直しを入れました（下の nikque.21 の項）。正常な book で残る局面と、`book reduce` の後に保存する book は v4.5.5-newedax.5 と同じです。**探索と結果は v4.5.5-newedax.5 と同じです。**

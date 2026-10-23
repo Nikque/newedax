@@ -2,6 +2,15 @@
 
 [English](RELEASE-NOTES.md)
 
+## v4.5.5-newedax.7（new edax：C++23 への移植）
+
+`book reduce`・`book reducecount` に、C 版 v4.5.5-nikque.22 と同じ変更を入れました（下の nikque.22 の項：時間とメモリを減らし、新しい設定 `book-reduce-index`・`book-reduce-reuse`・`book-reduce-shrink`・`book-reduce-walk`）。残る局面と局面ごとの中身は v4.5.5-newedax.6 と同じです。**探索と結果は v4.5.5-newedax.6 と同じです。**
+
+確認：
+
+- `book reduce`・`book reducecount` の試験（C 版と同じ試験）は 546 通りすべて一致しました（4 スレッドと 1 スレッド、数えてから打つ形、切り替えの値を変えて）。v4.5.5-newedax.5 とこの版の実行ファイルで `book reduce` の後に保存したbookは、数えてから打つ形でも 54 通りすべてバイト単位で同じ（保存日時を除く）。壊れた book と誤った語の試験（14 件）も通過。
+- 29GB の実 book では、C 版でだけ `book reducecount` の速さを測りました（nikque.22 の項）。
+
 ## v4.5.5-newedax.6（new edax：C++23 への移植）
 
 `book reduce`・`book reducecount` に、C 版 v4.5.5-nikque.21 と同じ変更と直しを入れました（下の nikque.21 の項）。正常な book で残る局面と、`book reduce` の後に保存する book は v4.5.5-newedax.5 と同じです。**探索と結果は v4.5.5-newedax.5 と同じです。**
