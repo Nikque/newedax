@@ -83,6 +83,10 @@ Options options = {
 	.book_seed_set = false, // book random numbers from the clock
 	.book_seed = 0, // book seed (when set)
 	.book_reproducible = false, // book functions as fast as possible (not reproducible)
+	.book_reduce_shrink = true, // book reduce: fewer buckets after it
+	.book_reduce_reuse = true, // book reduce: the count of book reducecount used
+	.book_reduce_index = 1, // book reducecount: a table of the buckets (twice as fast as the binary search with a book of 700 million positions)
+	.book_reduce_walk = 0, // book reducecount: walk by accumulated loss
 };
 
 /**
@@ -136,6 +140,10 @@ void options_usage(void)
 		"  -book-leaf-recalculate-rounds <n> passes of book leaf recalculate (2, 3, 4) at most; a pass that changes no leaf is the last (default 1).\n"
 		"  -book-seed <n|auto>           seed of the random choices of the book (auto, the default: from the clock).\n"
 		"  -book-reproducible <on/off>   book functions give the same book from a run to the next (default off).\n"
+		"  -book-reduce-shrink <on/off>  book reduce: fewer buckets when most positions are removed (default on).\n"
+		"  -book-reduce-reuse <on/off>   book reduce: use the positions that book reducecount found just before (default on).\n"
+		"  -book-reduce-index <binary/table> book reducecount: find a position from its number by binary search or a table (default).\n"
+		"  -book-reduce-walk <loss/group> book reducecount with threads: walk by loss (default) or in the order of the groups.\n"
 		"  -search-log-file <file>       file to store search detailed output/s.\n"
 		"  -ui-log-file <file>           file to store input/output to the (U)ser (I)nterface.\n");
 
@@ -352,6 +360,18 @@ int options_read(const char *option, const char *value)
 		else if (string_is(option, "book-leaf-recalculate-rounds")) options.book_leaf_recalculate_rounds = option_int(option, value, options.book_leaf_recalculate_rounds);
 		else if (string_is(option, "book-seed")) option_seed(option, value);
 		else if (string_is(option, "book-reproducible")) option_boolean(option, value, &options.book_reproducible);
+		else if (string_is(option, "book-reduce-shrink")) option_boolean(option, value, &options.book_reduce_shrink);
+		else if (string_is(option, "book-reduce-reuse")) option_boolean(option, value, &options.book_reduce_reuse);
+		else if (string_is(option, "book-reduce-index")) {
+			if (string_is(value, "binary")) options.book_reduce_index = 0;
+			else if (string_is(value, "table")) options.book_reduce_index = 1;
+			else warn("book-reduce-index: unknown value \"%s\" (binary or table)\n", value);
+		}
+		else if (string_is(option, "book-reduce-walk")) {
+			if (string_is(value, "loss")) options.book_reduce_walk = 0;
+			else if (string_is(value, "group")) options.book_reduce_walk = 1;
+			else warn("book-reduce-walk: unknown value \"%s\" (loss or group)\n", value);
+		}
 
 		else read = 0;
 	}
@@ -624,6 +644,8 @@ void options_dump(FILE *f)
 	if (options.book_seed_set) fprintf(f, "\tbook seed: %llu\n", options.book_seed);
 	else fprintf(f, "\tbook seed: auto (the clock)\n");
 	fprintf(f, "\tbook reproducible: %s\n", boolean_string[options.book_reproducible]);
+	fprintf(f, "\tbook reduce shrink: %s, reuse: %s, index: %s, walk: %s\n", boolean_string[options.book_reduce_shrink], boolean_string[options.book_reduce_reuse],
+		options.book_reduce_index ? "table" : "binary", options.book_reduce_walk ? "group" : "loss");
 	if (options.book_store_tasks > 0) fprintf(f, "\tbook store tasks: %d\n\n", options.book_store_tasks);
 	else fprintf(f, "\tbook store tasks: auto\n\n");
 
