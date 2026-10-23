@@ -8,11 +8,11 @@
 
 ## v4.5.5-newedax.6 の変更点
 
-`book reduce`・`book reducecount` を、C 版 v4.5.5-nikque.21 と同じく速く・少ないメモリで動くようにしました（下の nikque.21 の項）。働きと結果は v4.5.5-newedax.5 と同じです。**探索と結果は v4.5.5-newedax.5 と同じです。**
+`book reduce`・`book reducecount` に、C 版 v4.5.5-nikque.21 と同じ変更と直しを入れました（下の nikque.21 の項）。正常な book で残る局面と、`book reduce` の後に保存する book は v4.5.5-newedax.5 と同じです。**探索と結果は v4.5.5-newedax.5 と同じです。**
 
 確認：
 
-- `book reduce`・`book reducecount` の試験（C 版と同じ試験）は、4 スレッドでも 1 スレッドでも 546 通りすべて一致しました。直す前と後の実行ファイルで `book reduce` の後に保存したbookは、54 通りすべてバイト単位で同じ（保存日時を除く）。
+- `book reduce`・`book reducecount` の試験（C 版と同じ試験）は、4 スレッドでも 1 スレッドでも 546 通りすべて一致しました。v4.5.5-newedax.5 とこの版の実行ファイルで `book reduce` の後に保存したbookは、54 通りすべてバイト単位で同じ（保存日時を除く）。壊れた book と誤った語の試験（C 版と同じ 14 件）もすべて通りました。
 - 29GB の実 book では確かめていません。
 
 ## v4.5.5-newedax.5 の変更点
