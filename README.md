@@ -1,139 +1,88 @@
 # newedax
 
-**new edax** is [Edax 4.5.5](https://github.com/Nikque/edax-reversi-AVX) (the corrected fork, its `eval2` line, up to v4.5.5-nikque.22 and v4.5.5-eval2.10) ported to C++23. Changes of each version: [README-NIKQUE.en.md](README-NIKQUE.en.md). [日本語](#日本語)
+The Othello engine [Edax 4.5.5 nikque](https://github.com/Nikque/edax-reversi-AVX) (its eval2 line) ported to C++23. It gives the same results as the C version, uses less memory for books, and is as fast or faster in most cases.
 
-- **The latest release is [v4.5.5-newedax.7](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.7)**, with the changes of the C version v4.5.5-nikque.22: `book reduce` and `book reducecount` take less time and memory with large books; [v4.5.5-newedax.6](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.6) changed and fixed them (`book reducecount` with threads, an error for a damaged book); [v4.5.5-newedax.5](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.5) added `book reduce`, which makes the book lighter, and `book reducecount`; [v4.5.5-newedax.4](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.4) added the book analysis commands for a GUI program (`book moveinfo` and the others). [v4.5.5-newedax.3](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.3) was the first release that is not a pre-release (before it, the pre-releases [v4.5.5-newedax.2](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.2) and [v4.5.5-newedax.1](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.1)) (Windows x64/x86 and Android executables, libedax DLLs, the eval2 tools; [release notes](RELEASE-NOTES.md)). `bin/` of the repository holds the data only (`bin/data/eval.dat` of eval2, `bin/data/book.dat`, `bin/config.ini`): download the ZIP of the release, or build the executable yourself (below). The executables of the C version are in the [releases of edax-reversi-AVX](https://github.com/Nikque/edax-reversi-AVX/releases) (v4.5.5-nikque.22, v4.5.5-eval2.10).
-- **Same results as the C version**, checked on Windows (MSVC 2022, x64 and x86): with `bin/data/eval.dat` (eval2), fforum-20-39 is solved with the same node counts, scores and lines as v4.5.5-eval2.5; with the eval.dat of Edax 4.5, as v4.5.5-nikque.17. Also the same: the books of 14 test suites (with the same random seed), the C API of libedax, the Cassio protocol.
-- **Speed and memory** (Windows, the same compiler options, no PGO, the eval.dat of Edax 4.5): no case slower than the C version was found; loading a book of 6.5 million positions takes 11 to 45 % less memory. The executables of v4.5.5-newedax.3 against the releases of the C version v4.5.5-eval2.6 (measured on 2026-10-19 and 20): `wEdax-x86-64-v4.exe` (no PGO) is faster (middle game 0.96, book commands with 32 threads 0.95 to 0.99); `wEdax-x86-64.exe`, `wEdax-x86-sse.exe` and `wEdax-x86.exe` (PGO) are as fast or faster; **`wEdax-x86-64-v3.exe` (PGO) stays about 1 % slower** (details in [README-NIKQUE.en.md](README-NIKQUE.en.md)). Records (in Japanese): [docs/port](docs/port) (`PROGRESS-1.md`, `MEASURE-1.md`, `MEASURE-2.md`).
+[日本語](#日本語) · [Download](https://github.com/Nikque/newedax/releases/latest) · [Manual](manual/en/README.md) · [Release notes](RELEASE-NOTES.md) · [Full notes per version](README-NIKQUE.en.md)
 
-### What is new
-- Files of form 2: books (`NEDXBOOK`, about 33 % smaller) and evaluation files (`NEDXEVAL`), with a CRC-32C. Options `-book-format`, `-book-convert`, `-eval-convert` (both ways). Files of form 1 are still read.
-- Book positions take 40 bytes in memory (48 in the C version).
-- Build options: `EVAL_MOBILITY` (1, the default: the mobility weights of eval2 are read and used; an eval.dat without them gives the evaluation of Edax 4.5; 0: they are not read), `EVAL_SLOTS=64` (64 feature slots, a base for a stronger evaluation; the default is 48).
-- [tools/eval](tools/eval): the training tools of the eval2 evaluation in C++ (`evsearch`, `evtrain`, `w2dat2`, `selfplay3`, ...; records `docs/port/EVTOOLS-1.md` to `EVTOOLS-3.md`).
+## Download and run
 
-### Build
-- Boost 1.92 (headers only) in `third_party/boost_1_92_0` next to the folder of the repository (`../third_party/boost_1_92_0`), or `BOOST_DIR=<directory>`.
-- Windows, Visual Studio 2022 (x64 Developer Command Prompt): `build-win-v4.cmd` (x64 AVX-512), or in `src`: `nmake -f NMakefile vc-x64-v3` (other targets, PGO builds `vc-pgo-...`: `src/NMakefile`). The release binaries: `tools/port/build-release.cmd <checkout> <log directory>` (`-v4` without PGO, the other four with PGO, the DLLs).
-- Linux and macOS (`src/makefile`, gcc 13 or later, or clang): not built yet. Android (NDK r27d, `ndk-build`): compiled and linked (the binaries of v4.5.5-newedax.3), not run yet.
+1. Download the ZIP from the [latest release](https://github.com/Nikque/newedax/releases/latest) and unpack it. It contains executables for Windows (x64, x86) and Android, the libedax DLLs, and the eval2 training tools.
+2. Open the `bin` folder and start the executable from **inside that folder**. On Windows, start with `wEdax-x86-64.exe`; use `-v3` (AVX2) or `-v4` (AVX-512) if your CPU supports it.
 
-### Not checked yet
-Builds other than MSVC on Windows (and the Android link); AddressSanitizer and ThreadSanitizer on the C++ version; real books of billions of positions; a review by a second reader.
+The `bin/` folder of the repository holds only the data (`eval.dat` of eval2, `book.dat`, `config.ini`). Commands and settings are the same as the C version: see the [manual](manual/en/README.md).
 
-License: GPL-3.0 ([LICENSE](LICENSE)). Boost is under the Boost Software License and is not included.
+For Linux and macOS executables, use the C version ([edax-reversi-AVX releases](https://github.com/Nikque/edax-reversi-AVX/releases)).
 
-## 日本語
+## Relation to the C version
 
-**new edax** は、[Edax 4.5.5 の修正版](https://github.com/Nikque/edax-reversi-AVX)（`eval2` の系列。v4.5.5-nikque.22・v4.5.5-eval2.10 まで）を C++23 に移したものです。版ごとの変更点は [README-NIKQUE.ja.md](README-NIKQUE.ja.md) にあります。
+- Evaluation: eval2 by default. The upstream Edax `eval.dat` also works.
+- Commands, settings and results are the same as the C version (node counts, scores and lines checked on fforum-20-39 with both `eval.dat` files).
+- Each newedax release contains all changes of a C release. The latest, **v4.5.5-newedax.7**, corresponds to C v4.5.5-nikque.22 / v4.5.5-eval2.10.
 
-- **最新の版は [v4.5.5-newedax.7](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.7) です**。C 版 v4.5.5-nikque.22 と同じく、大きな book で `book reduce`・`book reducecount` が使う時間とメモリを減らしました。[v4.5.5-newedax.6](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.6) で処理の形を変えて直し（`book reducecount` の並列化、壊れた book ではエラー）、book を軽くする命令 `book reduce` と `book reducecount` は [v4.5.5-newedax.5](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.5)、GUI のプログラムのための book の解析の命令（`book moveinfo` など）は [v4.5.5-newedax.4](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.4) で足しました。[v4.5.5-newedax.3](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.3) がプレリリースではない最初の版です（その前はプレリリースの [v4.5.5-newedax.2](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.2) と [v4.5.5-newedax.1](https://github.com/Nikque/newedax/releases/tag/v4.5.5-newedax.1)）（Windows の x64・x86 と Android の実行ファイル、libedax の DLL、eval2 の道具。[修正一覧](RELEASE-NOTES.ja.md)）。リポジトリの `bin/` にはデータ（eval2 の `bin/data/eval.dat`、`bin/data/book.dat`、`bin/config.ini`）だけがあります。Release の ZIP を使うか、自分でビルドしてください（上の「Build」）。C 版の実行ファイルは [edax-reversi-AVX の Releases](https://github.com/Nikque/edax-reversi-AVX/releases)（v4.5.5-nikque.22、v4.5.5-eval2.10）にあります。
-- **C 版と同じ結果**（Windows、MSVC 2022、x64 と x86 で確かめた）：`bin/data/eval.dat`（eval2）では fforum-20-39 の節点数・評価値・読み筋が v4.5.5-eval2.5 と同じ、Edax 4.5 の eval.dat では v4.5.5-nikque.17 と同じ。14 の試験の book（乱数の種をそろえたとき）、libedax の C の API、Cassio の通信も同じ。
-- **速さとメモリ**（Windows、同じコンパイルの選択肢、PGO なし、Edax 4.5 の eval.dat）：C 版より遅い条件は見つかっていません。649 万局面の book の読み込みはメモリが 11〜45% 少ない。v4.5.5-newedax.3 の実行ファイルを C 版 v4.5.5-eval2.6 の配布物と比べると（2026-10-19・20）、`wEdax-x86-64-v4.exe`（PGO なし）は速く（中盤 0.96、32 スレッドの book の命令 0.95〜0.99）、`wEdax-x86-64.exe`・`wEdax-x86-sse.exe`・`wEdax-x86.exe`（PGO）は同じか速い。**`wEdax-x86-64-v3.exe`（PGO）は約 1% 遅いまま**です（詳しくは [README-NIKQUE.ja.md](README-NIKQUE.ja.md)）。記録は [docs/port](docs/port)（`PROGRESS-1.md`、`MEASURE-1.md`、`MEASURE-2.md`）。
-- 新しいこと：book と評価ファイルの形2（`-book-format`・`-book-convert`・`-eval-convert`。形1も読む）、book の局面が 40 バイト、`EVAL_MOBILITY`（既定 1）・`EVAL_SLOTS=64` の選択肢、[tools/eval](tools/eval)（eval2 の学習の道具の C++ 版）。
-- まだ確かめていないこと：Windows の MSVC 以外のビルド（Android はリンクまで。v4.5.5-newedax.3 の配布物は `tools/port/build-release.cmd` で作った）、メモリの誤りを検出するビルドでの試験、数十億局面の実 book、別の人による確認。
+## Differences from the C version
+
+- **Memory**: a book position takes 40 bytes (48 in the C version). Loading a book of 6.5 million positions takes 11 to 45 % less memory.
+- **Speed** (Windows, against the C release eval2.6): `wEdax-x86-64-v4.exe` is slightly faster; the x64 standard and x86 builds are as fast or faster; **`wEdax-x86-64-v3.exe` is about 1 % slower**.
+- **New file format (form 2)** for books (`NEDXBOOK`, about 33 % smaller) and evaluation files (`NEDXEVAL`), with a checksum. Convert with `-book-convert` / `-eval-convert` (both ways). Form 1 files (C version) are still read.
+- **Build options**: `EVAL_MOBILITY` (default 1), `EVAL_SLOTS=64`.
+- **[tools/eval](tools/eval)**: the eval2 training tools in C++ (`evsearch`, `evtrain`, `w2dat2`, `selfplay3`, ...).
+
+## Not checked yet
+
+Builds other than MSVC on Windows (Android: compiled and linked, not run on a device); AddressSanitizer / ThreadSanitizer; real books of billions of positions; review by a second person.
+
+## Build
+
+- Boost 1.92 (headers only) in `../third_party/boost_1_92_0`, or set `BOOST_DIR=<directory>`.
+- Windows (Visual Studio 2022, x64 Developer Command Prompt): `build-win-v4.cmd`, or in `src`: `nmake -f NMakefile vc-x64-v3` (other targets and PGO builds: `src/NMakefile`).
+- Release binaries: `tools/port/build-release.cmd <checkout> <log directory>`.
+- Android: NDK r27d, `ndk-build`.
+
+Port records (in Japanese): [docs/port](docs/port).
+
+## License
+
+GPL-3.0 ([LICENSE](LICENSE)). Based on Edax by Richard Delorme and [okuhara/edax-reversi-AVX](https://github.com/okuhara/edax-reversi-AVX). Boost is under the Boost Software License and is not included.
 
 ---
 
-# edax-reversi-AVX (the README of the fork and of the upstream project)
+## 日本語
 
-**Edax 4.5.5 corrected build (C version):** [English release README](README-NIKQUE.en.md) · [日本語の修正版README](README-NIKQUE.ja.md) · [Windows executable and release downloads](https://github.com/Nikque/edax-reversi-AVX/releases)
+オセロのエンジン [Edax 4.5.5 nikque](https://github.com/Nikque/edax-reversi-AVX)（eval2 の系列）を C++23 に移したものです。C 版と同じ結果を出し、book のメモリが少なく、ほとんどの場合 C 版と同じか速く動きます。
 
-The historical upstream README follows below.
+[ダウンロード](https://github.com/Nikque/newedax/releases/latest) · [マニュアル](manual/ja/README.md) · [修正一覧](RELEASE-NOTES.ja.md) · [版ごとの詳しい説明](README-NIKQUE.ja.md)
 
-Automatically exported from code.google.com/p/okuharaandroid-edax-reversi
+### 使い始め方
 
-Edax is a strong othello program. Its main features are:
+1. [最新の Release](https://github.com/Nikque/newedax/releases/latest) の ZIP をダウンロードして展開します。Windows（x64・x86）と Android の実行ファイル、libedax の DLL、eval2 の学習ツールが入っています。
+2. `bin` フォルダーを開き、**そのフォルダーの中から**実行ファイルを起動します。Windows なら、まず `wEdax-x86-64.exe` を使ってください。CPU が対応していれば `-v3`（AVX2）・`-v4`（AVX-512）が速くなります。
 
-    fast bitboard based & multithreaded engine.
-    accurate midgame-evaluation function.
-    opening book learning capability.
-    text based rich interface.
-    multi-protocol support to connect to graphical interfaces or play on Internet (GGS).
-    multi-OS support to run under MS-Windows, Linux and Mac OS X.
+リポジトリの `bin/` にはデータ（eval2 の `eval.dat`、`book.dat`、`config.ini`）だけがあります。コマンドと設定は C 版と同じです（[マニュアル](manual/ja/README.md)）。
 
-This is SSE/AVX optimized version of Edax 4.4.0. Functionally equivalent to the parent project, provided no bugs are introduced.
+Linux・macOS 用の実行ファイルは C 版（[edax-reversi-AVX の Releases](https://github.com/Nikque/edax-reversi-AVX/releases)）を使ってください。
 
-Thanks to AVX2, x64-modern build solves fforum-40-59.obf 60% faster than official edax-4.4 on Haswell, and runs level 30 autoplay 80% faster.
+### C 版との関係
 
-See http://www.amy.hi-ho.ne.jp/okuhara/bitboard.htm and http://www.amy.hi-ho.ne.jp/okuhara/edaxopt.htm for optimization details in Japanese.
+- 評価関数は eval2 が既定です。元の Edax の `eval.dat` も使えます。
+- コマンド・設定・結果は C 版と同じです（fforum-20-39 で、2 種類の `eval.dat` のどちらでもノード数・評価値・読み筋が一致することを確認）。
+- newedax の各版は、C 版のある版の変更をすべて含みます。最新の **v4.5.5-newedax.7** は、C 版 v4.5.5-nikque.22・v4.5.5-eval2.10 に対応します。
 
-## 1. Mobility (board_sse.c, board_mmx.c)
+### C 版との違い
 
-### 1.1 new SSE2 version of get_moves
-Diagonals are SIMD'd using vertical mirroring by bswap.
+- **メモリ**：book の 1 局面が 40 バイト（C 版は 48 バイト）。649 万局面の book の読み込みで、メモリが 11〜45% 少なくなります。
+- **速さ**（Windows、C 版 eval2.6 の配布物と比較）：`wEdax-x86-64-v4.exe` はわずかに速く、x64 標準版・x86 版は同じか速い。**`wEdax-x86-64-v3.exe` は約 1% 遅い**です。
+- **新しいファイル形式（形式 2）**：book（`NEDXBOOK`、約 33% 小さい）と評価ファイル（`NEDXEVAL`）。チェックサム付き。`-book-convert`・`-eval-convert` で相互に変換できます。C 版の形式 1 のファイルもそのまま読めます。
+- **ビルドオプション**：`EVAL_MOBILITY`（既定 1）、`EVAL_SLOTS=64`。
+- **[tools/eval](tools/eval)**：eval2 の学習ツールの C++ 版（`evsearch`・`evtrain`・`w2dat2`・`selfplay3` など）。
 
-    Athlon -get_moves_sse
-    problem\fforum-20-39.obf: 111349635 nodes in 0:07.998 (13922185 nodes/s).
-    mobility: 81.10 < 81.28 +/- 0.17 < 82.03
-    Athlon +get_moves_sse
-    problem\fforum-20-39.obf: 111349635 nodes in 0:07.889 (14114544 nodes/s).
-    mobility: 71.08 < 71.72 +/- 0.34 < 73.53
-    Core2 -get_moves_sse
-    problem/fforum-20-39.obf: 111349635 nodes in 0:10.180 (10938078 nodes/s).
-    mobility: 78.06 < 78.18 +/- 0.08 < 78.41
-    Core2 +get_moves_sse
-    problem/fforum-20-39.obf: 111349635 nodes in 0:09.978 (11159514 nodes/s).
-    mobility: 60.84 < 61.19 +/- 0.13 < 61.47
+### まだ確認していないこと
 
-### 1.2 can_move
-Now calls SIMD'd get_moves for x86/x64 build.
+Windows の MSVC 以外でのビルド（Android はリンクまで、実機では未実行）、AddressSanitizer・ThreadSanitizer での試験、数十億局面の実際の book、別の人によるレビュー。
 
-## 2. Stability (board.c, board_sse.c, board_mmx.c)
+### ビルド
 
-### 2.1 get_full_lines_h, get_full_lines_v
-get_full_lines for horizontal and vertical are simplified. The latter is compiled into rotation instrunction.
+上の英語の「Build」を見てください。移植の作業記録は [docs/port](docs/port) にあります。
 
-### 2.2 rearranged loop
-The last while loop is rearranged not to call bit_count in case stable == 0.
+### ライセンス
 
-### 2.3 new SSE2 version with bswap and pcmpeqb
-    Athlon -get_stability_sse
-    stability: 90.10 < 90.28 +/- 0.24 < 91.20
-    Athlon +get_stability_sse
-    stability: 81.59 < 81.93 +/- 0.73 < 86.25
-    Core2 -get_stability_sse
-    stability: 79.24 < 79.39 +/- 0.15 < 79.93
-    Core2 +get_stability_sse
-    stability: 71.80 < 71.85 +/- 0.06 < 72.07
-
-### 2.4 get_corner_stability
-Kindergarten version eliminates bit_count call.
-
-### 2.5 find_edge_stable
-Loop optimization and flip using carry propagation. One time execution but affect total solving time.
-
-## 3. eval.c (4.4.5)
-Eval feature calculation using SSE2 / AVX2 (now in eval_sse.c) improves midgame by 15-30% and endgame by 8-12%.
-Restoring eval from backup instead of rewinding.
-eval_open (one time execution) is also optimized.
-
-## 4. hash.c
-I think hash->data.move[0] on line 677 should be hash->data.move[1].
-
-## 5. board_symetry, board_unique (board.c, board_sse.c)
-SSE optimization and mirroring reduction. (Not used in solving game)
-
-## 6. endgame_sse.c (4.4.7)
-Keep more variables in SSE registers.  SSE optimized count_last_flip.  Parity sort by shuffle.
-
-## 7. board_get_hash_code (4.5.0)
-Changed to use CRC32c.  This enables hardware acceleration on modern build.
-
-## 8. AVX2 versions (x64-modern build only)
-In many cases AVX2 version is simplest, thanks to variable shift instructions (although they are 3 micro-op instructions).
-
-Benchmarks are on Core i5-4260U (Haswell) 1.4GHz (TB 2.7GHz) single thread.
-
-    4.4.0 original x64-modern clang
-    problem/fforum-20-39.obf: 111349635 nodes in 0:05.726 (19446321 nodes/s).
-    +optimizations 1-5 above, no-avx2
-    problem/fforum-20-39.obf: 111349635 nodes in 0:05.342 (20844185 nodes/s).
-    +get_moves (board_sse.c)
-    problem/fforum-20-39.obf: 111349635 nodes in 0:05.142 (21654927 nodes/s).
-    +flip_avx.c
-    problem/fforum-20-39.obf: 111349635 nodes in 0:04.946 (22513068 nodes/s).
-    +count_last_flip_sse.c
-    problem/fforum-20-39.obf: 111349635 nodes in 0:04.906 (22696624 nodes/s).
-
-## 9. makefile
-gcc-old, x86 build should be -m32, not -m64. Some flags and defines added for optimization.
+GPL-3.0（[LICENSE](LICENSE)）。Richard Delorme 氏の Edax と [okuhara/edax-reversi-AVX](https://github.com/okuhara/edax-reversi-AVX) をもとにしています。Boost は Boost Software License で、このリポジトリには含みません。
