@@ -117,7 +117,7 @@ The package's `bin/config.ini` contains these settings. The "built-in value" is 
 | `book-expand-tasks` | `auto` | 1 | Number of positions that the automatic book commands expand at the same time. Chapters [7](07-book-learning.md) and [9](09-large-books.md) |
 | `book-leaf-recalculate-rounds` | `1` | 1 | Largest number of rounds of `book leaf recalculate` and its family. [Chapter 8](08-book-maintenance.md) |
 | `book-store-tasks` | `auto` | `auto` | Number of games learned at the same time by the commands that grow a book from games. Chapters [7](07-book-learning.md) and [9](09-large-books.md) |
-| `probcut-model` | `standard` | `standard` | Pruning model of the search. `refit` is experimental (it changes the search results; read [v4.5.5-nikque.5 in the release notes](../../RELEASE-NOTES.md#v455-nikque5) before using it) |
+| `probcut-model` | `standard` | `standard` | Pruning model of the search. `refit` is experimental (it changes the search results; read [v4.5.5-nikque.5 in the release notes](https://github.com/Nikque/edax-reversi-AVX/blob/edax-4.5.5-fixes/RELEASE-NOTES.md#v455-nikque5) before using it) |
 
 **Note on `level` in `config.ini`**: a `level` in `config.ini` (or `edax.ini`) only sets the starting level. In a timed game (`-t`, `-move-time`), it does not limit the search depth. To limit it, use `-l` on the command line or the `level` command ([3.8](03-playing.md)).
 
