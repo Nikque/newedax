@@ -2,7 +2,7 @@
 
 The Othello engine [Edax 4.5.5 nikque](https://github.com/Nikque/edax-reversi-AVX) (its eval2 line) ported to C++23. It gives the same results as the C version, uses less memory for books, and is as fast or faster in most cases.
 
-[日本語](#日本語) · [Download](https://github.com/Nikque/newedax/releases/latest) · [Manual](manual/en/README.md) · [Release notes](RELEASE-NOTES.md) · [Full notes per version](README-NIKQUE.en.md)
+[日本語](#日本語) · [Download](https://github.com/Nikque/newedax/releases/latest) · [Manual](manual/en/README.md) · [Release notes](RELEASE-NOTES.md) · [Tests and measurements](docs/validation/newedax.en.md)
 
 ## Download and run
 
@@ -50,7 +50,7 @@ GPL-3.0 ([LICENSE](LICENSE)). Based on Edax by Richard Delorme and [okuhara/edax
 
 オセロのエンジン [Edax 4.5.5 nikque](https://github.com/Nikque/edax-reversi-AVX)（eval2 の系列）を C++23 に移したものです。C 版と同じ結果を出し、book のメモリが少なく、ほとんどの場合 C 版と同じか速く動きます。
 
-[ダウンロード](https://github.com/Nikque/newedax/releases/latest) · [マニュアル](manual/ja/README.md) · [修正一覧](RELEASE-NOTES.ja.md) · [版ごとの詳しい説明](README-NIKQUE.ja.md)
+[ダウンロード](https://github.com/Nikque/newedax/releases/latest) · [マニュアル](manual/ja/README.md) · [修正一覧](RELEASE-NOTES.ja.md) · [テストと実測の記録](docs/validation/newedax.ja.md)
 
 ### 使い始め方
 
