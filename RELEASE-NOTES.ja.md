@@ -12,6 +12,7 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 
 | newedax | C 版（nikque） | C 版（eval2） |
 |---|---|---|
+| newedax.8（未公開） | nikque.23（未公開） | eval2.11（未公開） |
 | newedax.7 | nikque.22 | eval2.10 |
 | newedax.6 | nikque.21 | eval2.9 |
 | newedax.5 | nikque.20 | eval2.8 |
@@ -19,6 +20,30 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 | newedax.3 | nikque.18 | eval2.6 |
 | newedax.2 | nikque.18 | eval2.6 |
 | newedax.1 | nikque.17 | eval2.5 |
+
+---
+
+## v4.5.5-newedax.8
+
+**未公開**（次の版）。GUI の候補手の表の精度（`book moveinfo` の `stage=`）を、C 版と同じく、前後の局面の答えから引き継いで、歩く量を減らしました。book のコマンドを `book` なしで打ったときに、打ち方を案内します。手引きと文書を書き直しました。
+
+**変更**
+
+- C 版 v4.5.5-nikque.23 の変更を取り込みました（[C 版の修正一覧](https://github.com/Nikque/edax-reversi-AVX/blob/edax-4.5.5-fixes/RELEASE-NOTES.ja.md#v455-nikque23)）。
+  - 覚えている今の局面の段階と、手の後の局面の先の局面の段階からわかる所は、歩かずに決めます。答え（`stage=`・`missing=`）は v4.5.5-newedax.7 と同じです。
+  - 最上位で book のコマンドの名前（`leaf expand 30 30`・`fill2 2` など）を打つと、警告に `(book command: type "book leaf expand 30 30" or "b leaf expand 30 30")` を添えます。最上位のコマンド・設定・`base` のコマンドと同じ名前には添えません。
+- 手引き：C 版と同じ見直し（言い回し、book のコマンドを全部 `book …` の形で書く、9.4 の保存の時間「18〜28 秒」、4 章の `refit` の説明から C 版の修正一覧の nikque.5 へのリンク）。12.4・13.2 に上の 2 つの変更を書きました。
+- 文書：README と修正一覧を書き直し、テストと実測の記録を `docs/validation/` へ移し、`README-NIKQUE.*` を消しました。配布物には `README-NIKQUE.*` の代わりに `README.md` が入ります。`config.ini` の初めの説明の行は、手引きの 4 章を指します。
+
+**互換性**
+
+- `book moveinfo` の答えは v4.5.5-newedax.7 と同じです。
+- 知らないコマンドの警告の行は、book のコマンドの名前のときだけ、後ろに案内が付きます（前の部分は同じです）。
+- 探索の結果・`eval.dat`・book のファイル形式は変わりません。
+
+**確認**：C 版と同じ試験（`tests/book-analyze.cpp`）で、引き継いだ段階は局面ごとに歩いた段階と全部の手で同じ（作り物の book 200 冊と試験用の book 2 つ）。`book moveinfo` の答えは、v4.5.5-newedax.7 とも C 版とも同じでした（試験用の book 2 つ、棋譜 2 局の各局面、基準 3 つ）。
+
+**未確認**：実 book での速さ、GUI での動き、Android の実機。
 
 ---
 

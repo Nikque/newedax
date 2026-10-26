@@ -12,6 +12,7 @@ Each version contains all changes of the C versions on the same row.
 
 | newedax | C (nikque) | C (eval2) |
 |---|---|---|
+| newedax.8 (not released) | nikque.23 (not released) | eval2.11 (not released) |
 | newedax.7 | nikque.22 | eval2.10 |
 | newedax.6 | nikque.21 | eval2.9 |
 | newedax.5 | nikque.20 | eval2.8 |
@@ -19,6 +20,30 @@ Each version contains all changes of the C versions on the same row.
 | newedax.3 | nikque.18 | eval2.6 |
 | newedax.2 | nikque.18 | eval2.6 |
 | newedax.1 | nikque.17 | eval2.5 |
+
+---
+
+## v4.5.5-newedax.8
+
+**Not released** (the next version). As in the C version, the precision of the candidate moves of the GUI (`stage=` of `book moveinfo`) is taken over from the answers of the positions before and after, so that less is walked. A book command typed without `book` gets a hint on how to type it. The manual and the documents were rewritten.
+
+**Changes**
+
+- The changes of C version v4.5.5-nikque.23 are included ([C release notes](https://github.com/Nikque/edax-reversi-AVX/blob/edax-4.5.5-fixes/RELEASE-NOTES.md#v455-nikque23)).
+  - What the kept stage of the current position and the kept stages of the next positions of the position after a move already tell is not walked again. The answers (`stage=`, `missing=`) are the same as in v4.5.5-newedax.7.
+  - A book command typed at the top level (`leaf expand 30 30`, `fill2 2`, …) adds `(book command: type "book leaf expand 30 30" or "b leaf expand 30 30")` to the warning. Names that are also top-level commands, settings or `base` commands get no hint.
+- Manual: the same review as the C version (the wording, every book command in the form `book …`, the time of a save in 9.4: 18 to 28 seconds, the note on `refit` in chapter 4 links to nikque.5 in the C release notes). 12.4 and 13.2 describe the two changes above.
+- Documents: the README and the release notes were rewritten, the test and measurement records moved to `docs/validation/`, and `README-NIKQUE.*` was removed. The package holds `README.md` instead of `README-NIKQUE.*`. The first comment lines of `config.ini` point to chapter 4 of the manual.
+
+**Compatibility**
+
+- The answers of `book moveinfo` are the same as in v4.5.5-newedax.7.
+- The warning line of an unknown command gets a hint at its end only for the names of book commands (its first part is the same).
+- The search results, `eval.dat` and the book file format do not change.
+
+**Checked**: with the same tests as the C version (`tests/book-analyze.cpp`), the stages taken over are the stages walked from each position alone, for every move (200 random books and 2 test books). The answers of `book moveinfo` are the same as those of v4.5.5-newedax.7 and of the C version (2 test books, each position of 2 games, 3 bases).
+
+**Not checked**: the speed on a real book, the behaviour in the GUI, Android devices.
 
 ---
 
