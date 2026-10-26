@@ -12,7 +12,7 @@ Each version contains all changes of the C versions on the same row.
 
 | newedax | C (nikque) | C (eval2) |
 |---|---|---|
-| newedax.8 (not released) | nikque.23 (not released) | eval2.11 (not released) |
+| newedax.8 | nikque.23 | eval2.11 |
 | newedax.7 | nikque.22 | eval2.10 |
 | newedax.6 | nikque.21 | eval2.9 |
 | newedax.5 | nikque.20 | eval2.8 |
@@ -25,7 +25,7 @@ Each version contains all changes of the C versions on the same row.
 
 ## v4.5.5-newedax.8
 
-**Not released** (the next version). As in the C version, the precision of the candidate moves of the GUI (`stage=` of `book moveinfo`) is taken over from the answers of the positions before and after, so that less is walked. A book command typed without `book` gets a hint on how to type it. The manual and the documents were rewritten.
+As in the C version, the precision of the candidate moves of the GUI (`stage=` of `book moveinfo`) is taken over from the answers of the positions before and after, so that less is walked. A book command typed without `book` gets a hint on how to type it. The manual and the documents were rewritten.
 
 **Changes**
 
@@ -44,6 +44,8 @@ Each version contains all changes of the C versions on the same row.
 **Checked**: with the same tests as the C version (`tests/book-analyze.cpp`), the stages taken over are the stages walked from each position alone, for every move (200 random books and 2 test books). The answers of `book moveinfo` are the same as those of v4.5.5-newedax.7 and of the C version (2 test books, each position of 2 games, 3 bases).
 
 **Not checked**: the speed on a real book, the behaviour in the GUI, Android devices.
+
+[Tests and measurements](docs/validation/newedax.en.md#v455-newedax8)
 
 ---
 

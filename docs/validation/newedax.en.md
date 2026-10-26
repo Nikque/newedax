@@ -5,6 +5,18 @@ Tests and measurements done for each version, moved without changes from the for
 For what changed, see the [release notes](../../RELEASE-NOTES.md). "Above" and "below" in the text refer to positions in the former document.
 
 
+## v4.5.5-newedax.8
+
+Checks:
+
+- The tests of the stages taken over and of the hint (the tests of the C version, `tests/book-analyze.cpp`): for 502,470 moves of 200 random books, the stages taken over are those walked from each position alone; the same on 2 test books (about 4.78 million moves on the book of 409,494 positions); the 24 cases of the hint pass. The answers of `book moveinfo` are the same as those of v4.5.5-newedax.7 and of the C version (2 test books, each position of 2 games, 3 bases).
+- The tests of the analysis commands (the comparisons on 3 small books, the real `book deviate` family, 40,000 random graphs of positions, the background thread, the lines of `book bestlines` and `book findline`) all pass with the released `wEdax-x86-64-v3.exe`; so do the `book reduce` tests, 500 cases, and the 14 tests of damaged books and wrong words.
+- The answers of 10 commands on the same positions (6,880 answers) are all the same as those of the C version v4.5.5-nikque.23 (except the time).
+- Search: the 5 Windows release programs solve fforum-20-39 with 1 thread with the same results and node counts as v4.5.5-newedax.7: 78,733,223 with the `eval.dat` of eval2, 77,639,567 with that of Edax 4.5; the 7 Cassio cases pass. The 3 DLLs: 206 API checks, 0 failures, with both `eval.dat`. The 14 eval2 tools: built and tested without failure (compared with the C tools, only the seconds of a progress line of `label` differ; the files made are the same). No program, DLL or Android binary holds a folder of the build machine. The 4 Android binaries: no warning (not run on a device).
+- The search, the evaluation, the book learning and the file format are not changed (the code changed finds the precision stages of `book moveinfo`, and writes the warning of an unknown command).
+- Size (against v4.5.5-newedax.7): `wEdax-x86-64-v4.exe` (no PGO) +4,096 bytes, the 4 PGO programs +2,560 to +4,096 bytes, the 3 DLLs the same size; the Android programs +2,544 and +4,352 bytes, the libraries +2,392 and +4,368 bytes.
+- The speed was not measured.
+
 ## v4.5.5-newedax.7
 
 Checks:

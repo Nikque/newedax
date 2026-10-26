@@ -12,7 +12,7 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 
 | newedax | C 版（nikque） | C 版（eval2） |
 |---|---|---|
-| newedax.8（未公開） | nikque.23（未公開） | eval2.11（未公開） |
+| newedax.8 | nikque.23 | eval2.11 |
 | newedax.7 | nikque.22 | eval2.10 |
 | newedax.6 | nikque.21 | eval2.9 |
 | newedax.5 | nikque.20 | eval2.8 |
@@ -25,7 +25,7 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 
 ## v4.5.5-newedax.8
 
-**未公開**（次の版）。GUI の候補手の表の精度（`book moveinfo` の `stage=`）を、C 版と同じく、前後の局面の答えから引き継いで、歩く量を減らしました。book のコマンドを `book` なしで打ったときに、打ち方を案内します。手引きと文書を書き直しました。
+GUI の候補手の表の精度（`book moveinfo` の `stage=`）を、C 版と同じく、前後の局面の答えから引き継いで、歩く量を減らしました。book のコマンドを `book` なしで打ったときに、打ち方を案内します。手引きと文書を書き直しました。
 
 **変更**
 
@@ -44,6 +44,8 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 **確認**：C 版と同じ試験（`tests/book-analyze.cpp`）で、引き継いだ段階は局面ごとに歩いた段階と全部の手で同じ（作り物の book 200 冊と試験用の book 2 つ）。`book moveinfo` の答えは、v4.5.5-newedax.7 とも C 版とも同じでした（試験用の book 2 つ、棋譜 2 局の各局面、基準 3 つ）。
 
 **未確認**：実 book での速さ、GUI での動き、Android の実機。
+
+[検証記録](docs/validation/newedax.ja.md#v455-newedax8)
 
 ---
 
