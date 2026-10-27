@@ -12,6 +12,7 @@ Each version contains all changes of the C versions on the same row.
 
 | newedax | C (nikque) | C (eval2) |
 |---|---|---|
+| newedax.9 (not released) | nikque.24 (not released) | eval2.12 (not released) |
 | newedax.8 | nikque.23 | eval2.11 |
 | newedax.7 | nikque.22 | eval2.10 |
 | newedax.6 | nikque.21 | eval2.9 |
@@ -20,6 +21,29 @@ Each version contains all changes of the C versions on the same row.
 | newedax.3 | nikque.18 | eval2.6 |
 | newedax.2 | nikque.18 | eval2.6 |
 | newedax.1 | nikque.17 | eval2.5 |
+
+---
+
+## v4.5.5-newedax.9
+
+**Not released** (the next version). As in the C version, the umigame numbers and the numbers of positions of the candidate moves of the GUI, `book levels` and `book missing` are taken over from the answers of the positions before, so that the same counts are not made again.
+
+**Changes**
+
+- The changes of C version v4.5.5-nikque.24 are included ([C release notes](https://github.com/Nikque/edax-reversi-AVX/blob/edax-4.5.5-fixes/RELEASE-NOTES.md#v455-nikque24)).
+  - Umigame numbers: when the graph of the position after a move is counted, the values of the positions 1 and 2 moves further in it are kept, so that their graphs are not built again when they become the current position.
+  - Numbers of positions (`part=count`) and `book levels`: the answer of each position is kept until the book changes.
+  - `book missing`: when the kept precision stages already tell that the range asked finds nothing, it answers 0 lines without walking.
+- Manual: 12.4 describes the three changes above (the same text as the C version).
+
+**Compatibility**
+
+- The answers of `book moveinfo`, `book levels` and `book missing` are the same as in v4.5.5-newedax.8, except that an umigame number marked `exact=0` when counted from its position alone may become the exact value kept from the position before (not marked, smaller or equal).
+- The search results, `eval.dat` and the book file format do not change.
+
+**Checked**: with the tests of the C version (`tests/book-analyze.cpp`), the answers taken over are those found from each position alone, for every move. The `@` lines of the same commands as v4.5.5-newedax.8 (2 test books, 5 conditions) are the same as those of newedax.8 and of the C version.
+
+**Not checked**: the speed on a real book, the behaviour in the GUI, Android devices.
 
 ---
 

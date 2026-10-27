@@ -12,6 +12,7 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 
 | newedax | C 版（nikque） | C 版（eval2） |
 |---|---|---|
+| newedax.9（未公開） | nikque.24（未公開） | eval2.12（未公開） |
 | newedax.8 | nikque.23 | eval2.11 |
 | newedax.7 | nikque.22 | eval2.10 |
 | newedax.6 | nikque.21 | eval2.9 |
@@ -20,6 +21,29 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 | newedax.3 | nikque.18 | eval2.6 |
 | newedax.2 | nikque.18 | eval2.6 |
 | newedax.1 | nikque.17 | eval2.5 |
+
+---
+
+## v4.5.5-newedax.9
+
+**未公開**（次の版）。GUI の候補手の表のうみがめ数・局面の数と、`book levels`・`book missing` を、C 版と同じく、前の局面の答えから引き継いで、同じ計算をし直さないようにしました。
+
+**変更**
+
+- C 版 v4.5.5-nikque.24 の変更を取り込みました（[C 版の修正一覧](https://github.com/Nikque/edax-reversi-AVX/blob/edax-4.5.5-fixes/RELEASE-NOTES.ja.md#v455-nikque24)）。
+  - うみがめ数：手の後の局面の網を数えるとき、その中の 1・2 手先の局面の値も覚え、その局面が今の局面になったときに網を作り直しません。
+  - 局面の数（`part=count`）と `book levels`：局面ごとの答えを、book が変わるまで覚えます。
+  - `book missing`：覚えている精度の段階から、聞いた範囲で何も見つからないとわかるときは、歩かずに 0 本と答えます。
+- 手引き：12.4 に上の 3 つを書きました（C 版と同じ文）。
+
+**互換性**
+
+- `book moveinfo`・`book levels`・`book missing` の答えは v4.5.5-newedax.8 と同じです。ただし、その局面だけから数えると `exact=0` が付くうみがめ数が、前の局面で覚えたちょうどの値（`exact=0` なし、より小さいか同じ値）になることがあります。
+- 探索の結果・`eval.dat`・book のファイル形式は変わりません。
+
+**確認**：C 版と同じ試験（`tests/book-analyze.cpp`）で、引き継いだ答えは、その局面だけから求めた答えと全部の手で同じでした。v4.5.5-newedax.8 と同じ命令（試験用の book 2 つ、条件 5 つ）を流した `@` の行は、newedax.8 とも C 版とも同じでした。
+
+**未確認**：実 book での速さ、GUI での動き、Android の実機。
 
 ---
 
