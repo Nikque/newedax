@@ -5,6 +5,18 @@ Tests and measurements done for each version, moved without changes from the for
 For what changed, see the [release notes](../../RELEASE-NOTES.md). "Above" and "below" in the text refer to positions in the former document.
 
 
+## v4.5.5-newedax.10
+
+Checks:
+
+- The test of the order of the terms (the tests of the C version, `tests/book-analyze.cpp`): with `umigame-order`, the numbers and the `exact` marks are all the same when the terms are put in random orders before they are sorted. The earlier tests pass too, with the same numbers as the C version (39 in the test of dropped terms of `umigame-large` included); so do the tests of the precision stages (502,470 moves) and of the hint (24 cases).
+- The tests of the analysis commands (the comparisons on 3 small books, the real `book deviate` family, 40,000 random graphs of positions, the background thread, the lines of `book bestlines` and `book findline`) all pass with the released `wEdax-x86-64-v3.exe`; so do the `book reduce` tests, 500 cases, and the 14 tests of damaged books and wrong words.
+- The answers of 10 commands on the same positions (6,880 answers) are all the same as those of the C version v4.5.5-nikque.25 (except the time).
+- Search: the 5 Windows release programs solve fforum-20-39 with 1 thread with the same results and node counts as v4.5.5-newedax.9: 78,733,223 with the `eval.dat` of eval2, 77,639,567 with that of Edax 4.5; the 7 Cassio cases pass. The 3 DLLs: 206 API checks, 0 failures, with both `eval.dat`. The 14 eval2 tools: built and tested without failure (compared with the C tools, only the seconds of a progress line of `label` differ; the files made are the same). No program, DLL or Android binary holds a folder of the build machine. The 4 Android binaries: no warning (not run on a device).
+- The search, the evaluation, the book learning and the file format are not changed (only the order in which `book_analyze.cpp` drops the terms of an umigame number is changed).
+- Size (against v4.5.5-newedax.9): `wEdax-x86-64-v4.exe` (no PGO) the same size, the 4 PGO programs −512 to +512 bytes, the 3 DLLs the same size; the Android programs +32 and +16 bytes, the libraries +32 and +16 bytes.
+- The speed was not measured.
+
 ## v4.5.5-newedax.9
 
 Checks:

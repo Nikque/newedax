@@ -12,7 +12,7 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 
 | newedax | C 版（nikque） | C 版（eval2） |
 |---|---|---|
-| newedax.10（未公開） | nikque.25（未公開） | eval2.13（未公開） |
+| newedax.10 | nikque.25 | eval2.13 |
 | newedax.9 | nikque.24 | eval2.12 |
 | newedax.8 | nikque.23 | eval2.11 |
 | newedax.7 | nikque.22 | eval2.10 |
@@ -27,7 +27,7 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 
 ## v4.5.5-newedax.10
 
-**未公開**（次の版）。C 版と同じく、うみがめ数の `exact=0` が付く値が、組み立てた環境によらず同じになるようにしました。
+C 版と同じく、うみがめ数の `exact=0` が付く値が、組み立てた環境によらず同じになるようにしました。
 
 **変更**
 
@@ -42,6 +42,8 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 **確認**：C 版と同じ試験（`tests/book-analyze.cpp`、`umigame-order` を含む）が全部通り、数は C 版と同じでした。
 
 **未確認**：実 book での速さ、GUI での動き、Android の実機。
+
+[検証記録](docs/validation/newedax.ja.md#v455-newedax10)
 
 ---
 

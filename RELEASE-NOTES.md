@@ -12,7 +12,7 @@ Each version contains all changes of the C versions on the same row.
 
 | newedax | C (nikque) | C (eval2) |
 |---|---|---|
-| newedax.10 (not released) | nikque.25 (not released) | eval2.13 (not released) |
+| newedax.10 | nikque.25 | eval2.13 |
 | newedax.9 | nikque.24 | eval2.12 |
 | newedax.8 | nikque.23 | eval2.11 |
 | newedax.7 | nikque.22 | eval2.10 |
@@ -27,7 +27,7 @@ Each version contains all changes of the C versions on the same row.
 
 ## v4.5.5-newedax.10
 
-**Not released** (the next version). As in the C version, an umigame number marked `exact=0` is the same whatever the build.
+As in the C version, an umigame number marked `exact=0` is the same whatever the build.
 
 **Changes**
 
@@ -42,6 +42,8 @@ Each version contains all changes of the C versions on the same row.
 **Checked**: the tests of the C version (`tests/book-analyze.cpp`, `umigame-order` included) all pass, with the same numbers as the C version.
 
 **Not checked**: the speed on a real book, the behaviour in the GUI, Android devices.
+
+[Tests and measurements](docs/validation/newedax.en.md#v455-newedax10)
 
 ---
 
