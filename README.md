@@ -17,7 +17,7 @@ For Linux and macOS executables, use the C version ([edax-reversi-AVX releases](
 
 - Evaluation: eval2 by default. The upstream Edax `eval.dat` also works.
 - Commands, settings and results are the same as the C version (node counts, scores and lines checked on fforum-20-39 with both `eval.dat` files).
-- Each newedax release contains all changes of a C release. The latest, **v4.5.5-newedax.8**, corresponds to C v4.5.5-nikque.23 / v4.5.5-eval2.11.
+- Each newedax release contains all changes of a C release. The latest, **v4.5.5-newedax.9**, corresponds to C v4.5.5-nikque.24 / v4.5.5-eval2.12.
 
 ## Differences from the C version
 
@@ -65,7 +65,7 @@ Linux・macOS 用の実行ファイルは C 版（[edax-reversi-AVX の Releases
 
 - 評価関数は eval2 が既定です。元の Edax の `eval.dat` も使えます。
 - コマンド・設定・結果は C 版と同じです（fforum-20-39 で、2 種類の `eval.dat` のどちらでもノード数・評価値・読み筋が一致することを確認）。
-- newedax の各版は、C 版のある版の変更をすべて含みます。最新の **v4.5.5-newedax.8** は、C 版 v4.5.5-nikque.23・v4.5.5-eval2.11 に対応します。
+- newedax の各版は、C 版のある版の変更をすべて含みます。最新の **v4.5.5-newedax.9** は、C 版 v4.5.5-nikque.24・v4.5.5-eval2.12 に対応します。
 
 ### C 版との違い
 

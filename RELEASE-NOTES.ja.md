@@ -12,7 +12,7 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 
 | newedax | C 版（nikque） | C 版（eval2） |
 |---|---|---|
-| newedax.9（未公開） | nikque.24（未公開） | eval2.12（未公開） |
+| newedax.9 | nikque.24 | eval2.12 |
 | newedax.8 | nikque.23 | eval2.11 |
 | newedax.7 | nikque.22 | eval2.10 |
 | newedax.6 | nikque.21 | eval2.9 |
@@ -26,7 +26,7 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 
 ## v4.5.5-newedax.9
 
-**未公開**（次の版）。GUI の候補手の表のうみがめ数・局面の数と、`book levels`・`book missing` を、C 版と同じく、前の局面の答えから引き継いで、同じ計算をし直さないようにしました。
+GUI の候補手の表のうみがめ数・局面の数と、`book levels`・`book missing` を、C 版と同じく、前の局面の答えから引き継いで、同じ計算をし直さないようにしました。
 
 **変更**
 
@@ -44,6 +44,8 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 **確認**：C 版と同じ試験（`tests/book-analyze.cpp`）で、引き継いだ答えは、その局面だけから求めた答えと全部の手で同じでした。v4.5.5-newedax.8 と同じ命令（試験用の book 2 つ、条件 5 つ）を流した `@` の行は、newedax.8 とも C 版とも同じでした。
 
 **未確認**：実 book での速さ、GUI での動き、Android の実機。
+
+[検証記録](docs/validation/newedax.ja.md#v455-newedax9)
 
 ---
 

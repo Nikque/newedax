@@ -12,7 +12,7 @@ Each version contains all changes of the C versions on the same row.
 
 | newedax | C (nikque) | C (eval2) |
 |---|---|---|
-| newedax.9 (not released) | nikque.24 (not released) | eval2.12 (not released) |
+| newedax.9 | nikque.24 | eval2.12 |
 | newedax.8 | nikque.23 | eval2.11 |
 | newedax.7 | nikque.22 | eval2.10 |
 | newedax.6 | nikque.21 | eval2.9 |
@@ -26,7 +26,7 @@ Each version contains all changes of the C versions on the same row.
 
 ## v4.5.5-newedax.9
 
-**Not released** (the next version). As in the C version, the umigame numbers and the numbers of positions of the candidate moves of the GUI, `book levels` and `book missing` are taken over from the answers of the positions before, so that the same counts are not made again.
+As in the C version, the umigame numbers and the numbers of positions of the candidate moves of the GUI, `book levels` and `book missing` are taken over from the answers of the positions before, so that the same counts are not made again.
 
 **Changes**
 
@@ -44,6 +44,8 @@ Each version contains all changes of the C versions on the same row.
 **Checked**: with the tests of the C version (`tests/book-analyze.cpp`), the answers taken over are those found from each position alone, for every move. The `@` lines of the same commands as v4.5.5-newedax.8 (2 test books, 5 conditions) are the same as those of newedax.8 and of the C version.
 
 **Not checked**: the speed on a real book, the behaviour in the GUI, Android devices.
+
+[Tests and measurements](docs/validation/newedax.en.md#v455-newedax9)
 
 ---
 

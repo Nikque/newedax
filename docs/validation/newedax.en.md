@@ -5,6 +5,18 @@ Tests and measurements done for each version, moved without changes from the for
 For what changed, see the [release notes](../../RELEASE-NOTES.md). "Above" and "below" in the text refer to positions in the former document.
 
 
+## v4.5.5-newedax.9
+
+Checks:
+
+- The tests of what is taken over (the tests of the C version, `tests/book-analyze.cpp`): the umigame numbers, the numbers of positions, `book levels` and `book missing` taken over are those found from each position alone, with the same numbers as the C version; the tests of the precision stages (502,470 moves) and of the hint (24 cases) pass. With a test build, the `@` lines of the commands of the GUI in 5 conditions on each position of 10 games of 2 test books are all the same as those of a program built from the source of v4.5.5-newedax.8 and as those of the C version.
+- The tests of the analysis commands (the comparisons on 3 small books, the real `book deviate` family, 40,000 random graphs of positions, the background thread, the lines of `book bestlines` and `book findline`) all pass with the released `wEdax-x86-64-v3.exe`; so do the `book reduce` tests, 500 cases, and the 14 tests of damaged books and wrong words.
+- The answers of 10 commands on the same positions (6,880 answers) are all the same as those of the C version v4.5.5-nikque.24 (except the time).
+- Search: the 5 Windows release programs solve fforum-20-39 with 1 thread with the same results and node counts as v4.5.5-newedax.8: 78,733,223 with the `eval.dat` of eval2, 77,639,567 with that of Edax 4.5; the 7 Cassio cases pass. The 3 DLLs: 206 API checks, 0 failures, with both `eval.dat`. The 14 eval2 tools: built and tested without failure (compared with the C tools, only the seconds of a progress line of `label` differ; the files made are the same). No program, DLL or Android binary holds a folder of the build machine. The 4 Android binaries: no warning (not run on a device).
+- The search, the evaluation, the book learning and the file format are not changed (only the code of `book_analyze.cpp` that finds the umigame numbers, the numbers of positions, `book levels` and `book missing` is changed).
+- Size (against v4.5.5-newedax.8): `wEdax-x86-64-v4.exe` (no PGO) +1,536 bytes, the 4 PGO programs +512 to +2,560 bytes, the 3 DLLs the same size; the Android programs +1,488 and +848 bytes, the libraries +1,504 and +864 bytes.
+- The speed was not measured.
+
 ## v4.5.5-newedax.8
 
 Checks:
