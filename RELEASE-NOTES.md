@@ -12,6 +12,7 @@ Each version contains all changes of the C versions on the same row.
 
 | newedax | C (nikque) | C (eval2) |
 |---|---|---|
+| newedax.10 (not released) | nikque.25 (not released) | eval2.13 (not released) |
 | newedax.9 | nikque.24 | eval2.12 |
 | newedax.8 | nikque.23 | eval2.11 |
 | newedax.7 | nikque.22 | eval2.10 |
@@ -21,6 +22,26 @@ Each version contains all changes of the C versions on the same row.
 | newedax.3 | nikque.18 | eval2.6 |
 | newedax.2 | nikque.18 | eval2.6 |
 | newedax.1 | nikque.17 | eval2.5 |
+
+---
+
+## v4.5.5-newedax.10
+
+**Not released** (the next version). As in the C version, an umigame number marked `exact=0` is the same whatever the build.
+
+**Changes**
+
+- The changes of C version v4.5.5-nikque.25 are included ([C release notes](https://github.com/Nikque/edax-reversi-AVX/blob/edax-4.5.5-fixes/RELEASE-NOTES.md#v455-nikque25)).
+- Manual: 12.4 says so (the same text as the C version).
+
+**Compatibility**
+
+- A number marked `exact=0` may differ from v4.5.5-newedax.9 (both are upper bounds). The other answers are the same.
+- The search results, `eval.dat` and the book file format do not change.
+
+**Checked**: the tests of the C version (`tests/book-analyze.cpp`, `umigame-order` included) all pass, with the same numbers as the C version.
+
+**Not checked**: the speed on a real book, the behaviour in the GUI, Android devices.
 
 ---
 
