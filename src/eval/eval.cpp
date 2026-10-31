@@ -578,13 +578,13 @@ constexpr int EVAL_N_PACKED = 114364;
 #define EVAL2_GROUP_SIZE 20
 #define EVAL2_N_GROUP 13	// groups of Edax 4.5 (the packed weights)
 #if EVAL_SLOTS > 48
-	#define EVAL2_N_GROUP_ALL (EVAL2_N_GROUP + 4)	// with the extra groups (EVAL_N_X weights each)
+	#define EVAL2_N_GROUP_ALL (EVAL2_N_GROUP + 4)	// with the extra groups (EVAL_X_SIZE weights each)
 #else
 	#define EVAL2_N_GROUP_ALL EVAL2_N_GROUP
 #endif
 #define EVAL2_GROUPS_AT 96
 #define EVAL2_HEADER_SIZE(n_group) (EVAL2_GROUPS_AT + (n_group) * EVAL2_GROUP_SIZE + 4)
-/** weights of an extra group (3^10, not packed) */
+/** weights of the table of an extra group (3^10, not packed; a group of 9 squares uses the first 3^9) */
 constexpr int EVAL_N_X = 59049;
 static const char EVAL2_MAGIC[8] = {'N', 'E', 'D', 'X', 'E', 'V', 'A', 'L'};
 static const char EVAL2_END[4] = {'E', 'E', 'N', 'D'};
@@ -618,10 +618,10 @@ static const struct EvalGroup {
 	{ 4, 4,    45, {D1, C2, B3, A4}},                                // S4 (42-45)
 	{ 0, 1,     1, {}},                                              // S0 (46)
 #if EVAL_SLOTS > 48
-	{10, 4, EVAL_N_X, {C1, D1, E1, F1, C2, D2, E2, F2, D3, E3}},     // X0 (slots 48-51, see EVAL_X_SQUARE)
-	{10, 4, EVAL_N_X, {A1, B1, C1, D1, E1, A2, B2, C2, D2, E2}},     // X1 (52-55)
-	{10, 4, EVAL_N_X, {A1, A2, A3, A4, A5, B1, B2, B3, B4, B5}},     // X2 (56-59)
-	{10, 4, EVAL_N_X, {A1, B2, C3, D4, B1, C2, D3, A2, B3, C4}},     // X3 (60-63)
+	{10, 4, 59049, {B1, C1, D1, E1, F1, G1, C2, D2, E2, F2}},        // X0 (slots 48-51, see EVAL_X_SQUARE)
+	{10, 4, 59049, {A1, B1, G1, H1, B2, G2, C3, F3, D4, E4}},        // X1 (52-55)
+	{10, 4, 59049, {B2, C2, D2, E2, F2, G2, C3, D3, E3, F3}},        // X2 (56-59)
+	{ 9, 4, 19683, {C3, D3, E3, C4, D4, E4, C5, D5, E5}},            // X3 (60-63)
 #endif
 };
 
@@ -1078,11 +1078,14 @@ void eval_open(const char* file)
 		*(pe->S0) = w[EVAL_PACKED_OFS[12]];
 #if EVAL_SLOTS > 48
 		// extra groups: the file weights (from the side to move at an even ply), or 0 if the file has none
-		for (i = 0; i < 4; ++i) {
-			const short *wx = w + EVAL_N_PACKED + i * EVAL_N_X;
-			if (header.n_group == EVAL2_N_GROUP) for (k = 0; k < EVAL_N_X; k++) *(pe->X[i][k]) = 0;
-			else if (ply & 1) for (k = 0; k < EVAL_N_X; k++) *(pe->X[i][k]) = wx[OPPONENT_FEATURE[k]];
-			else for (k = 0; k < EVAL_N_X; k++) *(pe->X[i][k]) = wx[k];
+		{
+			const short *wx = w + EVAL_N_PACKED;
+			for (i = 0; i < 4; wx += EVAL_X_SIZE[i++]) {
+				for (k = 0; k < EVAL_N_X; k++) *(pe->X[i][k]) = 0;
+				if (header.n_group == EVAL2_N_GROUP) continue;
+				if (ply & 1) for (k = 0; k < EVAL_X_SIZE[i]; k++) *(pe->X[i][k]) = wx[OPPONENT_FEATURE[k + EVAL_X_BASE[i]]];
+				else for (k = 0; k < EVAL_X_SIZE[i]; k++) *(pe->X[i][k]) = wx[k];
+			}
 		}
 #endif
 	}
@@ -1345,8 +1348,8 @@ void eval_pass(Eval *eval)
 	for (i = 42; i < 46; ++i)	// 4
 		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] - 3159 + 29484] + 3159;
 #if EVAL_SLOTS > 48
-	for (i = 48; i < 64; ++i)	// 10
-		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i]];
+	for (i = 48; i < 64; ++i)	// 9 or 10
+		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + EVAL_X_BASE[(i - 48) >> 2]];
 #endif
 }
 

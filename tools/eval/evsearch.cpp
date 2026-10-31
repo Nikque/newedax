@@ -14,7 +14,10 @@
  *                  estab (edge-stable discs), mobhv, mobd (mobility along some directions), mob2d (joint table of both mobilities)
  *   output       : "config_name lanes table_entries | ply source mse ..." one line per configuration
  *   other options: -lambda-prior l, -prior eval.dat, -teacher eval.dat -alpha a, -base dir:cfg, -dump dir, -notie,
- *                  -window k -decay d (training samples also from the plies p +- 2, ..., p +- 2k, weighted by d^j)
+ *                  -window k -decay d (training samples also from the plies p +- 2, ..., p +- 2k, weighted by d^j),
+ *                  -mute m (preconditioner max(N_i, m) for a weight seen N_i times, Buro 1997),
+ *                  -method sd -beta b (preconditioned steepest descent from zero, instead of conjugate gradients),
+ *                  -stop a (sd: stop when the mean absolute change of the weights falls under a)
  */
 #include <cmath>
 #include <omp.h>
@@ -541,6 +544,46 @@ static void load(int pi, int ply)
 static int nt = 24, iter = 30;
 static const char *dumpdir;	// -dump dir: write the trained weights (dir/<config>_<ply>.w, doubles) and instances (dir/<config>.pat)
 static double lambda = 300, lambda_prior = -1;	// -lambda-prior: L2 strength for the weights that have a prior (default: lambda; 1e30 freezes them)
+static double mute = 0, beta_sd = 0, stop_sd = 0;	// -mute, -beta, -stop
+static int method_sd = 0;	// -method sd
+
+// Preconditioned steepest descent: w[a] += beta * gradient[a] / M[a] at each iteration, from w = 0 (Buro 1997). The
+// gradient is computed again from all the records at each iteration; b is the gradient at w = 0.
+static EVTOOL_NOINLINE void descent(const Data *D, const unsigned int *idx, int nf, int nw, const double *lam, const double *b, const double *M, double *w, double **tq)
+{
+	double *q = (double *) xmalloc(nw * sizeof *q);
+	const double step = beta_sd > 0 ? beta_sd : 1.0 / (nf + 1);
+	for (int it = 0; it < iter; ++it) {
+		#pragma omp parallel num_threads(nt)
+		{
+			double *lq = tq[omp_get_thread_num()];
+			memset(lq, 0, nw * 8);
+			int kk;
+			#pragma omp for schedule(static)
+			for (kk = 0; kk < D->n; ++kk) {
+				const unsigned int *x = idx + (size_t) kk * nf;
+				double t = w[0];
+				for (int j = 0; j < nf; ++j) t += w[x[j]];
+				t *= D->c[kk];
+				for (int j = 0; j < nf; ++j) lq[x[j]] += t;
+				lq[0] += t;
+			}
+		}
+		double change = 0, largest = 0;
+		int i;
+		#pragma omp parallel for reduction(+:change)
+		for (i = 0; i < nw; ++i) {
+			double a = 0;
+			for (int t = 0; t < nt; ++t) a += tq[t][i];
+			q[i] = lam[i] >= 1e20 ? 0 : step * (b[i] - a - lam[i] * w[i]) / M[i];
+			change += fabs(q[i]);
+		}
+		for (i = 0; i < nw; ++i) { w[i] += q[i]; if (fabs(q[i]) > largest) largest = fabs(q[i]); }
+		if (it + 1 == iter || (it + 1) % 50 == 0) fprintf(stderr, "descent %d: mean change %.5f, largest %.4f\n", it + 1, change / nw, largest);
+		if (change / nw < stop_sd) break;
+	}
+	free(q);
+}
 
 #ifdef _MSC_VER
 #pragma code_seg(".text$a5")
@@ -570,7 +613,7 @@ static void run_config(const Config *c, int pi, double *mse)
 		tt[k] = (float) (D->t[k] - p0);
 	}
 	double *w = (double *) xcalloc(nw, 8), *r = (double *) xcalloc(nw, 8), *z = (double *) xcalloc(nw, 8);
-	double *p = (double *) xcalloc(nw, 8), *q = (double *) xcalloc(nw, 8), *M = (double *) xcalloc(nw, 8);
+	double *p = (double *) xcalloc(nw, 8), *q = (double *) xcalloc(nw, 8), *M = (double *) xcalloc(nw, 8), *cnt = (double *) xcalloc(nw, 8);
 	double **tq = (double **) xmalloc(nt * sizeof *tq), **td = (double **) xmalloc(nt * sizeof *td);
 	for (int t = 0; t < nt; ++t) { tq[t] = (double *) xmalloc(nw * 8); td[t] = (double *) xmalloc(nw * 8); }
 	// residual & diagonal at w = 0
@@ -589,10 +632,11 @@ static void run_config(const Config *c, int pi, double *mse)
 	}
 	int i;
 	#pragma omp parallel for
-	for (i = 0; i < nw; ++i) { double a = 0, b = 0; for (int t = 0; t < nt; ++t) { a += tq[t][i]; b += td[t][i]; } r[i] = a; M[i] = b + lam[i]; if (lam[i] >= 1e20) { r[i] = 0; M[i] = 1; } }	// lam >= 1e20: frozen at the prior
+	for (i = 0; i < nw; ++i) { double a = 0, b = 0; for (int t = 0; t < nt; ++t) { a += tq[t][i]; b += td[t][i]; } r[i] = a; cnt[i] = b; M[i] = (b > mute ? b : mute) + lam[i]; if (M[i] <= 0) M[i] = 1; if (lam[i] >= 1e20) { r[i] = 0; M[i] = 1; } }	// lam >= 1e20: frozen at the prior
 	double rz = 0;
 	for (i = 0; i < nw; ++i) { z[i] = r[i] / M[i]; p[i] = z[i]; rz += r[i] * z[i]; }
-	for (int it = 0; it < iter; ++it) {
+	if (method_sd) descent(D, idx, nf, nw, lam, r, M, w, tq);
+	else for (int it = 0; it < iter; ++it) {
 		#pragma omp parallel num_threads(nt)
 		{
 			double *lq = tq[omp_get_thread_num()];
@@ -624,7 +668,7 @@ static void run_config(const Config *c, int pi, double *mse)
 		if (j > 0 && c->inst_ofs[j] == c->inst_ofs[j - 1]) continue;
 		int size = 1;
 		for (int a = 0; a < c->inst_n[j]; ++a) size *= 3;
-		for (int x = 0; x < size; ++x) w[c->inst_ofs[j] + x] = w[c->inst_ofs[j] + c->inst_canon[j][x]];
+		for (int x = 0; x < size; ++x) { w[c->inst_ofs[j] + x] = w[c->inst_ofs[j] + c->inst_canon[j][x]]; cnt[c->inst_ofs[j] + x] = cnt[c->inst_ofs[j] + c->inst_canon[j][x]]; }
 	}
 	free(w0); free(tt); free(lam);
 	if (dumpdir) {
@@ -632,6 +676,10 @@ static void run_config(const Config *c, int pi, double *mse)
 		evtool::xname(name, "%s/%s_%02d.w", dumpdir, c->name, plies[pi]);
 		FILE *g = xfopen(name, "wb");
 		fwrite(w, 8, nw, g);
+		if (fclose(g) != 0) die("cannot write %s", name);
+		sprintf(name, "%s/%s_%02d.n", dumpdir, c->name, plies[pi]);	// the weighted number of samples of each weight
+		g = xfopen(name, "wb");
+		fwrite(cnt, 8, nw, g);
 		if (fclose(g) != 0) die("cannot write %s", name);
 	}
 	// test errors
@@ -655,7 +703,7 @@ static void run_config(const Config *c, int pi, double *mse)
 		mse[d] = se / T->n;
 		if (teacher) mse[8 + d] = st / T->n;
 	}
-	free(w); free(r); free(z); free(p); free(q); free(M);
+	free(w); free(r); free(z); free(p); free(q); free(M); free(cnt);
 	for (int t = 0; t < nt; ++t) { free(tq[t]); free(td[t]); }
 	free(tq); free(td);
 }
@@ -691,6 +739,10 @@ int main(int argc, char **argv)
 		else if (!strcmp(argv[i], "-threads")) nt = atoi(value(i));
 		else if (!strcmp(argv[i], "-dump")) dumpdir = value(i);
 		else if (!strcmp(argv[i], "-notie")) tie = 0;
+		else if (!strcmp(argv[i], "-mute")) mute = atof(value(i));
+		else if (!strcmp(argv[i], "-beta")) beta_sd = atof(value(i));
+		else if (!strcmp(argv[i], "-stop")) stop_sd = atof(value(i));
+		else if (!strcmp(argv[i], "-method")) { const char *m = value(i); if (!strcmp(m, "sd")) method_sd = 1; else if (strcmp(m, "cg")) die("bad -method %s (cg or sd)", m); }
 		else if (!strcmp(argv[i], "-window")) { window = atoi(value(i)); if (window < 0 || window > 30) die("bad -window (0 to 30)"); }
 		else if (!strcmp(argv[i], "-decay")) { decay = atof(value(i)); if (!(decay > 0 && decay <= 1)) die("bad -decay (0 < d <= 1)"); }
 		else if (!strcmp(argv[i], "-base")) { if (!dir_name_parse(value(i), base_dir, sizeof base_dir, base_cfg, sizeof base_cfg)) die("bad -base %s (dir:cfg)", argv[i]); }

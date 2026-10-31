@@ -83,7 +83,7 @@ typedef struct Eval_weight {
 	short	S8x4[6561*4][2];
 	short	S7654[2187+729+243+81][2];
 #if EVAL_SLOTS > 48
-	short	X[4][59049][2];	// extra groups of 10 squares (slots 48-63, 4 places each)
+	short	X[4][59049][2];	// extra groups of 9 or 10 squares (slots 48-63, 4 places each)
 #endif
 } Eval_weight;
 

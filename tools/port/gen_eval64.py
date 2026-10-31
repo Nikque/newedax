@@ -38,14 +38,12 @@ SYM = {
     'ht': lambda c, r: (7 - r, c),       # transpose then mirror A <-> H
 }
 
-# Extra pattern groups of the 64-slot evaluation: 4 groups of 10 squares, 4 places each (slots 48-63).
-# They are placeholders of the right size (3^10 weights a group), to build and measure the 64-slot
-# evaluation: the patterns of a trained evaluation are chosen later.
+# Extra pattern groups of the 64-slot evaluation: 4 groups of 9 or 10 squares, 4 places each (slots 48-63).
 EXTRA = [
-    ('edge block', 'C1 D1 E1 F1 C2 D2 E2 F2 D3 E3', ['id', 'v', 't', 'ht']),
-    ('corner 2x5', 'A1 B1 C1 D1 E1 A2 B2 C2 D2 E2', ['id', 'h', 'v', 'hv']),
-    ('corner 5x2', 'A1 A2 A3 A4 A5 B1 B2 B3 B4 B5', ['id', 'h', 'v', 'hv']),
-    ('diagonal band', 'A1 B2 C3 D4 B1 C2 D3 A2 B3 C4', ['id', 'h', 'v', 'hv']),
+    ('edge and inner squares', 'B1 C1 D1 E1 F1 G1 C2 D2 E2 F2', ['id', 'v', 't', 'ht']),
+    ('corners, X squares and diagonals', 'A1 B1 G1 H1 B2 G2 C3 F3 D4 E4', ['id', 'v', 't', 'ht']),
+    ('wall behind the edge', 'B2 C2 D2 E2 F2 G2 C3 D3 E3 F3', ['id', 'v', 't', 'ht']),
+    ('centre 3x3', 'C3 D3 E3 C4 D4 E4 C5 D5 E5', ['id', 'h', 'v', 'hv']),
 ]
 
 
@@ -107,6 +105,12 @@ def main(argv):
            ' * Feature tables of the 64-slot evaluation (EVAL_SLOTS=64), written by tools/port/gen_eval64.py',
            ' * from the 48-slot tables of eval.cpp (slots 0-47) and the extra pattern groups (slots 48-63).',
            ' * Do not edit: run the script again.', ' */', '',
+           '/** extra groups: squares, weights, and what is added to a feature of fewer than 10 squares to index OPPONENT_FEATURE */',
+           'static const unsigned char EVAL_X_N[4] = {' + ', '.join(str(len(e[1].split())) for e in EXTRA) + '};',
+           'static const int EVAL_X_SIZE[4] = {' + ', '.join(str(3 ** len(e[1].split())) for e in EXTRA) + '};',
+           'static const int EVAL_X_BASE[4] = {' + ', '.join(str(0 if len(e[1].split()) == 10 else 19683) for e in EXTRA) + '};',
+           'enum { EVAL_N_X_ALL = ' + str(sum(3 ** len(e[1].split()) for e in EXTRA)) + ' };',
+           '',
            '/** squares of the extra features (slots 48 to 63) */',
            'static const unsigned char EVAL_X_SQUARE[16][10] = {']
     for k, squares in enumerate(extra):

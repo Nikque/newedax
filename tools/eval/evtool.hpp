@@ -492,6 +492,15 @@ inline void et_groups(unsigned char *x)
 	x[1] = 1; x[4] = 1;	// S0: no square, 1 place, 1 weight
 }
 
+/** the extra groups of the 64-slot evaluation (EVAL_GROUP of src/eval), 4 places each, not packed */
+inline constexpr ET_F2X ET_X_GROUP[4] = {
+	{10, {B1, C1, D1, E1, F1, G1, C2, D2, E2, F2}},
+	{10, {A1, B1, G1, H1, B2, G2, C3, F3, D4, E4}},
+	{10, {B2, C2, D2, E2, F2, G2, C3, D3, E3, F3}},
+	{ 9, {C3, D3, E3, C4, D4, E4, C5, D5, E5}},
+};
+inline constexpr int ET_X_SIZE[4] = { 59049, 59049, 59049, 19683 };
+
 /** the mobility group of a file of form 2 (src/eval: EVAL2_MOBILITY_GROUP) */
 inline constexpr unsigned char ET_MOBILITY_GROUP[20] = { 0, 2, 1, 0, ET_NMOB, 0, 0, 0 };
 
