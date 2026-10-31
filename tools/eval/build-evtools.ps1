@@ -11,10 +11,10 @@ $here = $PSScriptRoot
 $root = Split-Path -Parent (Split-Path -Parent $here)
 if (-not $Tree) { $Tree = $root }
 $boost = if ($env:BOOST_DIR) { $env:BOOST_DIR } else { Join-Path (Split-Path -Parent $root) 'third_party\boost_1_92_0' }	# as src\NMakefile
-$all = @('evsearch', 'evtrain', 'w2dat2', 'sprepair', 'sample', 'bookdump', 'bookscan', 'selfplay3', 'label', 'playout', 'gen', 'leafgen', 'evcheck', 'trans2rec', 'evshape')
+$all = @('evsearch', 'evtrain', 'w2dat2', 'sprepair', 'sample', 'bookdump', 'bookscan', 'selfplay3', 'label', 'playout', 'gen', 'leafgen', 'evcheck', 'trans2rec', 'evshape', 'pcsigma')
 $list = if ($Tools) { $Tools -split ',' } else { $all }
-$omp = @('evsearch', 'evtrain', 'selfplay3', 'label', 'playout', 'gen', 'leafgen', 'evshape')
-$engine = @('selfplay3', 'label', 'playout', 'gen', 'leafgen', 'evcheck', 'trans2rec')
+$omp = @('evsearch', 'evtrain', 'selfplay3', 'label', 'playout', 'gen', 'leafgen', 'evshape', 'pcsigma')
+$engine = @('selfplay3', 'label', 'playout', 'gen', 'leafgen', 'evcheck', 'trans2rec', 'pcsigma')
 $vsdev = 'C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat'
 $env:PATH = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer;$env:PATH"
 New-Item -ItemType Directory -Force $Out | Out-Null

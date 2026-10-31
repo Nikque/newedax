@@ -5,7 +5,7 @@
  * then both sides play Edax at level L (exactly when at most E empties). Every position after the random part is
  * recorded with the final result of the game (disc difference of the side to move, empties to the winner) and with
  * the score of the search that chose the move.
- * usage: selfplay3 <outdir> <n_games> <seed> <threads> [-level L] [-rmin a] [-rmax b] [-exact E] [-eval file] [-alt p]
+ * usage: selfplay3 <outdir> <n_games> <seed> <threads> [-level L] [-rmin a] [-rmax b] [-exact E] [-eval file] [-alt p] [-h bits]
  * output: <outdir>/sp<ply>.bin (records player(8) opponent(8) final result(1), appended)
  *         <outdir>/ss<ply>.bin (same positions, with the score of the search that chose the move)
  *         with -alt p (0 < p <= 1): <outdir>/sa<ply>.bin, for a searched position with p probability, the position after
@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 	const char *outdir = argv[1];
 	const long long n_games = atoll(argv[2]);
 	const unsigned long long seed = strtoull(argv[3], nullptr, 10);
-	int nt = atoi(argv[4]), level = 8, rmin = 4, rmax = 32, exact = 0;	// -exact E: solve exactly when at most E empties
+	int nt = atoi(argv[4]), level = 8, rmin = 4, rmax = 32, exact = 0, hash_bits = 18;	// -exact E: solve exactly when at most E empties
 	const char *eval_file = "pw/eval.dat";
 	double p_alt = 0;
 	auto value = [&](int &i) -> char * { if (i + 1 >= argc) evtool::die("missing value of %s", argv[i]); return argv[++i]; };
@@ -39,13 +39,15 @@ int main(int argc, char **argv)
 		else if (!strcmp(argv[i], "-rmax")) rmax = atoi(value(i));
 		else if (!strcmp(argv[i], "-eval")) eval_file = value(i);
 		else if (!strcmp(argv[i], "-exact")) exact = atoi(value(i));
+		else if (!strcmp(argv[i], "-h")) hash_bits = atoi(value(i));
 		else if (!strcmp(argv[i], "-alt")) { p_alt = atof(value(i)); if (!(p_alt > 0 && p_alt <= 1)) evtool::die("bad -alt (0 < p <= 1)"); }
 	}
 	if (rmin < 0 || rmax < rmin || rmax > 60) evtool::die("bad -rmin / -rmax (0 <= rmin <= rmax <= 60)");
 	if (nt < 1) evtool::die("bad threads %s", argv[4]);
 
 	options.n_task = 1;
-	options.hash_table_size = 18;
+	options.hash_table_size = hash_bits;
+	options.probcut_model = 1;
 	options.verbosity = 0;
 	options.eval_file = (char *) eval_file;
 	bit_init();
@@ -97,7 +99,7 @@ int main(int argc, char **argv)
 		Rec buf[64], abuf[64];
 		signed char side[64], sscore[64];
 		long long g;
-		#pragma omp for schedule(dynamic, 16)
+		#pragma omp for schedule(dynamic, 1)
 		for (g = 0; g < n_games; ++g) {
 			unsigned long long r = mix64(seed * 0x9E3779B97F4A7C15ULL + g);
 			unsigned long long ra = r ^ 0xA5A5A5A5A5A5A5A5ULL;	// -alt: the random sequence of the other moves
