@@ -939,6 +939,29 @@ convert_end:
  *
  * @param file File name of the evaluation function data.
  */
+#ifdef __AVX512F__
+short *EVAL_FLAT;
+
+/**
+ * @brief Copy the interleaved weights to one table for each ply.
+ */
+static void eval_flat(void)
+{
+	free(EVAL_FLAT);
+	EVAL_FLAT = (short *) malloc(sizeof (short) * 61 * EVAL_FLAT_N);
+	if (EVAL_FLAT == NULL) fatal_error("Cannot allocate evaluation weights.\n");
+	for (int ply = 0; ply <= 60; ++ply) {
+		int p = ply - 2;
+		if (p < 0) p = 0;
+		p >>= 1;
+		if (p >= EVAL_N_2PLY - 1) p = EVAL_N_2PLY - 2;
+		const short *a = (const short *) &(*EVAL_WEIGHT)[p];
+		short *t = EVAL_FLAT + (size_t) ply * EVAL_FLAT_N;
+		for (int i = 0; i < EVAL_FLAT_N; ++i) t[i] = a[2 * i + (ply & 1)];
+	}
+}
+#endif
+
 void eval_open(const char* file)
 {
 	EvalFileHeader header;
@@ -1122,6 +1145,9 @@ void eval_open(const char* file)
 #endif
 
 	// f = file_open("eval.bin", "wb");
+#ifdef __AVX512F__
+	eval_flat();
+#endif
 	// fwrite(*EVAL_WEIGHT, sizeof(Eval_weight), EVAL_N_PLY, f);
 	// fclose(f);
 }
@@ -1133,6 +1159,10 @@ void eval_close(void)
 {
 	free(OPPONENT_FEATURE);
 	OPPONENT_FEATURE = NULL;
+#ifdef __AVX512F__
+	free(EVAL_FLAT);
+	EVAL_FLAT = NULL;
+#endif
 	free(EVAL_WEIGHT);
 	EVAL_WEIGHT = NULL;
 	free(EVAL_FILE);
