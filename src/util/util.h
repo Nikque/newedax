@@ -394,6 +394,17 @@ void thread_set_cpu(Thread, int);
 bool thread_cpu_bound(void);
 Thread thread_self(void);
 
+/** hint to the CPU inside a loop that waits */
+#if defined(_WIN32)
+	#define cpu_pause() YieldProcessor()
+#elif defined(__x86_64__) || defined(__i386__)
+	#define cpu_pause() __builtin_ia32_pause()
+#elif defined(__aarch64__)
+	#define cpu_pause() __asm__ __volatile__("yield")
+#else
+	#define cpu_pause() ((void) 0)
+#endif
+
 /** atomic addition */
 static inline void atomic_add(volatile unsigned long long *value, long long i)
 {

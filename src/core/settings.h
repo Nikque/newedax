@@ -150,7 +150,10 @@ constexpr int DEPTH_TO_SHALLOW_SEARCH = 6;
 #define SORT_ALPHA_DELTA 8
 
 /** Try Node splitting (for parallel search) down to that depth. */
-#define SPLIT_MIN_DEPTH 5
+#define SPLIT_MIN_DEPTH 9
+
+/** Polls of a waiting thread before it sleeps on its condition (for parallel search). */
+#define WAIT_SPIN_COUNT 20000
 
 /** Stop Node splitting (for parallel search) when few move remains.  */
 #define SPLIT_MIN_MOVES_TODO 1

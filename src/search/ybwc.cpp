@@ -227,7 +227,10 @@ void node_wait_slaves(Node* node)
 	while (node->n_slave) {
 		node->is_waiting = true;
 		assert(node->is_helping == false);
-		condition_wait(node);
+		unlock(node);
+		for (i = 0; i < WAIT_SPIN_COUNT && node->n_slave && !node->is_helping; ++i) cpu_pause();
+		lock(node);
+		if (node->n_slave && !node->is_helping) condition_wait(node);
 
 		if (node->is_helping) {
 			assert(node->help.run);
@@ -500,7 +503,12 @@ void* task_loop(void *param)
 	// task_free() always stops and joins it, even before it has started.
 
 	while (task->loop) {
-		if (!task->run) {
+		if (!task->run) { // a sleeping task wakes up late: with small tasks, half of the logical CPUs were idle at 32 threads
+			unlock(task);
+			for (int i = 0; i < WAIT_SPIN_COUNT && !task->run && task->loop; ++i) cpu_pause();
+			lock(task);
+		}
+		if (!task->run && task->loop) {
 			condition_wait(task);
 		}
 		if (task->run) {
