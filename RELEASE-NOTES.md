@@ -12,6 +12,7 @@ Each version contains all changes of the C versions on the same row.
 
 | newedax | C (nikque) | C (eval2) |
 |---|---|---|
+| newedax.11 (not released) | nikque.26 (not released) | eval2.14 (not released) |
 | newedax.10 | nikque.25 | eval2.13 |
 | newedax.9 | nikque.24 | eval2.12 |
 | newedax.8 | nikque.23 | eval2.11 |
@@ -22,6 +23,25 @@ Each version contains all changes of the C versions on the same row.
 | newedax.3 | nikque.18 | eval2.6 |
 | newedax.2 | nikque.18 | eval2.6 |
 | newedax.1 | nikque.17 | eval2.5 |
+
+---
+
+## v4.5.5-newedax.11
+
+**Not released** (the next version). As in the C version, `book deviate`, `book deviate2` and `book deviate3` can write the lines they walk to a text file without expanding the book (`export`).
+
+**Changes**
+
+- The changes of the C version v4.5.5-nikque.26 ([its release notes](https://github.com/Nikque/edax-reversi-AVX/blob/edax-4.5.5-fixes/RELEASE-NOTES.md#v455-nikque26)): `export <file> [leaf|ends|all]`, `edax_book_deviate_export` of libedax, the mark `@cancel id=N state=none export=1`.
+- Manual: 7.3 and 12.4 (the same text as the C version).
+
+**Compatibility**
+
+- The commands without `export` are the same as in v4.5.5-newedax.10. The search results, `eval.dat` and the book file format do not change.
+
+**Checked**: the same test of the export as the C version (4,545 cases on 3 test books).
+
+**Not checked**: the time and the memory on a real book, a real Android device.
 
 ---
 
