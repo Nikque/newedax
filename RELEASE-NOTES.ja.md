@@ -12,7 +12,7 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 
 | newedax | C 版（nikque） | C 版（eval2） |
 |---|---|---|
-| newedax.11（未公開） | nikque.26（未公開） | eval2.14（未公開） |
+| newedax.11 | nikque.26 | eval2.14 |
 | newedax.10 | nikque.25 | eval2.13 |
 | newedax.9 | nikque.24 | eval2.12 |
 | newedax.8 | nikque.23 | eval2.11 |
@@ -28,7 +28,7 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 
 ## v4.5.5-newedax.11
 
-**未公開**（次の版）。C 版と同じく、`book deviate`・`book deviate2`・`book deviate3` に、book を広げずに、たどる手順をテキストファイルに書き出す `export` を足しました。
+C 版と同じく、`book deviate`・`book deviate2`・`book deviate3` に、book を広げずに、たどる手順をテキストファイルに書き出す `export` を足しました。
 
 **変更**
 
@@ -42,6 +42,8 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 **確認**：C 版と同じ書き出しの試験（試験用の book 3 つで 4,545 通り）を流しました。
 
 **未確認**：実 book での時間とメモリ、Android の実機。
+
+[検証記録](docs/validation/newedax.ja.md#v455-newedax11)
 
 ---
 

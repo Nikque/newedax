@@ -12,7 +12,7 @@ Each version contains all changes of the C versions on the same row.
 
 | newedax | C (nikque) | C (eval2) |
 |---|---|---|
-| newedax.11 (not released) | nikque.26 (not released) | eval2.14 (not released) |
+| newedax.11 | nikque.26 | eval2.14 |
 | newedax.10 | nikque.25 | eval2.13 |
 | newedax.9 | nikque.24 | eval2.12 |
 | newedax.8 | nikque.23 | eval2.11 |
@@ -28,7 +28,7 @@ Each version contains all changes of the C versions on the same row.
 
 ## v4.5.5-newedax.11
 
-**Not released** (the next version). As in the C version, `book deviate`, `book deviate2` and `book deviate3` can write the lines they walk to a text file without expanding the book (`export`).
+As in the C version, `book deviate`, `book deviate2` and `book deviate3` can write the lines they walk to a text file without expanding the book (`export`).
 
 **Changes**
 
@@ -42,6 +42,8 @@ Each version contains all changes of the C versions on the same row.
 **Checked**: the same test of the export as the C version (4,545 cases on 3 test books).
 
 **Not checked**: the time and the memory on a real book, a real Android device.
+
+[Tests and measurements](docs/validation/newedax.en.md#v455-newedax11)
 
 ---
 

@@ -5,6 +5,18 @@ Tests and measurements done for each version, moved without changes from the for
 For what changed, see the [release notes](../../RELEASE-NOTES.md). "Above" and "below" in the text refer to positions in the former document.
 
 
+## v4.5.5-newedax.11
+
+Checks:
+
+- The test of the export: the lines written are compared with sets computed apart in Python (the positions with a leaf to expand, the ends, all the positions of the lines): on 41 positions of 3 test books, the 4,545 cases (3 commands, 5 ranges, 3 kinds) are all the same; every line can be played from the start, its moves follow the walk, and with `book deviate2` and `book deviate3` its total loss is the smallest. The mark `export=1` in the first answer is there.
+- With the released `wEdax-x86-64-v3.exe`: the `book reduce` tests (500 cases), the 14 tests of damaged books and wrong words and the earlier tests of the analysis commands (3 small books, the real `book deviate` family, 40,000 random graphs of positions, the background thread, the lines of `book bestlines` and `book findline`) find nothing wrong; the unit tests of the analyses (`tests/book-analyze.cpp`) pass.
+- The answers of 10 commands on the same positions (6,880 answers) are all the same as those of the C version v4.5.5-nikque.26 (except the time).
+- Search: the 5 Windows release programs solve fforum-20-39 with 1 thread with the same results and node counts as the same check of v4.5.5-newedax.10: 78,733,223 with the `eval.dat` of eval2, 77,639,567 with that of Edax 4.5; the 7 Cassio cases pass. The 3 DLLs pass 220 API checks with 0 failures with both `eval.dat`. Android (NDK r27d): no warning.
+- The search, the evaluation, the book learning and the file format are not changed (only the export and its mark in `book_analyze.cpp`, the reading of the command and `help book` in `edax.cpp`, and the function of libedax are new).
+- Size (against v4.5.5-newedax.10): the 5 Windows programs +3,584 to +9,728, the 3 DLLs +20,480 to +22,016, the Android programs +7,464 and +3,656 and libraries +8,552 and +4,400 bytes (the functions of the export).
+- The eval tools (`tools/eval`) are not changed, and their tests were not run again. The speed was not measured.
+
 ## v4.5.5-newedax.10
 
 Checks:
