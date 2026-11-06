@@ -14,15 +14,14 @@ using namespace evtool;
 
 int main(int argc, char **argv)
 {
-	if (argc < 5) { fprintf(stderr, "usage\n"); return 1; }
+	if (argc < 5) die("usage");
 	et_init();
 	ET_Eval *e = et_read(argv[1]);
 	const char *dir = argv[2], *cfg = argv[3];
 	char name[1024];
 	int n_inst, nw, sc[32] = {0};
 	sprintf(name, "%s/%s.pat", dir, cfg);
-	FILE *f = fopen(name, "rb");
-	if (!f) { fprintf(stderr, "cannot open %s\n", name); return 1; }
+	FILE *f = xfopen(name, "rb");
 	xfread(&n_inst, 4, 1, f, name); xfread(&nw, 4, 1, f, name);
 	if (n_inst < 1 || n_inst > 256 || nw < 1) die("bad instances in %s", name);
 	int *in = (int *) xmalloc(n_inst * sizeof *in), *io = (int *) xmalloc(n_inst * sizeof *io);
@@ -42,7 +41,7 @@ int main(int argc, char **argv)
 		if (r < 4 || r % 2) die("bad scalar features in %s", name);
 	}
 	const int has_mob = sc[0] | sc[2], mob_ofs = sc[0] ? sc[1] : sc[3], mob_n = sc[0] ? 64 : 32;	// mob (both sides) or mobp (side to move only)
-	for (int i = 4; i < 32; i += 2) if (sc[i]) { fprintf(stderr, "only the mob / mobp scalars are supported\n"); return 1; }
+	for (int i = 4; i < 32; i += 2) if (sc[i]) die("only the mob / mobp scalars are supported");
 	if (has_mob && (mob_ofs < 1 || mob_ofs > nw - mob_n)) die("bad scalar features in %s", name);
 	static short mob[61][64];
 	double *w = (double *) xmalloc(nw * sizeof *w);
@@ -50,7 +49,7 @@ int main(int argc, char **argv)
 	int covered[13] = {0};
 	for (int ply = 2; ply <= 53; ++ply) {
 		sprintf(name, "%s/%s_%02d.w", dir, cfg, ply);
-		if (!(f = fopen(name, "rb"))) { fprintf(stderr, "cannot open %s\n", name); return 1; }
+		f = xfopen(name, "rb");
 		xfread(w, 8, nw, f, name);
 		fclose(f);
 		short *ew = e->w[ply];

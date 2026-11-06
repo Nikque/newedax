@@ -169,7 +169,7 @@ int main(int argc, char **argv)
 			if (n_src == 8) die("too many -src (at most 8)");
 			Source *o = src + n_src++;
 			o->max = 30000000;
-			if (source_parse(value(i), o) < 3) { fprintf(stderr, "bad -src\n"); return 1; }
+			if (source_parse(value(i), o) < 3) die("bad -src");
 		}
 		else if (!strcmp(argv[i], "-plies")) { if (sscanf(value(i), "%d-%d", &p0, &p1) == 1) p1 = p0; }
 		else if (!strcmp(argv[i], "-window")) window = atoi(value(i));
@@ -180,9 +180,9 @@ int main(int argc, char **argv)
 		else if (!strcmp(argv[i], "-test")) test_mod = atoi(value(i));
 		else if (!strcmp(argv[i], "-eval")) only_eval = 1;
 		else if (!strcmp(argv[i], "-calib")) calib = atoi(value(i));
-		else { fprintf(stderr, "unknown option %s\n", argv[i]); return 1; }
+		else die("unknown option %s", argv[i]);
 	}
-	if (!init || p0 < 0 || !n_src || (!out && (!only_eval || calib >= 0))) { fprintf(stderr, "missing options\n"); return 1; }
+	if (!init || p0 < 0 || !n_src || (!out && (!only_eval || calib >= 0))) die("missing options");
 	if (p1 < p0 || p1 > 60) die("bad -plies (a-b, 0 <= a <= b <= 60)");
 	if (nt < 1 || test_mod < 1 || window < 0 || calib >= n_src) die("bad -threads, -test, -window or -calib");
 	omp_set_num_threads(nt);

@@ -42,8 +42,7 @@ int main(int argc, char **argv)
 	eval_open(options.eval_file);
 	search_global_init();
 
-	FILE *f = fopen(start, "rb");
-	if (!f) { fprintf(stderr, "cannot open %s\n", start); return 1; }
+	FILE *f = evtool::xfopen(start, "rb");
 	long long n = evtool::file_size(f) / (long long) sizeof (Rec);
 	Rec *S = (Rec *) evtool::xmalloc(n * sizeof *S);
 	n = (long long) fread(S, sizeof *S, n, f);

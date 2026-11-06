@@ -416,8 +416,7 @@ inline void et_init()
 	static const int kd_S10[] = { 19683, 6561, 2187, 729, 243, 81, 27, 9, 3, 1 };
 	static const int kd_C10[] = { 19683, 6561, 2187, 729, 81, 243, 27, 9, 3, 1 };
 	static const int kd_C9[] = { 1, 9, 3, 81, 27, 243, 2187, 729, 6561 };
-	int *T = (int *) malloc(2 * 59049 * sizeof *T), n[8];
-	if (T == nullptr) { fprintf(stderr, "out of memory\n"); exit(1); }
+	int *T = (int *) xmalloc(2 * 59049 * sizeof *T), n[8];
 	n[0] = et_set_packing(ET_P_S8, T, kd_S10 + 2, 0, 0, 0, 8);
 	n[1] = et_set_packing(ET_P_S7, T, kd_S10 + 3, 0, 0, 0, 7);
 	n[2] = et_set_packing(ET_P_S6, T, kd_S10 + 4, 0, 0, 0, 6);
@@ -427,9 +426,8 @@ inline void et_init()
 	n[6] = et_set_packing(ET_P_S10, T, kd_S10, 0, 0, 0, 10);
 	n[7] = et_set_packing(ET_P_C10, T, kd_C10, 0, 0, 0, 10);
 	free(T);
-	if (n[0] != 3321 || n[1] != 1134 || n[2] != 378 || n[3] != 135 || n[4] != 45 || n[5] != 10206 || n[6] != 29646 || n[7] != 29889) {
-		fprintf(stderr, "packing size mismatch\n"); exit(1);
-	}
+	if (n[0] != 3321 || n[1] != 1134 || n[2] != 378 || n[3] != 135 || n[4] != 45 || n[5] != 10206 || n[6] != 29646 || n[7] != 29889)
+		die("packing size mismatch");
 	ET_PACK[0] = ET_P_C9; ET_PACK[1] = ET_P_C10; ET_PACK[2] = ET_P_S10; ET_PACK[3] = ET_P_S10;
 	ET_PACK[4] = ET_PACK[5] = ET_PACK[6] = ET_PACK[7] = ET_P_S8;
 	ET_PACK[8] = ET_P_S7; ET_PACK[9] = ET_P_S6; ET_PACK[10] = ET_P_S5; ET_PACK[11] = ET_P_S4;
@@ -532,10 +530,8 @@ inline void et_read_2(FILE *f, const char *file, ET_Eval *e)
  */
 inline ET_Eval *et_read(const char *file)
 {
-	FILE *f = fopen(file, "rb");
-	if (!f) { fprintf(stderr, "cannot open %s\n", file); exit(1); }
-	ET_Eval *e = (ET_Eval *) calloc(1, sizeof *e);
-	if (e == nullptr) { fprintf(stderr, "out of memory\n"); exit(1); }
+	FILE *f = xfopen(file, "rb");
+	ET_Eval *e = (ET_Eval *) xcalloc(1, sizeof *e);
 	unsigned char magic[8];
 	if (fread(magic, 1, 8, f) == 8 && !memcmp(magic, "NEDXEVAL", 8)) {
 		rewind(f);
@@ -593,8 +589,7 @@ inline int et_mob(const ET_Eval *e, uint64_t P, uint64_t O)
 
 inline void et_write(const ET_Eval *e, const char *file)
 {
-	FILE *f = fopen(file, "wb");
-	if (!f) { fprintf(stderr, "cannot create %s\n", file); exit(1); }
+	FILE *f = xfopen(file, "wb");
 	fwrite(&e->edax, 4, 5, f); fwrite(&e->date, 8, 1, f);
 	fwrite(e->w, 2, (size_t) ET_NW * ET_NPLY, f);
 	if (fclose(f) != 0) die("cannot write %s", file);
