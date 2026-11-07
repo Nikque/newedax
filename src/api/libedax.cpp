@@ -2340,7 +2340,7 @@ static void lib_base_extract(const char *base_file, const int n_empties, const c
 	FILE *f;
 
 	if (base_file == NULL || problem_file == NULL) return;
-	if ((f = file_open(problem_file, "a")) == NULL) { // the functions which extract do not check it
+	if ((f = file_open(problem_file, "a")) == NULL) { // (before the base is loaded: the functions which extract check it after)
 		warn("Cannot open file %s\n", problem_file);
 		return;
 	}
