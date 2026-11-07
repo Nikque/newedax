@@ -1516,6 +1516,13 @@ static void book_test_count(const unsigned long long n)
 }
 #endif
 
+/** what position_search_with() and position_search_planned() did (their result is a set of these) */
+enum {
+	LEAF_LINKED = 1,     /**< the leaf became a link */
+	LEAF_SEARCHED = 2,   /**< a search was done */
+	LEAF_NOT_LINKED = 4  /**< the leaf could not become a link (no memory): nothing was done */
+};
+
 static int position_search_with(Position *position, Search *search);
 static int position_search_planned(Position *position, Book *book);
 static Search* book_search(Book *book);
@@ -1568,9 +1575,9 @@ static void position_search(Position *position, Book *book)
 {
 	const int r = book_plan ? position_search_planned(position, book) : position_search_with(position, book_search(book));
 
-	if (r & 1) ++book->stats.n_links;
-	if (r & 4) book->failed = true; // the leaf could not become a link (no memory): it was kept, not searched again
-	if (r & 3) book->need_saving = true;
+	if (r & LEAF_LINKED) ++book->stats.n_links;
+	if (r & LEAF_NOT_LINKED) book->failed = true; // the leaf was kept, not searched again
+	if (r & (LEAF_LINKED | LEAF_SEARCHED)) book->need_saving = true;
 }
 
 /**
@@ -1578,8 +1585,8 @@ static void position_search(Position *position, Book *book)
  *
  * @param position Position to search.
  * @param search Search to use.
- * @return 1 if the leaf became a link, | 2 if a search was done; 4 if the leaf could not become a link
- *         (no memory: nothing was done).
+ * @return LEAF_LINKED if the leaf became a link, | LEAF_SEARCHED if a search was done; LEAF_NOT_LINKED
+ *         if the leaf could not become a link (no memory: nothing was done).
  */
 static int position_search_with(Position *position, Search *search)
 {
@@ -1594,8 +1601,8 @@ static int position_search_with(Position *position, Search *search)
 #endif
 	if (position->leaf.move != NOMOVE) {
 		const int added = position_add_link(position, &position->leaf);
-		if (added == LINK_FAILED) return 4; // the leaf is kept: a new search would replace it
-		if (added == LINK_ADDED) r = 1;
+		if (added == LINK_FAILED) return LEAF_NOT_LINKED; // the leaf is kept: a new search would replace it
+		if (added == LINK_ADDED) r = LEAF_LINKED;
 	}
 
 	if (leaf_search_needed(position->n_link, n_moves, position->score.value == -SCORE_INF)) {
@@ -1631,7 +1638,7 @@ static int position_search_with(Position *position, Search *search)
 		if (position->leaf.score > position->score.value) {
 			position->score.value = position->leaf.score;
 		}
-		r |= 2;
+		r |= LEAF_SEARCHED;
 	}
 	return r;
 }
@@ -5502,8 +5509,8 @@ static void book_expand_apply(ExpandShared *s, Position *parent, Position *child
 		q->leaf = *leaf;
 		const int added = position_add_link(q, &q->leaf);
 		if (added == LINK_ADDED) ++book->stats.n_links;
-		if (added == LINK_FAILED || (r & 4)) book->failed = true; // no memory: the leaf is kept (its position is added below)
-		else if (r & 2) {
+		if (added == LINK_FAILED || (r & LEAF_NOT_LINKED)) book->failed = true; // no memory: the leaf is kept (its position is added below)
+		else if (r & LEAF_SEARCHED) {
 			q->leaf = parent->leaf;
 			if (q->leaf.score > q->score.value) q->score.value = q->leaf.score;
 		}
@@ -8023,7 +8030,7 @@ static void* plan_worker_run(void *v)
 				search_set_task_number(w->search, n);
 				w->n_tasks = n;
 			}
-			done = (position_search_with(&p, w->search) & 2) != 0;
+			done = (position_search_with(&p, w->search) & LEAF_SEARCHED) != 0;
 			lock(plan);
 			w->run_tasks = 0;
 #ifdef BOOK_TEST_STORE
@@ -8163,7 +8170,8 @@ void book_plan_search(Book *book)
  *
  * @param position Position to search.
  * @param book Opening book.
- * @return 1 if the leaf became a link, | 2 if a search was done.
+ * @return LEAF_LINKED if the leaf became a link, | LEAF_SEARCHED if a search was done (or its result taken
+ *         from the plan); LEAF_NOT_LINKED if the leaf could not become a link (no memory: nothing was done).
  */
 static int position_search_planned(Position *position, Book *book)
 {
@@ -8173,8 +8181,8 @@ static int position_search_planned(Position *position, Book *book)
 
 	if (position->leaf.move != NOMOVE) {
 		const int added = position_add_link(position, &position->leaf);
-		if (added == LINK_FAILED) return 4; // the leaf is kept: a new search would replace it
-		if (added == LINK_ADDED) r = 1;
+		if (added == LINK_FAILED) return LEAF_NOT_LINKED; // the leaf is kept: a new search would replace it
+		if (added == LINK_ADDED) r = LEAF_LINKED;
 	}
 
 	if (leaf_search_needed(position->n_link, n_moves, position->score.value == -SCORE_INF)) {
@@ -8188,7 +8196,7 @@ static int position_search_planned(Position *position, Book *book)
 				position->score.value = position->leaf.score;
 			}
 			++plan->n_used;
-			r |= 2;
+			r |= LEAF_SEARCHED;
 		} else if (job && plan->usual) { // the single search of the plan
 			++plan->n_used;
 			r |= position_search_with(position, book_search(book));
