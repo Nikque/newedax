@@ -57,16 +57,19 @@ static void core(int tasks){Search s;init_search(&s,tasks);unsigned long long ch
  printf("PASS core tasks=%d games=300 flip_checks=%llu symmetries=all8 exact_positions=%d empties=1..12 pass_events=%d\n",tasks,checks,exact,passes);search_free(&s);}
 /* evalmobility: evaluation files of form 1 with random mobility weights after their 61 plies ("MOBW", and "WBOM" with
    the shorts byte-swapped). With EVAL_MOBILITY=1, search_eval_0 and search_eval_1 add the weights of the numbers of legal
-   moves of both sides (counted with ref_moves); otherwise, and with the file without them, they evaluate the patterns only. */
+   moves of both sides (counted with ref_moves); otherwise, and with the file without them, they evaluate the patterns only.
+   The file without them is the 61 plies of EDAX_EVAL_FILE alone (up to newedax.11 EDAX_EVAL_FILE itself: the case
+   failed with an eval.dat that holds mobility weights, as the one of newedax). */
 static int mob_weight(const short (*mob)[64],int ply,Board b){Board q={b.opponent,b.player};int a=bit_count(ref_moves(b)),o=bit_count(ref_moves(q));if(a>31)a=31;if(o>31)o=31;return mob[ply][a]+mob[ply][32+o];}
 static int eval_round(int sum){sum=sum>=0?sum+64:sum-64;sum/=128;return sum<SCORE_MIN+1?SCORE_MIN+1:sum>SCORE_MAX-1?SCORE_MAX-1:sum;}
 static int eval_mobility_case(void){
  static short mob[61][64];for(int p=0;p<61;++p)for(int i=0;i<64;++i)mob[p][i]=(short)((int)(rr()%2001)-1000);
  const long size=5*4+8+61L*114364*2;FILE *f=fopen(eval_path(),"rb");if(!f)return 2;unsigned char *d=(unsigned char*)malloc(size);if(fread(d,1,size,f)!=(size_t)size){fclose(f);return 2;}fclose(f);
- const char *name[2]={"audit-eval-mobw.dat","audit-eval-wbom.dat"};
+ const char *name[3]={"audit-eval-mobw.dat","audit-eval-wbom.dat","audit-eval-plain.dat"};
  for(int s=0;s<2;++s){FILE *g;OPEN(g,name[s],"wb");fwrite(d,1,size,g);unsigned tag=s?0x57424f4dU:0x4d4f4257U;fwrite(&tag,4,1,g);for(int p=0;p<61;++p)for(int i=0;i<64;++i){unsigned short v=(unsigned short)mob[p][i];if(s)v=(unsigned short)(v<<8|v>>8);fwrite(&v,2,1,g);}fclose(g);}
+ {FILE *g;OPEN(g,name[2],"wb");fwrite(d,1,size,g);fclose(g);} /* (without mobility weights, whatever EDAX_EVAL_FILE holds after its 61 plies) */
  free(d);Search srch;init_search(&srch,1);long checks0=0,checks1=0;
- for(int s=0;s<3;++s){eval_open(s<2?name[s]:eval_path());const bool used=EVAL_MOBILITY&&s<2;
+ for(int s=0;s<3;++s){eval_open(name[s]);const bool used=EVAL_MOBILITY&&s<2;
 #if EVAL_MOBILITY
   if(EVAL_HAS_MOBILITY!=used){printf("FAIL evalmobility has_mobility=%d file=%d\n",(int)EVAL_HAS_MOBILITY,s);return 2;}
 #endif
