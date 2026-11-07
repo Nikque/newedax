@@ -268,7 +268,9 @@ char* string_read_line(FILE *f)
  *
  * The programs using the library (e.g. through libedax4dart) give their file names in UTF-8, but the
  * functions of Windows that take a char* name expect the ANSI code page. In the library, a file name is
- * read first as UTF-8, then as ANSI (as the original libedax does).
+ * read first as UTF-8, then as ANSI (as the original libedax does) if it is not UTF-8 or if no file has the
+ * name read as UTF-8. A file found under the name read as UTF-8 that cannot be opened (locked, a
+ * directory...) keeps the error of this name (errno, GetLastError).
  */
 
 /**
@@ -301,12 +303,15 @@ static const unsigned int lib_code_page[2] = {CP_UTF8, CP_ACP};
 static BOOL lib_move_file(const char *from, const char *to, const DWORD flags)
 {
 	BOOL r = FALSE;
-	int i;
+	int i, missing = 1;
 
-	for (i = 0; i < 2 && !r; ++i) {
+	for (i = 0; i < 2 && missing; ++i) {
 		wchar_t *wfrom = lib_to_wide(from, lib_code_page[i]);
 		wchar_t *wto = lib_to_wide(to, lib_code_page[i]);
-		if (wfrom && wto) r = MoveFileExW(wfrom, wto, flags);
+		if (wfrom && wto) {
+			const DWORD e = (r = MoveFileExW(wfrom, wto, flags)) ? ERROR_SUCCESS : GetLastError();
+			missing = (e == ERROR_FILE_NOT_FOUND || e == ERROR_PATH_NOT_FOUND);
+		}
 		free(wfrom);
 		free(wto);
 	}
@@ -325,12 +330,13 @@ FILE* file_open(const char *path, const char *mode)
 #if defined(LIB_BUILD) && defined(_WIN32)
 	wchar_t *wmode = lib_to_wide(mode, CP_ACP);
 	FILE *f = NULL;
-	int i;
+	int i, missing = 1;
 
-	for (i = 0; i < 2 && f == NULL && wmode != NULL; ++i) {
+	for (i = 0; i < 2 && missing && wmode != NULL; ++i) {
 		wchar_t *wpath = lib_to_wide(path, lib_code_page[i]);
 		if (wpath) {
 			f = _wfopen(wpath, wmode);
+			missing = (f == NULL && errno == ENOENT);
 			free(wpath);
 		}
 	}
@@ -349,12 +355,13 @@ FILE* file_open(const char *path, const char *mode)
 int file_remove(const char *path)
 {
 #if defined(LIB_BUILD) && defined(_WIN32)
-	int r = -1, i;
+	int r = -1, i, missing = 1;
 
-	for (i = 0; i < 2 && r != 0; ++i) {
+	for (i = 0; i < 2 && missing; ++i) {
 		wchar_t *wpath = lib_to_wide(path, lib_code_page[i]);
 		if (wpath) {
 			r = _wremove(wpath);
+			missing = (r != 0 && errno == ENOENT);
 			free(wpath);
 		}
 	}
