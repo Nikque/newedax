@@ -418,7 +418,7 @@ static void apply_base(int pi, int ply)
 {
 	char name[1024];
 	int n_inst, nw, k;
-	sprintf(name, "%s/%s.pat", base_dir, base_cfg);
+	evtool::xname(name, "%s/%s.pat", base_dir, base_cfg);
 	FILE *f = fopen(name, "rb");
 	if (!f) { fprintf(stderr, "cannot open %s\n", name); exit(1); }
 	xfread(&n_inst, 4, 1, f, name); xfread(&nw, 4, 1, f, name);
@@ -433,7 +433,7 @@ static void apply_base(int pi, int ply)
 		for (int i = 0; i < bn[j]; ++i) if (bs[j][i] > 63) die("bad instances in %s", name);
 	}
 	fclose(f);
-	sprintf(name, "%s/%s_%02d.w", base_dir, base_cfg, ply);
+	evtool::xname(name, "%s/%s_%02d.w", base_dir, base_cfg, ply);
 	f = fopen(name, "rb");
 	if (!f) { fprintf(stderr, "cannot open %s\n", name); exit(1); }
 	double *w = (double *) xmalloc(nw * sizeof *w);
@@ -512,7 +512,7 @@ static void load(int pi, int ply)
 		const double factor = pow(decay, abs(j));
 		for (int d = 0; d < n_src; ++d) {
 			char name[1024];
-			sprintf(name, "%s/%s%02d.bin", src[d].dir, src[d].prefix, q);
+			evtool::xname(name, "%s/%s%02d.bin", src[d].dir, src[d].prefix, q);
 			FILE *f = fopen(name, "rb");
 			if (!f) continue;
 			const long long n = file_size(f) / (long long) sizeof (Rec);
@@ -629,7 +629,7 @@ static void run_config(const Config *c, int pi, double *mse)
 	free(w0); free(tt); free(lam);
 	if (dumpdir) {
 		char name[1024];
-		sprintf(name, "%s/%s_%02d.w", dumpdir, c->name, plies[pi]);
+		evtool::xname(name, "%s/%s_%02d.w", dumpdir, c->name, plies[pi]);
 		FILE *g = xfopen(name, "wb");
 		fwrite(w, 8, nw, g);
 		if (fclose(g) != 0) die("cannot write %s", name);
@@ -715,12 +715,12 @@ int main(int argc, char **argv)
 		if (!parse_config(copy, &c)) continue;
 		if (dumpdir) {	// instances: n_inst, nw, then n, ofs, sq[16] per instance (ints, bytes)
 			char name[1024];
-			sprintf(name, "%s/%s.pat", dumpdir, c.name);
+			evtool::xname(name, "%s/%s.pat", dumpdir, c.name);
 			FILE *g = xfopen(name, "wb");
 			fwrite(&c.n_inst, 4, 1, g); fwrite(&c.nw, 4, 1, g);
 			for (int j = 0; j < c.n_inst; ++j) { fwrite(&c.inst_n[j], 4, 1, g); fwrite(&c.inst_ofs[j], 4, 1, g); fwrite(c.inst_sq[j], 1, 16, g); }
 			if (fclose(g) != 0) die("cannot write %s", name);
-			sprintf(name, "%s/%s.scl", dumpdir, c.name);	// scalar features: S_N x (used, offset)
+			evtool::xname(name, "%s/%s.scl", dumpdir, c.name);	// scalar features: S_N x (used, offset)
 			g = xfopen(name, "wb");
 			for (int a = 0; a < S_N; ++a) { fwrite(&c.scalar[a], 4, 1, g); fwrite(&c.scalar_ofs[a], 4, 1, g); }
 			if (fclose(g) != 0) die("cannot write %s", name);

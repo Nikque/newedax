@@ -20,7 +20,7 @@ int main(int argc, char **argv)
 	const char *dir = argv[2], *cfg = argv[3];
 	char name[1024];
 	int n_inst, nw, sc[32] = {0};
-	sprintf(name, "%s/%s.pat", dir, cfg);
+	evtool::xname(name, "%s/%s.pat", dir, cfg);
 	FILE *f = xfopen(name, "rb");
 	xfread(&n_inst, 4, 1, f, name); xfread(&nw, 4, 1, f, name);
 	if (n_inst < 1 || n_inst > 256 || nw < 1) die("bad instances in %s", name);
@@ -34,7 +34,7 @@ int main(int argc, char **argv)
 		for (int i = 0; i < in[j]; ++i) if (isq[j][i] > 63) die("bad instances in %s", name);
 	}
 	fclose(f);
-	sprintf(name, "%s/%s.scl", dir, cfg);
+	evtool::xname(name, "%s/%s.scl", dir, cfg);
 	if ((f = fopen(name, "rb"))) {
 		const size_t r = fread(sc, 4, 32, f);	// 11 scalar features of evsearch: (used, offset) each
 		fclose(f);
@@ -48,7 +48,7 @@ int main(int argc, char **argv)
 	double maxdiff = 0;
 	int covered[13] = {0};
 	for (int ply = 2; ply <= 53; ++ply) {
-		sprintf(name, "%s/%s_%02d.w", dir, cfg, ply);
+		evtool::xname(name, "%s/%s_%02d.w", dir, cfg, ply);
 		f = xfopen(name, "rb");
 		xfread(w, 8, nw, f, name);
 		fclose(f);

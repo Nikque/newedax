@@ -25,7 +25,7 @@ int main(int argc, char **argv)
 		const int ply = popc(r.P | r.O) - 4;
 		if (ply < 0) die("%s is damaged (a board of fewer than 4 discs)", argv[1]);
 		if (!out[ply]) {
-			sprintf(name, "%s/book%02d.bin", argv[2], ply);
+			evtool::xname(name, "%s/book%02d.bin", argv[2], ply);
 			out[ply] = xfopen(name, "wb");
 			setvbuf(out[ply], nullptr, _IOFBF, 1 << 20);
 		}

@@ -63,7 +63,7 @@ int main(int argc, char **argv)
 	long long nS = 0, capS = 0;
 	for (int p = p0; p <= p1; ++p) {
 		char name[1024];
-		sprintf(name, "%s/book%02d.bin", datadir, p);
+		evtool::xname(name, "%s/book%02d.bin", datadir, p);
 		FILE *f = fopen(name, "rb");
 		if (!f) continue;
 		const long long n = evtool::file_size(f) / (long long) sizeof (Rec);
@@ -94,7 +94,7 @@ int main(int argc, char **argv)
 	long long count[61] = {}, done = 0, nodes = 0;
 	for (int p = 0; p <= 60; ++p) {
 		char name[1024];
-		sprintf(name, "%s/leaf%02d.raw", outdir, p);
+		evtool::xname(name, "%s/leaf%02d.raw", outdir, p);
 		out[p] = evtool::xfopen(name, "ab");
 	}
 	const double t0 = omp_get_wtime();

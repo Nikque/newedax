@@ -59,7 +59,7 @@ static void load_ply(int q, double c, Set *train, Set *test)
 {
 	for (int d = 0; d < n_src; ++d) {
 		char name[1024];
-		sprintf(name, "%s/%s%02d.bin", src[d].dir, src[d].prefix, q);
+		evtool::xname(name, "%s/%s%02d.bin", src[d].dir, src[d].prefix, q);
 		FILE *f = fopen(name, "rb");
 		if (!f) continue;
 		const long long n = file_size(f) / (long long) sizeof (Rec);

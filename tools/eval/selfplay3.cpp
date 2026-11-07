@@ -58,11 +58,11 @@ int main(int argc, char **argv)
 	long long count[61] = {}, count_alt = 0;
 	for (int p = 0; p <= 60; ++p) {
 		char name[1024];
-		sprintf(name, "%s/sp%02d.bin", outdir, p);
+		evtool::xname(name, "%s/sp%02d.bin", outdir, p);
 		out[p] = evtool::xfopen(name, "ab");
-		sprintf(name, "%s/ss%02d.bin", outdir, p);
+		evtool::xname(name, "%s/ss%02d.bin", outdir, p);
 		outs[p] = evtool::xfopen(name, "ab");
-		if (p_alt > 0) { sprintf(name, "%s/sa%02d.bin", outdir, p); outa[p] = evtool::xfopen(name, "ab"); }
+		if (p_alt > 0) { evtool::xname(name, "%s/sa%02d.bin", outdir, p); outa[p] = evtool::xfopen(name, "ab"); }
 	}
 	const double t0 = omp_get_wtime();
 	long long done = 0;

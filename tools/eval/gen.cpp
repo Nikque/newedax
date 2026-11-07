@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 	long long count[61] = {};
 	char name[61][1024];
 	for (int p = 0; p <= 60; ++p) {
-		sprintf(name[p], "%s/gen%02d.bin", outdir, p);
+		evtool::xname(name[p], "%s/gen%02d.bin", outdir, p);
 		if (p > 40 && p <= last) out[p] = evtool::xfopen(name[p], "ab");
 	}
 	const double t0 = omp_get_wtime();

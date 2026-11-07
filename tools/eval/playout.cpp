@@ -57,8 +57,8 @@ int main(int argc, char **argv)
 	FILE *outf[61] = {}, *outc[61] = {};
 	for (int p = 0; p <= 60; ++p) {
 		char name[1024];
-		sprintf(name, "%s/lf%02d.bin", outdir, p); outf[p] = evtool::xfopen(name, "ab");
-		sprintf(name, "%s/lc%02d.bin", outdir, p); outc[p] = evtool::xfopen(name, "ab");
+		evtool::xname(name, "%s/lf%02d.bin", outdir, p); outf[p] = evtool::xfopen(name, "ab");
+		evtool::xname(name, "%s/lc%02d.bin", outdir, p); outc[p] = evtool::xfopen(name, "ab");
 	}
 	const double t0 = omp_get_wtime();
 	long long done = 0, total = 0;

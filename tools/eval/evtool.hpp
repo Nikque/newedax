@@ -9,6 +9,7 @@
 
 #include <cctype>
 #include <climits>
+#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -61,6 +62,21 @@ inline FILE *xfopen(const char *file, const char *mode)
 	FILE *f = fopen(file, mode);
 	if (f == nullptr) die(mode[0] == 'r' ? "cannot open %s" : "cannot create %s", file);
 	return f;
+}
+
+/**
+ * the name of a file written with a format into an array (as snprintf), or exit with "file name too long: <its
+ * start>..." when it does not fit (up to newedax.11 the tools wrote the names of their folders with sprintf, beyond
+ * the array when a folder had a long name)
+ */
+template <size_t N>
+inline void xname(char (&name)[N], const char *format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	const int n = vsnprintf(name, N, format, args);
+	va_end(args);
+	if (n < 0 || (size_t) n >= N) die("file name too long: %s...", name);
 }
 
 /** fread of exactly n items, or exit with "cannot read <file>" */

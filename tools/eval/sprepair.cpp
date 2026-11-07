@@ -23,14 +23,14 @@ int main(int argc, char **argv)
 	if (argc < 4) die("usage: sprepair <indir> <outdir> <prefix>");
 	for (int ply = 0; ply <= 60; ++ply) {
 		char name[1024];
-		sprintf(name, "%s/%s%02d.bin", argv[1], argv[3], ply);
+		evtool::xname(name, "%s/%s%02d.bin", argv[1], argv[3], ply);
 		FILE *f = fopen(name, "rb");
 		if (!f) continue;
 		long long n = file_size(f);
 		unsigned char *d = (unsigned char *) xmalloc(n + 17);
 		n = (long long) fread(d, 1, n, f);
 		fclose(f);
-		sprintf(name, "%s/%s%02d.bin", argv[2], argv[3], ply);
+		evtool::xname(name, "%s/%s%02d.bin", argv[2], argv[3], ply);
 		FILE *g = xfopen(name, "wb");
 		long long pos = 0, kept = 0, skipped = 0;
 		while (pos + 17 <= n) {

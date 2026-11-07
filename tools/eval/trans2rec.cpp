@@ -80,7 +80,7 @@ int main(int argc, char **argv)
 				const int ply = 60 - (64 - bit_count(rec[i].P | rec[i].O));
 				rec[i].v = (signed char) (side[i] == colour ? diff : -diff);
 				if (!out[ply]) {
-					sprintf(name, "%s/%s%02d.bin", outdir, prefix, ply);
+					evtool::xname(name, "%s/%s%02d.bin", outdir, prefix, ply);
 					out[ply] = evtool::xfopen(name, "ab");
 					setvbuf(out[ply], nullptr, _IOFBF, 1 << 20);
 				}
