@@ -74,7 +74,7 @@ int main(int argc, char **argv)
 					size *= 3;
 				}
 				const int cl = ET_CLASS[ft];
-				char *seen = (char *) calloc(ET_PSIZE[cl], 1);
+				char *seen = (char *) xcalloc(ET_PSIZE[cl], 1); // (up to newedax.11 calloc, its result not checked)
 				for (int v = 0; v < size; ++v) {
 					int y = v, xe = 0;
 					for (int i = n - 1; i >= 0; --i) { xe += (y % 3) * pw[i]; y /= 3; }

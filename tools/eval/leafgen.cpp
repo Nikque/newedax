@@ -28,7 +28,8 @@ static void hook(const Board *b)
 	if (!L) return;
 	L->rng = L->rng * 6364136223846793005ULL + 1442695040888963407ULL;
 	if ((L->rng >> 33) % (unsigned) L->rate) return;
-	if (L->n == L->cap) { L->cap = L->cap ? 2 * L->cap : 4096; L->r = (Rec *) realloc(L->r, L->cap * sizeof *L->r); }
+	// (up to newedax.11 a realloc whose result was not checked, and a count that could overflow)
+	if (L->n == L->cap) { L->cap = evtool::grow(L->cap, 4096); L->r = (Rec *) evtool::xrealloc(L->r, (size_t) L->cap * sizeof *L->r); }
 	L->r[L->n].P = b->player; L->r[L->n].O = b->opponent; L->r[L->n].v = L->root;
 	++L->n;
 }
