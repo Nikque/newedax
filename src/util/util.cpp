@@ -317,6 +317,23 @@ static BOOL lib_move_file(const char *from, const char *to, const DWORD flags)
 	}
 	return r;
 }
+
+/** @brief CreateFile with a file name in UTF-8 (or ANSI). */
+static HANDLE lib_create_file(const char *path, const DWORD access, const DWORD share, LPSECURITY_ATTRIBUTES security, const DWORD disposition, const DWORD flags, HANDLE template_file)
+{
+	HANDLE h = INVALID_HANDLE_VALUE;
+	int i, missing = 1;
+
+	for (i = 0; i < 2 && missing; ++i) {
+		wchar_t *wpath = lib_to_wide(path, lib_code_page[i]);
+		if (wpath) {
+			const DWORD e = (h = CreateFileW(wpath, access, share, security, disposition, flags, template_file)) != INVALID_HANDLE_VALUE ? ERROR_SUCCESS : GetLastError();
+			missing = (e == ERROR_FILE_NOT_FOUND || e == ERROR_PATH_NOT_FOUND);
+			free(wpath);
+		}
+	}
+	return h;
+}
 #endif
 
 /**
@@ -405,6 +422,50 @@ bool file_replace(const char *from, const char *to)
 	return MoveFileExA(from, to, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
 #else
 	return rename(from, to) == 0;
+#endif
+}
+
+/**
+ * @brief Tell whether two file names are of the same file.
+ *
+ * A name written another way (relative or full, with '/' or '\\', in another case on Windows, through a
+ * link) is of the same file: the files are compared (their volume and index on Windows, their device and
+ * inode elsewhere). A name of no file is only the same as itself.
+ *
+ * @param a File name.
+ * @param b File name.
+ * @return true if the two names are of the same file.
+ */
+bool file_same(const char *a, const char *b)
+{
+	if (a == NULL || b == NULL) return false;
+	if (strcmp(a, b) == 0) return true;
+#ifdef _WIN32
+	{
+		// (the attributes only: a file opened by another program without sharing is compared too)
+		const DWORD share = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
+#if defined(LIB_BUILD)
+		HANDLE ha = lib_create_file(a, FILE_READ_ATTRIBUTES, share, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+		HANDLE hb = lib_create_file(b, FILE_READ_ATTRIBUTES, share, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+#else
+		HANDLE ha = CreateFileA(a, FILE_READ_ATTRIBUTES, share, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+		HANDLE hb = CreateFileA(b, FILE_READ_ATTRIBUTES, share, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+#endif
+		BY_HANDLE_FILE_INFORMATION ia, ib;
+		bool same = false;
+
+		if (ha != INVALID_HANDLE_VALUE && hb != INVALID_HANDLE_VALUE && GetFileInformationByHandle(ha, &ia) && GetFileInformationByHandle(hb, &ib)) {
+			same = (ia.dwVolumeSerialNumber == ib.dwVolumeSerialNumber && ia.nFileIndexHigh == ib.nFileIndexHigh && ia.nFileIndexLow == ib.nFileIndexLow);
+		}
+		if (ha != INVALID_HANDLE_VALUE) CloseHandle(ha);
+		if (hb != INVALID_HANDLE_VALUE) CloseHandle(hb);
+		return same;
+	}
+#else
+	{
+		struct stat sa, sb;
+		return stat(a, &sa) == 0 && stat(b, &sb) == 0 && sa.st_dev == sb.st_dev && sa.st_ino == sb.st_ino;
+	}
 #endif
 }
 

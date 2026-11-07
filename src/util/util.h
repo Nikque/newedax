@@ -64,6 +64,7 @@ FILE* file_open(const char*, const char*);
 int file_remove(const char*);
 bool file_rename(const char*, const char*);
 bool file_replace(const char*, const char*);
+bool file_same(const char*, const char*);
 void string_to_lowercase(char*);
 void string_to_uppercase(char*);
 int string_to_coordinate(const char*);
