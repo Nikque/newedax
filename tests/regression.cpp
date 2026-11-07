@@ -402,6 +402,13 @@ Board pb=b;if(e.n_empties&1){pb.player=b.opponent;pb.opponent=b.player;}for(int 
   unsigned int before=n;book_subtree(&b,&b2);bool subtree_ok=b.n_nodes<before&&table_ok();
   printf("BIGCOUNTS positions=%u root_lines=%u (390216 expected) transitions=%d differences=%d table_after_fix=%d table_after_subtree=%d nodes_after_subtree=%u\n",n,root_lines,transitions,differences,fix_ok,subtree_ok,b.n_nodes);
   free(ref);free(got);free(was);book_free(&b);search_free(&s);if(root_lines!=390216||transitions==0||differences||!fix_ok||!subtree_ok)return 2;}
+ else if(!strcmp(t,"importscore")){ /* a line of a text book whose leaf score is out of -64..64 holds no position (up to v4.5.5-nikque.26 300 was read as 44) */
+  Board b[3];char s[80],m[4];FILE *f;Book k={0};const int score[3]={6,300,-65};int ok;board_init(b);board_next(b,F5,b+1);board_next(b+1,(int)first_bit(board_get_moves(b+1)),b+2);
+  OPEN(f,"audit-import.txt","w");for(int i=0;i<3;++i){move_to_string((int)first_bit(board_get_moves(b+i)),BLACK,m);fprintf(f,"%s,10,%s,%d\n",board_to_string(b+i,BLACK,s),m,score[i]);}fclose(f);
+  ok=book_import(&k,"audit-import.txt");Position *p=ok?book_probe(&k,b):NULL;
+  printf("IMPORT leaf scores 6, 300, -65: imported=%d positions=%u (1 expected), leaf score of the first %d\n",ok,ok?k.n_nodes:0,p?p->leaf.score:-999);
+  for(int i=1;ok&&i<3;++i){Position *q=book_probe(&k,b+i);if(q)printf("IMPORT line %d imported with the leaf score %d\n",i+1,q->leaf.score);}
+  ok=ok&&k.n_nodes==1&&p&&p->leaf.score==6;if(k.array)book_free(&k);remove("audit-import.txt");if(!ok)return 2;}
  else return 1;
  return 0;
 }
