@@ -238,6 +238,22 @@ static void option_boolean(const char *option, const char *value, bool *result)
 }
 
 /**
+ * @brief Read the value of an option that is one of two words (the first one is 0, the second one 1).
+ *
+ * @param option Option name (for the message).
+ * @param value Option value.
+ * @param word_0 Word of the value 0.
+ * @param word_1 Word of the value 1.
+ * @param result Option to set (unchanged, with a warning, if the value is neither word).
+ */
+static void option_choice(const char *option, const char *value, const char *word_0, const char *word_1, int *result)
+{
+	if (string_is(value, word_0)) *result = 0;
+	else if (string_is(value, word_1)) *result = 1;
+	else warn("%s: unknown value \"%s\" (%s or %s)\n", option, value, word_0, word_1);
+}
+
+/**
  * @brief Read an option.
  *
  * @param option Option name.
@@ -315,11 +331,7 @@ int options_read(const char *option, const char *value)
 		else if (string_is(option, "ggs-open")) option_boolean(option, value, &options.ggs_open);
 
 		else if (string_is(option, "probcut-d")) parse_real(value, &options.probcut_d);
-		else if (string_is(option, "probcut-model")) {
-			if (string_is(value, "standard")) options.probcut_model = 0;
-			else if (string_is(value, "refit")) options.probcut_model = 1;
-			else warn("probcut-model: unknown value \"%s\" (standard or refit)\n", value);
-		}
+		else if (string_is(option, "probcut-model")) option_choice(option, value, "standard", "refit", &options.probcut_model);
 
 		else if (string_is(option, "pv-debug")) option_boolean(option, value, &options.pv_debug);
 		else if (string_is(option, "pv-check")) option_boolean(option, value, &options.pv_check);
@@ -362,16 +374,8 @@ int options_read(const char *option, const char *value)
 		else if (string_is(option, "book-reproducible")) option_boolean(option, value, &options.book_reproducible);
 		else if (string_is(option, "book-reduce-shrink")) option_boolean(option, value, &options.book_reduce_shrink);
 		else if (string_is(option, "book-reduce-reuse")) option_boolean(option, value, &options.book_reduce_reuse);
-		else if (string_is(option, "book-reduce-index")) {
-			if (string_is(value, "binary")) options.book_reduce_index = 0;
-			else if (string_is(value, "table")) options.book_reduce_index = 1;
-			else warn("book-reduce-index: unknown value \"%s\" (binary or table)\n", value);
-		}
-		else if (string_is(option, "book-reduce-walk")) {
-			if (string_is(value, "loss")) options.book_reduce_walk = 0;
-			else if (string_is(value, "group")) options.book_reduce_walk = 1;
-			else warn("book-reduce-walk: unknown value \"%s\" (loss or group)\n", value);
-		}
+		else if (string_is(option, "book-reduce-index")) option_choice(option, value, "binary", "table", &options.book_reduce_index);
+		else if (string_is(option, "book-reduce-walk")) option_choice(option, value, "loss", "group", &options.book_reduce_walk);
 
 		else read = 0;
 	}
