@@ -12,6 +12,7 @@ Each version contains all changes of the C versions on the same row.
 
 | newedax | C (nikque) | C (eval2) |
 |---|---|---|
+| newedax.12 | nikque.27 | eval2.15 |
 | newedax.11 | nikque.26 | eval2.14 |
 | newedax.10 | nikque.25 | eval2.13 |
 | newedax.9 | nikque.24 | eval2.12 |
@@ -23,6 +24,32 @@ Each version contains all changes of the C versions on the same row.
 | newedax.3 | nikque.18 | eval2.6 |
 | newedax.2 | nikque.18 | eval2.6 |
 | newedax.1 | nikque.17 | eval2.5 |
+
+---
+
+## v4.5.5-newedax.12
+
+As in the C version, a book file that another program holds when Edax starts is no longer taken for a damaged one and replaced. Other bugs found in a review are fixed, and the code was rearranged without changing what it does. The eval tools (`tools/eval`) stop with an error on a file name too long and on a failed allocation.
+
+**Changes**
+
+- The changes of the C version v4.5.5-nikque.27 ([its release notes](https://github.com/Nikque/edax-reversi-AVX/blob/edax-4.5.5-fixes/RELEASE-NOTES.md#v455-nikque27)): a book file that cannot be opened at the start is tried again after about 2 seconds and, if it still cannot be opened, never saved to (no `.damaged` file either); the marks of the book files that could not be loaded; `edax_book_file_status` of libedax; the fixes of `book import`, `book merge`, the `export` of the `book deviate` family, `book moveinfo`, `book reducecount`, the time `5:`, the place of `config.ini`, the table and the statistics of `weval`, libedax and others; the code rearranged without changing what it does.
+- The eval tools (`tools/eval`): when the name of a file made from the name of a folder does not fit in its array, the tool ends with `file name too long` and the exit code 1 (22 places in 10 tools; before, the name was written beyond the array, and `sprepair`, `bookdump` and `w2dat2` crashed or went on with a damaged name). `leafgen` and `w2dat2` end with `out of memory` when an allocation fails. The errors of opening a file and of memory are given by the same functions (`xfopen`, `xmalloc`, `xcalloc`, `die`), with the same messages and exit codes.
+- Tests: `tests/libedax_test.c` has 281 checks (61 more, 28 of them on Windows only), `tests/book-analyze.cpp` 3 more tests, `tests/regression.cpp` the new cases of the C version. The case `evalmobility` of `tests/regression.cpp` passes with the `eval.dat` of newedax, which holds mobility weights (its file without mobility weights is written from the weights of the 61 plies alone; before, it always failed with that `eval.dat`).
+- Manual: 4.1, 6.6, 7.3, 8.4, 8.5, 12.2, 12.4 and 13.1 (the same text as the C version, but the number of checks in 12.2).
+
+**Compatibility**
+
+- The search results, `eval.dat` and the book file format do not change.
+- The answers differ from v4.5.5-newedax.11 only in the cases above. The error messages of the book give a line of the source, which changed.
+- libedax: when the book file of the settings could not be opened at the start, no save replaces it (`edax_book_save_checked` and `edax_book_keep_unread_file` give 0). A program that saves the book itself should look at `edax_book_file_status` after the initialization.
+- The eval tools give the same outputs as those of newedax.11 for the same inputs, but for a name too long.
+
+**Checked**: as for the C version, before and after the changes, on test books with 1 and 4 threads, the book commands (76 cases) write the same files and give the same answers, the analysis commands (20,046) give the same answers, and 25 cases of the other commands give the same output (but the time and the line numbers of the book source). The 281 checks of the test of libedax and the unit tests of the analyses pass; the gcc 11 build (WSL) gives the same warnings as before, and its library passes 251 checks (all but the checks for Windows only). 6,880 answers are the same as those of the C version v4.5.5-nikque.27. The eval tools give the same outputs as those of newedax.11 for the same inputs in 26 cases (both those built from its source and those of its ZIP; no real book among the inputs).
+
+**Not checked**: the time and the memory on a real book, a real Android device, the paths of the eval tools without memory (read only).
+
+[Tests and measurements](docs/validation/newedax.en.md#v455-newedax12)
 
 ---
 

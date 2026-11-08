@@ -12,6 +12,7 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 
 | newedax | C 版（nikque） | C 版（eval2） |
 |---|---|---|
+| newedax.12 | nikque.27 | eval2.15 |
 | newedax.11 | nikque.26 | eval2.14 |
 | newedax.10 | nikque.25 | eval2.13 |
 | newedax.9 | nikque.24 | eval2.12 |
@@ -23,6 +24,32 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 | newedax.3 | nikque.18 | eval2.6 |
 | newedax.2 | nikque.18 | eval2.6 |
 | newedax.1 | nikque.17 | eval2.5 |
+
+---
+
+## v4.5.5-newedax.12
+
+C 版と同じく、起動のときにほかのプログラムが開いていた book のファイルを、壊れたものとして置き換えることがなくなりました。見直しで見つけたほかの不具合も直し、動きを変えずにコードを整理しました。評価の道具（`tools/eval`）は、長すぎるファイル名とメモリの確保の失敗を、誤りとして止めます。
+
+**変更**
+
+- C 版 v4.5.5-nikque.27 の変更を取り込みました（[C 版の修正一覧](https://github.com/Nikque/edax-reversi-AVX/blob/edax-4.5.5-fixes/RELEASE-NOTES.ja.md#v455-nikque27)）：起動のときに開けない book のファイルは 2 秒ほど待って開き直し、それでも開けなければそのファイルには保存しない（`.damaged` も作らない）こと、読めなかった book のファイルの印、libedax の `edax_book_file_status`、`book import`・`book merge`・`book deviate` の仲間の `export`・`book moveinfo`・`book reducecount`・時間の `5:`・`config.ini` の場所・`weval` の表と統計・libedax などの直し、動きを変えないコードの整理。
+- 評価の道具（`tools/eval`）：フォルダーの名前から作るファイルの名前が入れ物に収まらないときは、`file name too long` と出して終了コード 1 で止まります（10 本の 22 か所。前は入れ物の外に書き、`sprepair`・`bookdump`・`w2dat2` は落ちるか、壊れた名前で続けていました）。`leafgen`・`w2dat2` は、メモリを確保できないときに `out of memory` で止まります。ファイルを開けないとき・メモリが足りないときの止め方を、同じ関数（`xfopen`・`xmalloc`・`xcalloc`・`die`）にまとめました（文と終了コードは同じ）。
+- 試験：`tests/libedax_test.c` は 281 項目（61 項目増。うち 28 項目は Windows だけ）、`tests/book-analyze.cpp` は 3 つ増、`tests/regression.cpp` は C 版と同じ場面を足しました。`tests/regression.cpp` の `evalmobility` は、移動力の重みを持つ newedax の `eval.dat` でも通ります（移動力の重みのない評価のファイルを、61 手の重みだけを書いて作ります。前は、その `eval.dat` では必ず失敗していました）。
+- 手引き：4.1・6.6・7.3・8.4・8.5・12.2・12.4・13.1 に書きました（C 版と同じ文。12.2 の試験の項目数のほか）。
+
+**互換性**
+
+- 探索の結果・`eval.dat`・book のファイル形式は変わりません。
+- 答えが v4.5.5-newedax.11 と違うのは、上の場合だけです。book のエラーの文に入るソースの行番号は変わりました。
+- libedax：設定の book のファイルを起動のときに開けなかったときは、どの保存もそのファイルを置き換えません（`edax_book_save_checked`・`edax_book_keep_unread_file` は 0）。book を自分で保存するプログラムは、初期化の後に `edax_book_file_status` を確かめてください。
+- 評価の道具は、長すぎる名前のときのほかは、newedax.11 の道具と同じ入力で同じ出力です。
+
+**確認**：C 版と同じく、直す前と後で、試験用の book（1 スレッドと 4 スレッド）の book のコマンド 76 通りの書いたファイルと答え、解析の命令 20,046 個の答え、ほかのコマンド 25 場面の出力（時間と book のソースの行番号のほか）が同じでした。libedax の試験 281 項目と解析の単体試験が通り、gcc 11（WSL）の組み立ては警告が前と同じで、そのライブラリは 251 項目（Windows だけの項目のほか全部）が通りました。答え 6,880 個が C 版 v4.5.5-nikque.27 と同じです。評価の道具は、newedax.11 の道具と同じ入力で 26 事例の出力が同じでした（そのソースから組み立てたものとも、配布物のものとも。入力に実 book は使っていません）。
+
+**未確認**：実 book での時間とメモリ、Android の実機、評価の道具のメモリが足りないときの道（読んで確かめた）。
+
+[検証記録](docs/validation/newedax.ja.md#v455-newedax12)
 
 ---
 

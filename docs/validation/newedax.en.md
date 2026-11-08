@@ -5,6 +5,19 @@ Tests and measurements done for each version, moved without changes from the for
 For what changed, see the [release notes](../../RELEASE-NOTES.md). "Above" and "below" in the text refer to positions in the former document.
 
 
+## v4.5.5-newedax.12
+
+Checks:
+
+- Before and after the changes (the tests of the C version): on test books with 1 and 4 threads, the book commands (76 cases) write the same files and give the same answers, the analysis commands (20,046) give the same answers, and 25 cases of the other commands give the same output (but the time and the line numbers of the book source). The new checks of the bugs fail with the code before the fixes, but a few that cannot hit the bug on purpose (checked with test copies of the code). The gcc 11.4 build (WSL) gives as many warnings as before, and its library passes 251 checks (all but the checks for Windows only) with 0 failures.
+- With the released `wEdax-x86-64-v3.exe`: the `book reduce` tests (500 cases), the 14 tests of damaged books and wrong words and the earlier tests of the analysis commands (3 small books, the real `book deviate` family, 40,000 random graphs of positions, the background thread, the lines of `book bestlines` and `book findline`) find nothing wrong. The 19 unit tests of the analyses (`tests/book-analyze.cpp`) pass (the 16 earlier ones with the numbers of the previous version). The tests of the precision stages (502,470 moves of 200 random books) and of the hint (24 cases) find nothing wrong.
+- The answers of 10 commands on the same positions (6,880 answers) are all the same as those of the C version v4.5.5-nikque.27 (its released files) (except the time).
+- Search: the 5 Windows release programs solve fforum-20-39 with 1 thread with the same results and node counts as the same check of v4.5.5-newedax.11: 78,733,223 with the `eval.dat` of eval2, 77,639,567 with that of Edax 4.5; the 7 Cassio cases pass. The 3 DLLs pass 281 API checks with 0 failures with both `eval.dat`. Android (NDK r27d): no warning.
+- The 14 eval tools: built with `tools/eval/build-evtools.ps1` (x64 AVX-512) without an error or a warning. The C tools and their records are not at hand, so they were compared with the tools of newedax.11 (built from its source, and those of its ZIP) on the same inputs: in 26 cases of `tools/eval/compare_c.py`, the files written, the standard output (but the times) and the standard error are the same. `tools/eval/test_evtools.py`: 25 tests pass, and the one that needs an AVX2 build is skipped (the same with the tools of newedax.11). With a folder name of 1,100 characters, `sprepair`, `bookdump` and `w2dat2` end with `file name too long` (the tools of newedax.11 all crashed (the stack check, `0xC0000409`)). No real book was used: the inputs were made from a synthetic book, test books and self-play records.
+- The search, the evaluation, the book learning and the file format are not changed. The node counts above check that the search is the same.
+- Size (against v4.5.5-newedax.11): the 5 Windows programs −1,536 to +1,024 bytes, the 3 DLLs +1,024 to +2,560 bytes, the Android programs −808 and +352 and libraries +424 and +1,112 bytes (the fixes and the rearranged code); 11 eval tools have the same size, `leafgen` +1,024, `selfplay3` and `sprepair` +512 bytes.
+- Speed: not measured.
+
 ## v4.5.5-newedax.11
 
 Checks:
