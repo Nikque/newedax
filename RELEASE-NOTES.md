@@ -35,7 +35,7 @@ Each version contains all changes of the C versions on the same row.
 **Changes**
 
 - Evaluation (default build, `EVAL_SLOTS` 64): the 13 groups of Edax 4.5 and 13 extra groups (`M X W C`, weights of 3^10 squares or 3^9), 15 shapes and the mobility weights in 64 slots, chosen by searches on the error of the evaluation and level 18/24 games from 2026-11-05 to 11-13 (the shapes and their squares below). The weights were trained again with `tools/eval/evsearch` (plies 2-53).
-- The 48-slot build (`EVAL_SLOTS=48`): the same source and the same `eval.dat` format as the 64 slots, without the shapes `h1825_145` and `h1723_10` (16 slots: the feature updates use 3 vectors of 256 bits in place of 4), with weights trained without them. It searches about 11 % more nodes in the same time, but its evaluation loses more: at the same time it is −12.1 Elo (−17.3 to −6.9) against the 64 slots.
+- The 48-slot build (`EVAL_SLOTS=48`): the same source and the same `eval.dat` format as the 64 slots, without the shapes `cxd10` and `edw10` (16 slots: the feature updates use 3 vectors of 256 bits in place of 4), with weights trained without them. It searches about 11 % more nodes in the same time, but its evaluation loses more: at the same time it is −12.1 Elo (−17.3 to −6.9) against the 64 slots.
 - `EVAL_SLOTS` 48 no longer means eval2: the eval2 evaluation (46 patterns) is no longer built.
 - Probcut: `refit` is the default (`-probcut-model refit`, and `probcut-model = refit` in `bin/config.ini`). It was measured against `standard` on these weights: `standard` −1.0 Elo (−5.9 to +3.8, 4,378 games) for the 64 slots, −7.7 (−14.8 to −0.7, 2,204 games) for the 48 slots.
 - Search: a thread that waits polls before it sleeps; the threads split from depth 9. AVX-512 builds read the weights of a ply from one table, one by one.
@@ -49,19 +49,19 @@ The shapes of the 64 slots (slots: the images used):
 |---|---|---|
 | `c10` (Edax) | a5 a4 a3 a2 a1 b2 b1 c1 d1 e1 | 4 |
 | `s100` (Edax) | b2 a1 b1 c1 d1 e1 f1 g1 h1 g2 | 4 |
-| `xm` | b1 c1 d1 e1 f1 g1 c2 d2 e2 f2 | 4 |
-| `xw` | b2 c2 d2 e2 f2 g2 c3 d3 e3 f3 | 4 |
-| `f208_1` | a1 b1 c1 f1 g1 h1 a2 c2 f2 h2 | 4 |
-| `f203_77` | c1 e1 d2 f2 e3 g3 f4 h4 g5 h6 | 4 |
-| `f1_47` | g5 h5 g6 h6 e7 f7 h7 e8 f8 g8 | 4 |
-| `c8_b3b6` | c1 c2 b3 c3 c4 c5 b6 c6 c7 c8 | 4 |
-| `d5a_124` | d1 e2 d3 e3 f3 e4 f4 g4 f5 h5 | 4 |
-| `f1144_5` | a1 b1 c1 g1 a2 b2 c2 a3 b3 a7 | 4 |
-| `d7x_b2g7a8` | b1 b2 c2 d3 e4 f5 g6 g7 h7 a8 | 4 |
-| `p504` | a1 h1 b2 c3 d4 e5 f6 g7 a8 h8 | 2 |
-| `d3z_e2g4b5d7` | c1 b2 e2 a3 g4 b5 h6 d7 g7 f8 | 2 |
-| `h1825_145` (not in the 48 slots) | c1 d1 g1 h1 b2 d2 f2 g2 h2 f3 | 8 |
-| `h1723_10` (not in the 48 slots) | g5 f6 e7 f7 g7 d8 e8 f8 g8 h8 | 8 |
+| `m10` | b1 c1 d1 e1 f1 g1 c2 d2 e2 f2 | 4 |
+| `mi10` | b2 c2 d2 e2 f2 g2 c3 d3 e3 f3 | 4 |
+| `n10` | a1 b1 c1 f1 g1 h1 a2 c2 f2 h2 | 4 |
+| `d64` | c1 e1 d2 f2 e3 g3 f4 h4 g5 h6 | 4 |
+| `hm10` | g5 h5 g6 h6 e7 f7 h7 e8 f8 g8 | 4 |
+| `l3w10` | c1 c2 b3 c3 c4 c5 b6 c6 c7 c8 | 4 |
+| `db10` | d1 e2 d3 e3 f3 e4 f4 g4 f5 h5 | 4 |
+| `ct10` | a1 b1 c1 g1 a2 b2 c2 a3 b3 a7 | 4 |
+| `dx10` | b1 b2 c2 d3 e4 f5 g6 g7 h7 a8 | 4 |
+| `d8c` | a1 h1 b2 c3 d4 e5 f6 g7 a8 h8 | 2 |
+| `d3e10` | c1 b2 e2 a3 g4 b5 h6 d7 g7 f8 | 2 |
+| `cxd10` (not in the 48 slots) | c1 d1 g1 h1 b2 d2 f2 g2 h2 f3 | 8 |
+| `edw10` (not in the 48 slots) | g5 f6 e7 f7 g7 d8 e8 f8 g8 h8 | 8 |
 
 **Compatibility**
 
