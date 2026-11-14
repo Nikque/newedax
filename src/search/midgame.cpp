@@ -34,27 +34,34 @@
  * @param eval	Evaluation function.
  * @return An evaluated score.
  */
+#if EVAL_SLOTS > 48
 static int accumlate_eval(int ply, Eval *eval)
 {
 	unsigned short *f = eval->feature.us;
 #ifdef __AVX512F__
 	// one by one: faster than 16-lane gathers on Zen 5, with the same value
 	const short *t = EVAL_FLAT + (size_t) ply * EVAL_FLAT_N;
-	const short *c9 = t + offsetof(Eval_weight, C9) / 4, *c10 = t + offsetof(Eval_weight, C10) / 4;
-	const short *s0 = t + offsetof(Eval_weight, S100) / 4, *s1 = t + offsetof(Eval_weight, S101) / 4;
-	const short *s8 = t + offsetof(Eval_weight, S8x4) / 4, *s7 = t + offsetof(Eval_weight, S7654) / 4;
-	int sum = t[0] + c9[f[0]] + c9[f[1]] + c9[f[2]] + c9[f[3]] + c10[f[4]] + c10[f[5]] + c10[f[6]] + c10[f[7]]
-	  + s0[f[8]] + s0[f[9]] + s0[f[10]] + s0[f[11]] + s1[f[12]] + s1[f[13]] + s1[f[14]] + s1[f[15]]
-	  + s8[f[16]] + s8[f[17]] + s8[f[18]] + s8[f[19]] + s8[f[20]] + s8[f[21]] + s8[f[22]] + s8[f[23]]
-	  + s8[f[24]] + s8[f[25]] + s8[f[26]] + s8[f[27]] + s8[f[28]] + s8[f[29]]
-	  + s7[f[30]] + s7[f[31]] + s7[f[32]] + s7[f[33]] + s7[f[34]] + s7[f[35]] + s7[f[36]] + s7[f[37]]
-	  + s7[f[38]] + s7[f[39]] + s7[f[40]] + s7[f[41]] + s7[f[42]] + s7[f[43]] + s7[f[44]] + s7[f[45]];
+	const short *c10 = t + offsetof(Eval_weight, C10) / 4;
+	const short *s0 = t + offsetof(Eval_weight, S100) / 4;
+	int sum = t[0] + c10[f[4]] + c10[f[5]] + c10[f[6]] + c10[f[7]]
+	  + s0[f[8]] + s0[f[9]] + s0[f[10]] + s0[f[11]];
   #if EVAL_SLOTS > 48
 	enum { W_N = 59049 };
 	const short *x = t + offsetof(Eval_weight, X) / 4;
 	sum += x[f[48]] + x[f[49]] + x[f[50]] + x[f[51]] + x[W_N + f[52]] + x[W_N + f[53]] + x[W_N + f[54]] + x[W_N + f[55]]
 	  + x[2 * W_N + f[56]] + x[2 * W_N + f[57]] + x[2 * W_N + f[58]] + x[2 * W_N + f[59]]
-	  + x[3 * W_N + f[60]] + x[3 * W_N + f[61]] + x[3 * W_N + f[62]] + x[3 * W_N + f[63]];
+	  + x[3 * W_N + f[60]] + x[3 * W_N + f[61]] + x[3 * W_N + f[62]] + x[3 * W_N + f[63]]
+	  + x[4 * W_N + f[46]] + x[4 * W_N + f[47]]
+	  + x[5 * W_N + f[38]] + x[5 * W_N + f[39]] + x[5 * W_N + f[40]] + x[5 * W_N + f[41]]
+	  + x[5 * W_N + f[42]] + x[5 * W_N + f[43]] + x[5 * W_N + f[44]] + x[5 * W_N + f[45]]
+	  + x[6 * W_N + f[16]] + x[6 * W_N + f[17]] + x[6 * W_N + f[18]] + x[6 * W_N + f[19]]
+	  + x[7 * W_N + f[28]] + x[7 * W_N + f[29]]
+	  + x[8 * W_N + f[20]] + x[8 * W_N + f[21]] + x[8 * W_N + f[22]] + x[8 * W_N + f[23]]
+	  + x[9 * W_N + f[24]] + x[9 * W_N + f[25]] + x[9 * W_N + f[26]] + x[9 * W_N + f[27]]
+	  + x[10 * W_N + f[12]] + x[10 * W_N + f[13]] + x[10 * W_N + f[14]] + x[10 * W_N + f[15]]
+	  + x[11 * W_N + f[0]] + x[11 * W_N + f[1]] + x[11 * W_N + f[2]] + x[11 * W_N + f[3]]
+	  + x[11 * W_N + f[34]] + x[11 * W_N + f[35]] + x[11 * W_N + f[36]] + x[11 * W_N + f[37]]
+	  + x[12 * W_N + f[30]] + x[12 * W_N + f[31]] + x[12 * W_N + f[32]] + x[12 * W_N + f[33]];
   #endif
 	return sum;
 
@@ -70,7 +77,8 @@ static int accumlate_eval(int ply, Eval *eval)
 	if (ply >= EVAL_N_2PLY - 1)
 		ply = EVAL_N_2PLY - 2;
 
-#if defined(__AVX2__) && !defined(__bdver4__) && !defined(__znver1__) && !defined(__znver2__)
+#if 0 && defined(__AVX2__) && !defined(__bdver4__) && !defined(__znver1__) && !defined(__znver2__)	// (v4.5.5-newedax.13) the AVX2 gathers do not sum the shapes of these slots: AVX2 builds use the plain code
+#error the shape in place of d5 and d4 is only summed by the AVX-512 and the plain code
 	enum {
 		W_C9 = offsetof(Eval_weight, C9) / 4,
 		W_C10 = offsetof(Eval_weight, C10) / 4,
@@ -119,27 +127,131 @@ static int accumlate_eval(int ply, Eval *eval)
 
 #else
 	w = (Eval_weight *)((*EVAL_WEIGHT)[ply].S0 + b0);
-	sum = *(w->C9[f[0]]) + *(w->C9[f[1]]) + *(w->C9[f[2]]) + *(w->C9[f[3]])
-	  + *(w->C10[f[4]]) + *(w->C10[f[5]]) + *(w->C10[f[6]]) + *(w->C10[f[7]])
-	  + *(w->S100[f[8]]) + *(w->S100[f[9]]) + *(w->S100[f[10]]) + *(w->S100[f[11]])
-	  + *(w->S101[f[12]]) + *(w->S101[f[13]]) + *(w->S101[f[14]]) + *(w->S101[f[15]])
-	  + *(w->S8x4[f[16]]) + *(w->S8x4[f[17]]) + *(w->S8x4[f[18]]) + *(w->S8x4[f[19]])
-	  + *(w->S8x4[f[20]]) + *(w->S8x4[f[21]]) + *(w->S8x4[f[22]]) + *(w->S8x4[f[23]])
-	  + *(w->S8x4[f[24]]) + *(w->S8x4[f[25]]) + *(w->S8x4[f[26]]) + *(w->S8x4[f[27]])
-	  + *(w->S7654[f[30]]) + *(w->S7654[f[31]]) + *(w->S7654[f[32]]) + *(w->S7654[f[33]])
-	  + *(w->S7654[f[34]]) + *(w->S7654[f[35]]) + *(w->S7654[f[36]]) + *(w->S7654[f[37]])
-	  + *(w->S7654[f[38]]) + *(w->S7654[f[39]]) + *(w->S7654[f[40]]) + *(w->S7654[f[41]])
-	  + *(w->S7654[f[42]]) + *(w->S7654[f[43]]) + *(w->S7654[f[44]]) + *(w->S7654[f[45]]);
+	sum = *(w->C10[f[4]]) + *(w->C10[f[5]]) + *(w->C10[f[6]]) + *(w->C10[f[7]])
+	  + *(w->S100[f[8]]) + *(w->S100[f[9]]) + *(w->S100[f[10]]) + *(w->S100[f[11]]);
   #if EVAL_SLOTS > 48
 	sum += *(w->X[0][f[48]]) + *(w->X[0][f[49]]) + *(w->X[0][f[50]]) + *(w->X[0][f[51]])
 	  + *(w->X[1][f[52]]) + *(w->X[1][f[53]]) + *(w->X[1][f[54]]) + *(w->X[1][f[55]])
 	  + *(w->X[2][f[56]]) + *(w->X[2][f[57]]) + *(w->X[2][f[58]]) + *(w->X[2][f[59]])
-	  + *(w->X[3][f[60]]) + *(w->X[3][f[61]]) + *(w->X[3][f[62]]) + *(w->X[3][f[63]]);
+	  + *(w->X[3][f[60]]) + *(w->X[3][f[61]]) + *(w->X[3][f[62]]) + *(w->X[3][f[63]])
+	  + *(w->X[4][f[46]]) + *(w->X[4][f[47]])
+	  + *(w->X[5][f[38]]) + *(w->X[5][f[39]]) + *(w->X[5][f[40]]) + *(w->X[5][f[41]])
+	  + *(w->X[5][f[42]]) + *(w->X[5][f[43]]) + *(w->X[5][f[44]]) + *(w->X[5][f[45]])
+	  + *(w->X[6][f[16]]) + *(w->X[6][f[17]]) + *(w->X[6][f[18]]) + *(w->X[6][f[19]])
+	  + *(w->X[7][f[28]]) + *(w->X[7][f[29]])
+	  + *(w->X[8][f[20]]) + *(w->X[8][f[21]]) + *(w->X[8][f[22]]) + *(w->X[8][f[23]])
+	  + *(w->X[9][f[24]]) + *(w->X[9][f[25]]) + *(w->X[9][f[26]]) + *(w->X[9][f[27]])
+	  + *(w->X[10][f[12]]) + *(w->X[10][f[13]]) + *(w->X[10][f[14]]) + *(w->X[10][f[15]])
+	  + *(w->X[11][f[0]]) + *(w->X[11][f[1]]) + *(w->X[11][f[2]]) + *(w->X[11][f[3]])
+	  + *(w->X[11][f[34]]) + *(w->X[11][f[35]]) + *(w->X[11][f[36]]) + *(w->X[11][f[37]])
+	  + *(w->X[12][f[30]]) + *(w->X[12][f[31]]) + *(w->X[12][f[32]]) + *(w->X[12][f[33]]);
   #endif
 #endif
-	return sum + *(w->S8x4[f[28]]) + *(w->S8x4[f[29]]) + *(w->S0);
+	return sum + *(w->S0);
 #endif
 }
+#else
+static int accumlate_eval(int ply, Eval *eval)
+{
+	unsigned short *f = eval->feature.us;
+#ifdef __AVX512F__
+	// one by one: faster than 16-lane gathers on Zen 5, with the same value
+	const short *t = EVAL_FLAT + (size_t) ply * EVAL_FLAT_N;
+	const short *c10 = t + offsetof(Eval_weight, C10) / 4;
+	const short *s0 = t + offsetof(Eval_weight, S100) / 4;
+	enum { W_N = 59049 };
+	const short *x = t + offsetof(Eval_weight, X) / 4;
+	(void) c10;	(void) s0;
+	int sum = t[0]	// (mk48.py) the 48 slots kept, slot i of the 48 = slot EVAL_SLOT64[i] of the 64
+	  + c10[f[0]] + c10[f[1]] + c10[f[2]] + c10[f[3]] + s0[f[4]] + s0[f[5]]
+	  + s0[f[6]] + s0[f[7]] + x[10 * W_N + f[8]] + x[10 * W_N + f[9]] + x[10 * W_N + f[10]] + x[10 * W_N + f[11]]
+	  + x[6 * W_N + f[12]] + x[6 * W_N + f[13]] + x[6 * W_N + f[14]] + x[6 * W_N + f[15]] + x[8 * W_N + f[16]] + x[8 * W_N + f[17]]
+	  + x[8 * W_N + f[18]] + x[8 * W_N + f[19]] + x[9 * W_N + f[20]] + x[9 * W_N + f[21]] + x[9 * W_N + f[22]] + x[9 * W_N + f[23]]
+	  + x[7 * W_N + f[24]] + x[7 * W_N + f[25]] + x[12 * W_N + f[26]] + x[12 * W_N + f[27]] + x[12 * W_N + f[28]] + x[12 * W_N + f[29]]
+	  + x[4 * W_N + f[30]] + x[4 * W_N + f[31]] + x[f[32]] + x[f[33]] + x[f[34]] + x[f[35]]
+	  + x[1 * W_N + f[36]] + x[1 * W_N + f[37]] + x[1 * W_N + f[38]] + x[1 * W_N + f[39]] + x[2 * W_N + f[40]] + x[2 * W_N + f[41]]
+	  + x[2 * W_N + f[42]] + x[2 * W_N + f[43]] + x[3 * W_N + f[44]] + x[3 * W_N + f[45]] + x[3 * W_N + f[46]] + x[3 * W_N + f[47]];
+	return sum;
+
+#else
+	const Eval_weight *w;
+	int b0, sum;
+
+	b0 = ply & 1;	// even/odd ply interleaved for aligned VPGATHERDD access (4.5.5)
+	ply -= 2;
+	if (ply < 0)
+		ply = 0;
+	ply >>= 1;
+	if (ply >= EVAL_N_2PLY - 1)
+		ply = EVAL_N_2PLY - 2;
+
+#if 0 && defined(__AVX2__) && !defined(__bdver4__) && !defined(__znver1__) && !defined(__znver2__)	// (v4.5.5-newedax.13) the AVX2 gathers do not sum the shapes of these slots: AVX2 builds use the plain code
+#error the shape in place of d5 and d4 is only summed by the AVX-512 and the plain code
+	enum {
+		W_C9 = offsetof(Eval_weight, C9) / 4,
+		W_C10 = offsetof(Eval_weight, C10) / 4,
+		W_S100 = offsetof(Eval_weight, S100) / 4,
+		W_S101 = offsetof(Eval_weight, S101) / 4
+	};
+	w = *EVAL_WEIGHT + ply;
+	__m128i SW = _mm_cvtsi32_si128((b0 ^ 1) * 16);	// 16 for even, 0 for odd
+	__m256i FF = _mm256_add_epi32(_mm256_cvtepu16_epi32(eval->feature.v8[0]),
+		_mm256_set_epi32(W_C10, W_C10, W_C10, W_C10, W_C9, W_C9, W_C9, W_C9));
+	__m256i DD = _mm256_i32gather_epi32((int *) w, FF, 4);
+	__m256i SS = _mm256_srai_epi32(_mm256_sll_epi32(DD, SW), 16);	// select word and sign extend
+
+	FF = _mm256_add_epi32(_mm256_cvtepu16_epi32(eval->feature.v8[1]),
+		_mm256_set_epi32(W_S101, W_S101, W_S101, W_S101, W_S100, W_S100, W_S100, W_S100));
+	DD = _mm256_i32gather_epi32((int *) w, FF, 4);
+	SS = _mm256_add_epi32(SS, _mm256_srai_epi32(_mm256_sll_epi32(DD, SW), 16));
+
+	DD = _mm256_i32gather_epi32((int *) w->S8x4, _mm256_cvtepu16_epi32(eval->feature.v8[2]), 4);
+	SS = _mm256_add_epi32(SS, _mm256_srai_epi32(_mm256_sll_epi32(DD, SW), 16));
+
+	DD = _mm256_i32gather_epi32((int *) w->S7654, _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i *) &eval->feature.us[30])), 4);
+	SS = _mm256_add_epi32(SS, _mm256_srai_epi32(_mm256_sll_epi32(DD, SW), 16));
+
+	DD = _mm256_i32gather_epi32((int *) w->S7654, _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i *) &eval->feature.us[38])), 4);
+	SS = _mm256_add_epi32(SS, _mm256_srai_epi32(_mm256_sll_epi32(DD, SW), 16));
+  #if EVAL_SLOTS > 48
+	enum { W_X = offsetof(Eval_weight, X) / 4, W_N = 59049 };
+	FF = _mm256_add_epi32(_mm256_cvtepu16_epi32(eval->feature.v8[6]),
+		_mm256_set_epi32(W_X + W_N, W_X + W_N, W_X + W_N, W_X + W_N, W_X, W_X, W_X, W_X));
+	DD = _mm256_i32gather_epi32((int *) w, FF, 4);
+	SS = _mm256_add_epi32(SS, _mm256_srai_epi32(_mm256_sll_epi32(DD, SW), 16));
+	FF = _mm256_add_epi32(_mm256_cvtepu16_epi32(eval->feature.v8[7]),
+		_mm256_set_epi32(W_X + 3 * W_N, W_X + 3 * W_N, W_X + 3 * W_N, W_X + 3 * W_N, W_X + 2 * W_N, W_X + 2 * W_N, W_X + 2 * W_N, W_X + 2 * W_N));
+	DD = _mm256_i32gather_epi32((int *) w, FF, 4);
+	SS = _mm256_add_epi32(SS, _mm256_srai_epi32(_mm256_sll_epi32(DD, SW), 16));
+  #endif
+	__m128i S = _mm_add_epi32(_mm256_castsi256_si128(SS), _mm256_extracti128_si256(SS, 1));
+
+	__m128i D = _mm_i32gather_epi32((int *) w->S8x4, _mm_cvtepu16_epi32(eval->feature.v8[3]), 4);
+	S = _mm_add_epi32(S, _mm_srai_epi32(_mm_sll_epi32(D, SW), 16));
+		// https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction
+	S = _mm_add_epi32(S, _mm_unpackhi_epi64(S, S));
+	sum = _mm_cvtsi128_si32(_mm_add_epi32(S, _mm_shufflelo_epi16(S, 0x4e)));
+	w = (Eval_weight *)(w->S0 + b0);
+
+#else
+	w = (Eval_weight *)((*EVAL_WEIGHT)[ply].S0 + b0);
+	sum = *(w->C10[f[0]]) + *(w->C10[f[1]]) + *(w->C10[f[2]]) + *(w->C10[f[3]])
+	  + *(w->S100[f[4]]) + *(w->S100[f[5]]) + *(w->S100[f[6]]) + *(w->S100[f[7]])
+	  + *(w->X[10][f[8]]) + *(w->X[10][f[9]]) + *(w->X[10][f[10]]) + *(w->X[10][f[11]])
+	  + *(w->X[6][f[12]]) + *(w->X[6][f[13]]) + *(w->X[6][f[14]]) + *(w->X[6][f[15]])
+	  + *(w->X[8][f[16]]) + *(w->X[8][f[17]]) + *(w->X[8][f[18]]) + *(w->X[8][f[19]])
+	  + *(w->X[9][f[20]]) + *(w->X[9][f[21]]) + *(w->X[9][f[22]]) + *(w->X[9][f[23]])
+	  + *(w->X[7][f[24]]) + *(w->X[7][f[25]]) + *(w->X[12][f[26]]) + *(w->X[12][f[27]])
+	  + *(w->X[12][f[28]]) + *(w->X[12][f[29]]) + *(w->X[4][f[30]]) + *(w->X[4][f[31]])
+	  + *(w->X[0][f[32]]) + *(w->X[0][f[33]]) + *(w->X[0][f[34]]) + *(w->X[0][f[35]])
+	  + *(w->X[1][f[36]]) + *(w->X[1][f[37]]) + *(w->X[1][f[38]]) + *(w->X[1][f[39]])
+	  + *(w->X[2][f[40]]) + *(w->X[2][f[41]]) + *(w->X[2][f[42]]) + *(w->X[2][f[43]])
+	  + *(w->X[3][f[44]]) + *(w->X[3][f[45]]) + *(w->X[3][f[46]]) + *(w->X[3][f[47]]);	// (mk48.py) the 48 slots kept
+#endif
+	return sum + *(w->S0);
+#endif
+}
+#endif
 
 #if EVAL_MOBILITY
 /**

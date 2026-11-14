@@ -92,7 +92,7 @@ typedef struct {
 	int book_expand_tasks;                /**< book positions expanded at the same time (each search uses n_task / book_expand_tasks threads); 0 = auto */
 	bool speed_set;                       /**< speed given by the user; otherwise the time management uses the measured search speed */
 	bool level_set;                       /**< level given by the user (with a time control, it caps the search level) */
-	int probcut_model;                    /**< probcut error model: 0 = standard, 1 = refit (experimental, see eval.c) */
+	int probcut_model;                    /**< probcut error model: 0 = standard, 1 = refit (the default, see eval.c) */
 	int book_depth;                       /**< book depth set at startup (book-depth); 0 = auto: keep the depth of the loaded book */
 	int book_format;                      /**< form of the saved book files (book-format): 1 (Edax 4), 2 (NEDXBOOK); 0 = auto: the form of the loaded file; for a new book, the form of the book file it replaces, else 1 */
 	int book_store_tasks;                 /**< games learned at the same time by book store/add/learn (each game uses n_task / book_store_tasks threads), and leaf searches of book link done at the same time; 0 = auto (n_task, the default), 1 = one position after the other */

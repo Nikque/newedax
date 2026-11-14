@@ -74,7 +74,7 @@ Options options = {
 	.book_expand_tasks = 1, // book positions expanded at the same time
 	.speed_set = false, // speed given by the user (else measured)
 	.level_set = false, // level given by the user (else no level cap with a time control)
-	.probcut_model = 0, // probcut model: standard
+	.probcut_model = 1, // probcut model: refit (v4.5.5-newedax.13: the model of the measures of the 64 and the 48 slots)
 	.book_depth = 0, // book depth: auto (the depth of the loaded book)
 	.book_format = 0, // form of the saved book: auto (the form of the loaded file, or of the file a new book replaces)
 	.book_store_tasks = 0, // games learned at the same time: auto
@@ -119,7 +119,7 @@ void options_usage(void)
 		"                                (with a time, -l caps the level; without -l, no cap)\n"
 		"  -speed <n|auto>               search speed (nodes/s) used to share the time; auto: measured.\n"
 		"  -ponder <on/off>              search during opponent time.\n"
-		"  -probcut-model <standard|refit> probcut error model (refit: experimental, see README).\n"
+		"  -probcut-model <refit|standard> probcut error model (default: refit, see README).\n"
 		"  -eval-file                    read eval weight from this file.\n"
 		"  -book-file                    load opening book from this file.\n"
 		"  -book-usage <on/off>          play from the opening book.\n"

@@ -493,13 +493,22 @@ inline void et_groups(unsigned char *x)
 }
 
 /** the extra groups of the 64-slot evaluation (EVAL_GROUP of src/eval), 4 places each, not packed */
-inline constexpr ET_F2X ET_X_GROUP[4] = {
+inline constexpr ET_F2X ET_X_GROUP[13] = {
 	{10, {B1, C1, D1, E1, F1, G1, C2, D2, E2, F2}},
-	{10, {A1, B1, G1, H1, B2, G2, C3, F3, D4, E4}},
+	{10, {A1, B1, C1, F1, G1, H1, A2, C2, F2, H2}},
 	{10, {B2, C2, D2, E2, F2, G2, C3, D3, E3, F3}},
-	{ 9, {C3, D3, E3, C4, D4, E4, C5, D5, E5}},
+	{10, {C1, E1, D2, F2, E3, G3, F4, H4, G5, H6}},
+	{10, {C1, B2, E2, A3, G4, B5, H6, D7, G7, F8}},
+	{10, {G5, F6, E7, F7, G7, D8, E8, F8, G8, H8}},
+	{10, {G5, H5, G6, H6, E7, F7, H7, E8, F8, G8}},
+	{10, {A1, H1, B2, C3, D4, E5, F6, G7, A8, H8}},
+	{10, {D1, E2, D3, E3, F3, E4, F4, G4, F5, H5}},
+	{10, {A1, B1, C1, G1, A2, B2, C2, A3, B3, A7}},
+	{10, {C1, C2, B3, C3, C4, C5, B6, C6, C7, C8}},
+	{10, {C1, D1, G1, H1, B2, D2, F2, G2, H2, F3}},
+	{10, {B1, B2, C2, D3, E4, F5, G6, G7, H7, A8}},
 };
-inline constexpr int ET_X_SIZE[4] = { 59049, 59049, 59049, 19683 };
+inline constexpr int ET_X_SIZE[13] = { 59049, 59049, 59049, 59049, 59049, 59049, 59049, 59049, 59049, 59049, 59049, 59049, 59049 };
 
 /** the mobility group of a file of form 2 (src/eval: EVAL2_MOBILITY_GROUP) */
 inline constexpr unsigned char ET_MOBILITY_GROUP[20] = { 0, 2, 1, 0, ET_NMOB, 0, 0, 0 };

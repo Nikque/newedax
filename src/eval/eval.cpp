@@ -174,6 +174,8 @@ static const CoordinateToFeature EVAL_X2F[] = {
 
 #if EVAL_SLOTS > 48
 #include "eval/eval_feature64.h"
+#elif EVAL_XGROUPS
+#include "eval/eval_feature48.h"
 #else
 const EVAL_FEATURE_V EVAL_FEATURE[65] = {
 	{{ // a1
@@ -577,8 +579,8 @@ constexpr int EVAL_N_PACKED = 114364;
  */
 #define EVAL2_GROUP_SIZE 20
 #define EVAL2_N_GROUP 13	// groups of Edax 4.5 (the packed weights)
-#if EVAL_SLOTS > 48
-	#define EVAL2_N_GROUP_ALL (EVAL2_N_GROUP + 4)	// with the extra groups (EVAL_X_SIZE weights each)
+#if EVAL_XGROUPS
+	#define EVAL2_N_GROUP_ALL (EVAL2_N_GROUP + 13)	// with the extra groups (EVAL_X_SIZE weights each)
 #else
 	#define EVAL2_N_GROUP_ALL EVAL2_N_GROUP
 #endif
@@ -617,11 +619,20 @@ static const struct EvalGroup {
 	{ 5, 4,   135, {D1, E2, F3, G4, H5}},                            // S5 (38-41)
 	{ 4, 4,    45, {D1, C2, B3, A4}},                                // S4 (42-45)
 	{ 0, 1,     1, {}},                                              // S0 (46)
-#if EVAL_SLOTS > 48
+#if EVAL_XGROUPS
 	{10, 4, 59049, {B1, C1, D1, E1, F1, G1, C2, D2, E2, F2}},        // X0 (slots 48-51, see EVAL_X_SQUARE)
-	{10, 4, 59049, {A1, B1, G1, H1, B2, G2, C3, F3, D4, E4}},        // X1 (52-55)
+	{10, 4, 59049, {A1, B1, C1, F1, G1, H1, A2, C2, F2, H2}},        // X1 (52-55)
 	{10, 4, 59049, {B2, C2, D2, E2, F2, G2, C3, D3, E3, F3}},        // X2 (56-59)
-	{ 9, 4, 19683, {C3, D3, E3, C4, D4, E4, C5, D5, E5}},            // X3 (60-63)
+	{10, 4, 59049, {C1, E1, D2, F2, E3, G3, F4, H4, G5, H6}},            // X3 (60-63)
+	{10, 2, 59049, {C1, B2, E2, A3, G4, B5, H6, D7, G7, F8}},
+	{10, 8, 59049, {G5, F6, E7, F7, G7, D8, E8, F8, G8, H8}},
+	{10, 4, 59049, {G5, H5, G6, H6, E7, F7, H7, E8, F8, G8}},
+	{10, 2, 59049, {A1, H1, B2, C3, D4, E5, F6, G7, A8, H8}},
+	{10, 4, 59049, {D1, E2, D3, E3, F3, E4, F4, G4, F5, H5}},
+	{10, 4, 59049, {A1, B1, C1, G1, A2, B2, C2, A3, B3, A7}},
+	{10, 4, 59049, {C1, C2, B3, C3, C4, C5, B6, C6, C7, C8}},
+	{10, 8, 59049, {C1, D1, G1, H1, B2, D2, F2, G2, H2, F3}},
+	{10, 4, 59049, {B1, B2, C2, D3, E4, F5, G6, G7, H7, A8}},
 #endif
 };
 
@@ -1053,6 +1064,10 @@ void eval_open(const char* file)
 #else
 	if (header.mobility) fatal_error("%s holds mobility weights: they need a build with EVAL_MOBILITY\n", file);
 #endif
+#if EVAL_XGROUPS
+	// (v4.5.5-newedax.13) a file without the extra groups (the eval.dat of eval2 or of Edax 4.5) is read with the extra weights 0: a wrong evaluation
+	if (header.n_group == EVAL2_N_GROUP) warn("%s has no weights for the extra groups of this build (EVAL_SLOTS %d): the evaluation is wrong; use the eval.dat of the release of this build\n", file, EVAL_SLOTS);
+#endif
 	n_w = (int) header.n_weights;
 	w = (short*) malloc(n_w * sizeof (*w)); // a temporary to read packed weights
 	if (w == NULL) fatal_error("Cannot allocate temporary table variable.\n");
@@ -1099,11 +1114,11 @@ void eval_open(const char* file)
 			*(pe->S7654[k + 3159]) = w[pp->EVAL_S4[k] + EVAL_PACKED_OFS[11]];
 		}
 		*(pe->S0) = w[EVAL_PACKED_OFS[12]];
-#if EVAL_SLOTS > 48
+#if EVAL_XGROUPS
 		// extra groups: the file weights (from the side to move at an even ply), or 0 if the file has none
 		{
 			const short *wx = w + EVAL_N_PACKED;
-			for (i = 0; i < 4; wx += EVAL_X_SIZE[i++]) {
+			for (i = 0; i < 13; wx += EVAL_X_SIZE[i++]) {
 				for (k = 0; k < EVAL_N_X; k++) *(pe->X[i][k]) = 0;
 				if (header.n_group == EVAL2_N_GROUP) continue;
 				if (ply & 1) for (k = 0; k < EVAL_X_SIZE[i]; k++) *(pe->X[i][k]) = wx[OPPONENT_FEATURE[k + EVAL_X_BASE[i]]];
@@ -1359,29 +1374,47 @@ void eval_update_leaf(int x, unsigned long long f, Eval *eval_out, const Eval *e
  *
  * @param eval  Evaluation function.
  */
+#if EVAL_SLOTS > 48
 void eval_pass(Eval *eval)
 {
 	int i;
 
-	for (i =  0; i <  4; ++i)	// 9
-		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + 19683];
-	for (i =  4; i < 16; ++i)	// 10
+	for (i =  0; i <  4; ++i)	// the shape in place of c9 and d6
+		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + EVAL_X_BASE[11]];
+	for (i =  4; i < 12; ++i)	// 10
 		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i]];
-	for (i = 16; i < 30; ++i)	// 8
-		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] - EVAL_OFFSET[i] + 26244] + EVAL_OFFSET[i];
-	for (i = 30; i < 34; ++i)	// 7
-		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + 28431];
-	for (i = 34; i < 38; ++i)	// 6
-		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] - 2187 + 29160] + 2187;
-	for (i = 38; i < 42; ++i)	// 5
-		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] - 2916 + 29403] + 2916;
-	for (i = 42; i < 46; ++i)	// 4
-		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] - 3159 + 29484] + 3159;
+	for (i = 12; i < 16; ++i)	// the shape in place of s101
+		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + EVAL_X_BASE[10]];
+	for (i = 16; i < 20; ++i)	// the shape in place of l2
+		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + EVAL_X_BASE[6]];
+	for (i = 20; i < 24; ++i)	// u1 in place of l3
+		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + EVAL_X_BASE[8]];
+	for (i = 24; i < 28; ++i)	// the shape in place of l4
+		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + EVAL_X_BASE[9]];
+	for (i = 28; i < 30; ++i)	// the shape in place of d8 (2 images)
+		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + EVAL_X_BASE[7]];
+	for (i = 30; i < 34; ++i)	// the shape in place of d7
+		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + EVAL_X_BASE[12]];
+	for (i = 34; i < 38; ++i)	// the same shape
+		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + EVAL_X_BASE[11]];
+	for (i = 38; i < 46; ++i)	// the shape in place of d5 and d4
+		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + EVAL_X_BASE[5]];
 #if EVAL_SLOTS > 48
 	for (i = 48; i < 64; ++i)	// 9 or 10
 		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + EVAL_X_BASE[(i - 48) >> 2]];
+	for (i = 46; i < 48; ++i)
+		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + EVAL_X_BASE[4]];
 #endif
 }
+#else
+void eval_pass(Eval *eval)
+{
+	int i;
+
+	for (i = 0; i < EVAL_SLOTS; ++i)	// (mk48.py) the 48 slots kept, see eval_feature48.h
+		eval->feature.us[i] = OPPONENT_FEATURE[eval->feature.us[i] + EVAL_PASS_BASE[i]];
+}
+#endif
 
 /**
  * @brief Compute the error-type of the evaluation function according to the

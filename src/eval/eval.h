@@ -14,17 +14,19 @@
 #include "core/bit.h"
 
 /**
- * Feature slots: 48 (the 47 features of Edax 4.5, the default) or 64 (EVAL_SLOTS=64: 16 more features,
- * slots 48 to 63, see eval_feature64.h). The features fill whole vectors: 3 or 4 of 256 bits.
+ * Feature slots: 64 (the default since v4.5.5-newedax.13, see eval_feature64.h) or 48 (EVAL_SLOTS=48: the 64 without
+ * 2 shapes, see eval_feature48.h). The features fill whole vectors: 3 or 4 of 256 bits.
  */
 #ifndef EVAL_SLOTS
-	#define EVAL_SLOTS 48
+	#define EVAL_SLOTS 64	// v4.5.5-newedax.13: the default build (64, or 48: the 64 without 2 shapes)
 #endif
 #if EVAL_SLOTS != 48 && EVAL_SLOTS != 64
 	#error "EVAL_SLOTS is 48 or 64"
 #endif
-#if EVAL_SLOTS > 48 && !defined(hasSSE2) && !defined(__ARM_NEON) && !defined(VECTOR_EVAL_UPDATE)
-	#define VECTOR_EVAL_UPDATE	// (the update square by square of eval.cpp knows the 47 features of Edax 4.5 only)
+/** the 13 extra groups of weights are read with 64 and with 48 slots (48: the 64 slots without 2 shapes, eval_feature48.h) */
+#define EVAL_XGROUPS 1
+#if (EVAL_SLOTS > 48 || EVAL_XGROUPS) && !defined(hasSSE2) && !defined(__ARM_NEON) && !defined(VECTOR_EVAL_UPDATE)
+	#define VECTOR_EVAL_UPDATE	// (the update square by square of eval.cpp knows the 47 features of Edax 4.5 only: not the 48 slots of v4.5.5-newedax.13)
 #endif
 
 /**
@@ -82,8 +84,8 @@ typedef struct Eval_weight {
 	short	S101[59049][2];
 	short	S8x4[6561*4][2];
 	short	S7654[2187+729+243+81][2];
-#if EVAL_SLOTS > 48
-	short	X[4][59049][2];	// extra groups of 9 or 10 squares (slots 48-63, 4 places each)
+#if EVAL_XGROUPS
+	short	X[13][59049][2];	// extra groups of 9 or 10 squares (slots 48-63, 4 places each)
 #endif
 } Eval_weight;
 

@@ -82,7 +82,7 @@ int main(int argc, char **argv)
 		printf("%lld weights interpolated\n", filled);
 	}
 	int covered[13] = {0};
-	static short xw[61][4][59049];
+	static short xw[61][13][59049];
 	bool has_x = false;
 	for (int ply = 2; ply <= 53; ++ply) {
 		w = all + (size_t) ply * nw;
@@ -123,7 +123,7 @@ int main(int argc, char **argv)
 				free(seen);
 				covered[cl] = 1; found = 1;
 			}
-			for (int g = 0; g < 4 && !found; ++g) {
+			for (int g = 0; g < 13 && !found; ++g) {
 				uint64_t es = 0;
 				for (int i = 0; i < ET_X_GROUP[g].n; ++i) es |= 1ULL << ET_X_GROUP[g].x[i];
 				if (ET_X_GROUP[g].n != n || es != set) continue;
@@ -148,7 +148,7 @@ int main(int argc, char **argv)
 		}
 		if (has_mob) for (int i = 0; i < mob_n; ++i) mob[ply][i] = (short) lrint(w[mob_ofs + i] * 128);
 	}
-	for (int c = 0; c < 12; ++c) if (!covered[c]) { fprintf(stderr, "Edax class %d is not in the configuration\n", c); return 1; }
+	for (int c = 0; c < 12; ++c) if (c < 10 && c != 4 && c != 7 && c != 5 && c != 6 && c != 3 && c != 0 && c != 9 && c != 8 && !covered[c]) { fprintf(stderr, "Edax class %d is not in the configuration\n", c); return 1; }
 	for (int ply = 0; ply < 2; ++ply) { memcpy(e->w[ply], e->w[ply + 2], sizeof e->w[0]); memcpy(mob[ply], mob[ply + 2], sizeof mob[0]); }
 	for (int ply = 54; ply < ET_NPLY; ++ply) { memcpy(e->w[ply], e->w[ply - 2], sizeof e->w[0]); memcpy(mob[ply], mob[ply - 2], sizeof mob[0]); }
 	if (argc > 5) {	// version x.y.z of the evaluation file
@@ -160,9 +160,9 @@ int main(int argc, char **argv)
 		for (int ply = 0; ply < 2; ++ply) memcpy(xw[ply], xw[ply + 2], sizeof xw[0]);
 		for (int ply = 54; ply < ET_NPLY; ++ply) memcpy(xw[ply], xw[ply - 2], sizeof xw[0]);
 		static const double coefficient[6] = { -0.10026799, 0.31027733, -0.57772603, 0.07585621, 1.16492647, 5.4171698 };
-		const int n_group = 13 + 4 + (has_mob ? 1 : 0), size = 96 + n_group * 20 + 4;
+		const int n_group = 13 + 13 + (has_mob ? 1 : 0), size = 96 + n_group * 20 + 4;
 		unsigned int n_weights = ET_NW + (has_mob ? ET_NMOB : 0);
-		for (int g = 0; g < 4; ++g) n_weights += ET_X_SIZE[g];
+		for (int g = 0; g < 13; ++g) n_weights += ET_X_SIZE[g];
 		unsigned char *x = (unsigned char *) xcalloc(size, 1);
 		const uint16_t form = 2, hsize = (uint16_t) size, n_plies = ET_NPLY, first_ply = 0, groups = (uint16_t) n_group;
 		memcpy(x, "NEDXEVAL", 8); memcpy(x + 8, &form, 2); memcpy(x + 10, &hsize, 2);
@@ -170,13 +170,13 @@ int main(int argc, char **argv)
 		memcpy(x + 36, &n_plies, 2); memcpy(x + 38, &first_ply, 2); memcpy(x + 40, &n_weights, 4); memcpy(x + 44, &groups, 2);
 		memcpy(x + 48, coefficient, 48);
 		et_groups(x + 96);
-		for (int g = 0; g < 4; ++g) {
+		for (int g = 0; g < 13; ++g) {
 			unsigned char *y = x + 96 + (13 + g) * 20;
-			y[0] = (unsigned char) ET_X_GROUP[g].n; y[1] = 4;
+			y[0] = (unsigned char) ET_X_GROUP[g].n; y[1] = g == 12 ? 4 : g == 11 ? 8 : g == 10 ? 4 : g >= 8 ? 4 : g == 7 ? 2 : g == 6 ? 4 : g == 5 ? 8 : g == 4 ? 2 : 4;
 			memcpy(y + 4, &ET_X_SIZE[g], 4);
 			memcpy(y + 8, ET_X_GROUP[g].x, ET_X_GROUP[g].n);
 		}
-		if (has_mob) memcpy(x + 96 + 17 * 20, ET_MOBILITY_GROUP, 20);
+		if (has_mob) memcpy(x + 96 + 26 * 20, ET_MOBILITY_GROUP, 20);
 		uint32_t crc = crc32c_update(0, x, size - 4);
 		memcpy(x + size - 4, &crc, 4);
 		f = xfopen(argv[4], "wb");
@@ -185,7 +185,7 @@ int main(int argc, char **argv)
 		for (int ply = 0; ply < ET_NPLY; ++ply) {
 			const auto put = [&](const void *p, size_t n) { crc = crc32c_update(crc, (const unsigned char *) p, n * 2); fwrite(p, 2, n, f); };
 			put(e->w[ply], ET_NW);
-			for (int g = 0; g < 4; ++g) put(xw[ply][g], ET_X_SIZE[g]);
+			for (int g = 0; g < 13; ++g) put(xw[ply][g], ET_X_SIZE[g]);
 			if (has_mob) put(mob[ply], ET_NMOB);
 		}
 		fwrite(&crc, 4, 1, f);
