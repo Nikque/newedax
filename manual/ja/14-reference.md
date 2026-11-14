@@ -159,7 +159,7 @@
 | `book-leaf-recalculate-rounds` | 1〜1000000 | 1 | 1 | `book leaf recalculate` 系列の回数の上限 |
 | `book-seed` | 0〜2^64−1、`auto` | `auto` | `auto` | book の同点候補を選ぶ乱数の種（`auto` は時計から） |
 | `book-reproducible` | `on`／`off` | `off` | `off` | book のコマンドを、毎回同じ book になるように行う（[7章](07-book-learning.md)） |
-| `probcut-model` | `standard`／`refit` | `standard` | `standard` | 枝刈りの方式（`refit` は実験用） |
+| `probcut-model` | `refit`／`standard` | `refit` | `refit` | 枝刈りの方式（v4.5.5-newedax.13 から `refit` が既定。`standard` は Edax 4.5.5 の方式） |
 | `book-reduce-index` | `binary`／`table` | `table` | | `book reducecount` で番号から局面を引く方法（v4.5.5-nikque.22 から。[8.4](08-book-maintenance.md)） |
 | `book-reduce-walk` | `loss`／`group` | `loss` | | `book reducecount` を並列で行うときの、たどる順（v4.5.5-nikque.22 から） |
 | `book-reduce-reuse` | `on`／`off` | `on` | | `book reduce` で直前の `book reducecount` の結果を使う（v4.5.5-nikque.22 から） |

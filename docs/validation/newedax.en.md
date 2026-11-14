@@ -5,6 +5,18 @@ Tests and measurements done for each version, moved without changes from the for
 For what changed, see the [release notes](../../RELEASE-NOTES.md). "Above" and "below" in the text refer to positions in the former document.
 
 
+## v4.5.5-newedax.13
+
+Checks:
+
+- The weights and the engine: in each build (64 and 48 slots), the 5 Windows release programs give at level 12 on 40 midgame positions, with no option (the default probcut model `refit`), the same values, node counts and lines as the engine with which the weights were measured (2026-11-13, `-probcut-model refit`). Before the release builds, the same check passed on builds with AVX-512, AVX2, no SIMD flag and `/fp:fast` (the cl options of the release), with `-probcut-model refit` and with no option.
+- fforum-20-39 (1 thread): at the default level, the 10 Windows programs give the same answers and node counts as the engine with which the weights were measured (77,808,331 nodes with the 64 slots, 73,019,204 with the 48 slots; they differ from those of v4.5.5-newedax.12, as the evaluation changed). There, the position 18 is searched at 22@98% (not exactly) and gives h3 (−22) in place of g2 (−20), with both builds, as that engine does. With `-l 60` (exact), the 10 programs give 0 wrong moves and 0 wrong scores. The 7 Cassio cases pass with the 10 programs. The 6 DLLs pass 281 API checks with 0 failures with the `eval.dat` of their build. Android (NDK r27d): no warning, no error.
+- `tests/regression.cpp`: the 54 cases pass with the 64 and the 48 slots, built with AVX-512 and for 32-bit x86 without SSE (as `wEdax-x86.exe`). The cases of the files of form 1 now make their file from the 13 groups of Edax 4.5 of the `eval.dat` of form 2, and `evalslots` counts the extra weights of the file (with the `eval.dat` of this version, 5 cases failed before these changes of the tests).
+- Fixed before the release: the 48-slot `wEdax-x86.exe` (32-bit, no SSE) stopped in its PGO run: without SIMD, the 48 slots used the update of Edax 4.5 square by square, which does not know the shapes of this version. It now uses the update of the 64 slots (the regression cases above check it).
+- The eval tools: 16 programs built with `tools/eval/build-evtools.ps1` (x64 AVX-512, Boost 1.92) without an error.
+- Strength: see the table of the release notes. The games were played with builds of the same source (the PGO build of the 64 slots, `refit`), from random openings, each played with both colours, without a book; the weights of the release are those of the measures.
+- Not checked: real Android devices, Windows ARM64, the speed of the books, the time and memory on a real book.
+
 ## v4.5.5-newedax.12
 
 Checks:

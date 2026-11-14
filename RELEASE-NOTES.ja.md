@@ -2,7 +2,7 @@
 
 [English](RELEASE-NOTES.md) · [README](README.md) · [マニュアル](manual/ja/README.md) · [テストと実測の記録](docs/validation/newedax.ja.md)
 
-newedax（C 版 Edax 4.5.5 nikque の eval2 系列を C++23 に移したもの）の、版ごとの利用者向けの変更点です。テストと実測の詳しい記録は、各版の末尾のリンク先にあります。
+newedax（C 版 Edax 4.5.5 nikque の eval2 系列を C++23 に移したもの）の、版ごとの使う人に関わる変更点です。テストと実測の詳しい記録は、各版の末尾のリンク先にあります。
 
 C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://github.com/Nikque/edax-reversi-AVX/blob/edax-4.5.5-fixes/RELEASE-NOTES.ja.md) を見てください。
 
@@ -12,6 +12,7 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 
 | newedax | C 版（nikque） | C 版（eval2） |
 |---|---|---|
+| newedax.13 | nikque.27 | eval2.15 |
 | newedax.12 | nikque.27 | eval2.15 |
 | newedax.11 | nikque.26 | eval2.14 |
 | newedax.10 | nikque.25 | eval2.13 |
@@ -26,6 +27,63 @@ C 版から取り込んだ変更の詳細は、[C 版の修正一覧](https://gi
 | newedax.1 | nikque.17 | eval2.5 |
 
 ---
+
+## v4.5.5-newedax.13
+
+**新しい評価関数：64 枠で学習し直したものと、48 枠の版。** 配布物は 2 つです。`edax-4.5.5-newedax.13-64.zip`（既定の 64 枠）と `edax-4.5.5-newedax.13-48.zip`（48 枠：64 枠から形を 2 つ外したもの。1 節点あたりが速い）。それぞれに専用の `eval.dat`（107,612,578 バイト）が入っています。リポジトリの `bin/data` に残っている eval2 の `eval.dat` は、これらの版には使えません。同じ持ち時間（1 局 30 秒ずつ）で、64 枠の版は eval2（v4.5.5-newedax.12）に **+60.2 Elo**（95%：+47.9〜+72.6）、Egaroucid（大会用の枝、1 局 120 秒、8 スレッド）に **+23.2 Elo**（+3.0〜+43.6）でした。ProbCut の既定は `refit` になりました。
+
+**変更点**
+
+- 評価関数（既定の版、`EVAL_SLOTS` 64）：Edax 4.5 の 13 群と追加の 13 群（`M X W C`、3^10 マスまたは 3^9 の重み）、15 個の形と着手可能数の重みを 64 枠に置きました。形は 2026-11-05〜11-13 に、評価の誤差と Lv18・Lv24 の対局で探しました（形とマスは下の表）。重みは `tools/eval/evsearch`（手数 2〜53）で学習し直しました。
+- 48 枠の版（`EVAL_SLOTS=48`）：64 枠と同じソース・同じ形式の `eval.dat` で、形 `h1825_145` と `h1723_10`（16 枠）を外したもの（特徴の差分更新は 256 ビットのベクトル 4 本のかわりに 3 本）。重みはこの 2 つを外して学習しました。同じ時間で約 11% 多く読みますが、評価の落ちのほうが大きく、同じ時間で 64 枠に −12.1 Elo（−17.3〜−6.9）でした。
+- `EVAL_SLOTS` 48 は eval2 の意味ではなくなりました。eval2 の評価関数（46 パターン）は組み立てられません。
+- ProbCut：既定を `refit` にしました（`-probcut-model refit`、`bin/config.ini` の `probcut-model = refit`）。この重みで `standard` と比べた結果：64 枠で `standard` は −1.0 Elo（−5.9〜+3.8、4,378 局）、48 枠で −7.7（−14.8〜−0.7、2,204 局）。
+- 探索：待っているスレッドが眠る前に見回るようにし、深さ 9 から分けます。AVX-512 の版は、手数ごとの重みを 1 つの表から 1 つずつ読みます。
+- 道具（`tools/eval`）：`evshape`、`evsearch -mute`・`-method sd`、`w2dat2 -interp` と追加の群、`selfplay3 -h`、`selfplay3` と `label` の探索の refit、`pcsigma`。
+- 評価ファイル：64 枠・48 枠の版は、追加の群の重みの無いファイル（eval2 や Edax 4.5 の `eval.dat`）を読むと警告を出します。
+- 試験（`tests/regression.cpp`）：`evalslots` が AVX-512 の版の表も読み、ファイルの追加の群の重みを数に入れ、差分更新をすべての枠で確かめるようにしました。形式 1 のファイルの試し（`evalform2`・`evalform2mob`・`evalbadconv`・`evalmobility`）は、形式 2 の `eval.dat` の Edax 4.5 の 13 群から形式 1 のファイルを作って使います。
+
+64 枠の形（枠：使う像の数）：
+
+| 形 | マス | 枠 |
+|---|---|---|
+| `c10`（Edax） | a5 a4 a3 a2 a1 b2 b1 c1 d1 e1 | 4 |
+| `s100`（Edax） | b2 a1 b1 c1 d1 e1 f1 g1 h1 g2 | 4 |
+| `xm` | b1 c1 d1 e1 f1 g1 c2 d2 e2 f2 | 4 |
+| `xw` | b2 c2 d2 e2 f2 g2 c3 d3 e3 f3 | 4 |
+| `f208_1` | a1 b1 c1 f1 g1 h1 a2 c2 f2 h2 | 4 |
+| `f203_77` | c1 e1 d2 f2 e3 g3 f4 h4 g5 h6 | 4 |
+| `f1_47` | g5 h5 g6 h6 e7 f7 h7 e8 f8 g8 | 4 |
+| `c8_b3b6` | c1 c2 b3 c3 c4 c5 b6 c6 c7 c8 | 4 |
+| `d5a_124` | d1 e2 d3 e3 f3 e4 f4 g4 f5 h5 | 4 |
+| `f1144_5` | a1 b1 c1 g1 a2 b2 c2 a3 b3 a7 | 4 |
+| `d7x_b2g7a8` | b1 b2 c2 d3 e4 f5 g6 g7 h7 a8 | 4 |
+| `p504` | a1 h1 b2 c3 d4 e5 f6 g7 a8 h8 | 2 |
+| `d3z_e2g4b5d7` | c1 b2 e2 a3 g4 b5 h6 d7 g7 f8 | 2 |
+| `h1825_145`（48 枠には無い） | c1 d1 g1 h1 b2 d2 f2 g2 h2 f3 | 8 |
+| `h1723_10`（48 枠には無い） | g5 f6 e7 f7 g7 d8 e8 f8 g8 h8 | 8 |
+
+**互換性**
+
+- 探索の結果は変わります（評価関数と ProbCut の既定）。book の形式は変わりません。前の版で学習した book は読めますが、その値は前の評価関数でつけたものです。
+- `eval.dat`：それぞれの版の `eval.dat` は配布物の ZIP（`bin/data/eval.dat`）にあり、git にはありません。リポジトリから組み立てた版にも必要です。`bin/data` の eval2 の `eval.dat` と Edax 4.5 の `eval.dat` は、64 枠・48 枠の版には使えません（警告を出して読みますが、評価が正しくなりません）。
+- 64 枠と 48 枠の `eval.dat` は同じ形式ですが、それぞれ自分の版のためのものです。
+- libedax：API は v4.5.5-newedax.12 と同じです。ライブラリを同梱するプログラムは、同じ版の `eval.dat` も同梱してください。
+- `-probcut-model standard` で、前の ProbCut の形になります。
+
+**測った結果**（64 枠の版、refit、PGO の組。B が新しい版、95% の幅）：
+
+| 相手 | 条件 | 局数 | Elo |
+|---|---|---|---|
+| eval2（v4.5.5-newedax.12、standard） | 1 局 30 秒ずつ | 1,102 | +60.2（+47.9〜+72.6） |
+| 11/05 の重み（64 枠、refit） | 1 局 30 秒ずつ | 2,204 | +11.2（+3.7〜+18.7） |
+| 元の `eval.dat` の Edax | 両方 Lv18 | 4,378 | +77.5（+69.9〜+85.2） |
+| Egaroucid（大会用の枝 `dev-lazysmp-ggs-b`） | 1 局 120 秒、8 スレッド | 180 | +23.2（+3.0〜+43.6） |
+| 48 枠の版（refit） | 1 局 30 秒ずつ | 4,378 | +12.1（+6.9〜+17.3） |
+
+**確かめていないこと**：Android の実機、Windows ARM64、book の速さ、Windows の MSVC と Android の NDK 以外での組み立て。
+
+[試験と測定](docs/validation/newedax.ja.md#v455-newedax13)
 
 ## v4.5.5-newedax.12
 

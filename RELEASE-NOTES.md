@@ -12,6 +12,7 @@ Each version contains all changes of the C versions on the same row.
 
 | newedax | C (nikque) | C (eval2) |
 |---|---|---|
+| newedax.13 | nikque.27 | eval2.15 |
 | newedax.12 | nikque.27 | eval2.15 |
 | newedax.11 | nikque.26 | eval2.14 |
 | newedax.10 | nikque.25 | eval2.13 |
@@ -26,6 +27,63 @@ Each version contains all changes of the C versions on the same row.
 | newedax.1 | nikque.17 | eval2.5 |
 
 ---
+
+## v4.5.5-newedax.13
+
+**A new evaluation function: 64 feature slots, trained again, and a 48-slot build.** The release has two ZIPs: `edax-4.5.5-newedax.13-64.zip` (the default build, 64 slots) and `edax-4.5.5-newedax.13-48.zip` (48 slots: the 64 without 2 shapes, faster per node). Each holds its own `eval.dat` (107,612,578 bytes); the `eval.dat` of eval2 that stays in `bin/data` of the repository is not for these builds. At the same time (30 s a game a side), the 64-slot build is **+60.2 Elo** (95%: +47.9 to +72.6) against eval2 (v4.5.5-newedax.12), and **+23.2 Elo** (+3.0 to +43.6) against Egaroucid (its tournament branch, 120 s a game, 8 threads). The default probcut model is now `refit`.
+
+**Changes**
+
+- Evaluation (default build, `EVAL_SLOTS` 64): the 13 groups of Edax 4.5 and 13 extra groups (`M X W C`, weights of 3^10 squares or 3^9), 15 shapes and the mobility weights in 64 slots, chosen by searches on the error of the evaluation and level 18/24 games from 2026-11-05 to 11-13 (the shapes and their squares below). The weights were trained again with `tools/eval/evsearch` (plies 2-53).
+- The 48-slot build (`EVAL_SLOTS=48`): the same source and the same `eval.dat` format as the 64 slots, without the shapes `h1825_145` and `h1723_10` (16 slots: the feature updates use 3 vectors of 256 bits in place of 4), with weights trained without them. It searches about 11 % more nodes in the same time, but its evaluation loses more: at the same time it is −12.1 Elo (−17.3 to −6.9) against the 64 slots.
+- `EVAL_SLOTS` 48 no longer means eval2: the eval2 evaluation (46 patterns) is no longer built.
+- Probcut: `refit` is the default (`-probcut-model refit`, and `probcut-model = refit` in `bin/config.ini`). It was measured against `standard` on these weights: `standard` −1.0 Elo (−5.9 to +3.8, 4,378 games) for the 64 slots, −7.7 (−14.8 to −0.7, 2,204 games) for the 48 slots.
+- Search: a thread that waits polls before it sleeps; the threads split from depth 9. AVX-512 builds read the weights of a ply from one table, one by one.
+- Tools (`tools/eval`): `evshape`; `evsearch -mute`, `-method sd`; `w2dat2 -interp` and the extra groups; `selfplay3 -h`; refit in the search of `selfplay3` and `label`; `pcsigma`.
+- Evaluation file: the 64-slot and the 48-slot builds give a warning when the file has no weights for their extra groups (the `eval.dat` of eval2 or of Edax 4.5).
+- Tests (`tests/regression.cpp`): `evalslots` reads the table of AVX-512 builds, counts the extra weights of the file and checks the update on every slot; the cases of the files of form 1 (`evalform2`, `evalform2mob`, `evalbadconv`, `evalmobility`) make their file of form 1 from the 13 groups of Edax 4.5 of an `eval.dat` of form 2.
+
+The shapes of the 64 slots (slots: the images used):
+
+| shape | squares | slots |
+|---|---|---|
+| `c10` (Edax) | a5 a4 a3 a2 a1 b2 b1 c1 d1 e1 | 4 |
+| `s100` (Edax) | b2 a1 b1 c1 d1 e1 f1 g1 h1 g2 | 4 |
+| `xm` | b1 c1 d1 e1 f1 g1 c2 d2 e2 f2 | 4 |
+| `xw` | b2 c2 d2 e2 f2 g2 c3 d3 e3 f3 | 4 |
+| `f208_1` | a1 b1 c1 f1 g1 h1 a2 c2 f2 h2 | 4 |
+| `f203_77` | c1 e1 d2 f2 e3 g3 f4 h4 g5 h6 | 4 |
+| `f1_47` | g5 h5 g6 h6 e7 f7 h7 e8 f8 g8 | 4 |
+| `c8_b3b6` | c1 c2 b3 c3 c4 c5 b6 c6 c7 c8 | 4 |
+| `d5a_124` | d1 e2 d3 e3 f3 e4 f4 g4 f5 h5 | 4 |
+| `f1144_5` | a1 b1 c1 g1 a2 b2 c2 a3 b3 a7 | 4 |
+| `d7x_b2g7a8` | b1 b2 c2 d3 e4 f5 g6 g7 h7 a8 | 4 |
+| `p504` | a1 h1 b2 c3 d4 e5 f6 g7 a8 h8 | 2 |
+| `d3z_e2g4b5d7` | c1 b2 e2 a3 g4 b5 h6 d7 g7 f8 | 2 |
+| `h1825_145` (not in the 48 slots) | c1 d1 g1 h1 b2 d2 f2 g2 h2 f3 | 8 |
+| `h1723_10` (not in the 48 slots) | g5 f6 e7 f7 g7 d8 e8 f8 g8 h8 | 8 |
+
+**Compatibility**
+
+- The search results change (the evaluation and the default probcut model). The book file format does not change; books learned with an earlier version are read, but their values were given by the former evaluation.
+- `eval.dat`: the file of each build is in its ZIP (`bin/data/eval.dat`), not in git. A build of the repository needs it: the `eval.dat` of eval2 in `bin/data` and the one of Edax 4.5 cannot be used by the 64 and the 48 slots (they are read with a warning, but the evaluation is then wrong).
+- The 64-slot and the 48-slot `eval.dat` have the same format, but each is for its own build.
+- libedax: the same API as v4.5.5-newedax.12. A program that ships the library must ship the `eval.dat` of the same build.
+- `-probcut-model standard` gives the former probcut model.
+
+**Measured** (the 64-slot build, refit, its PGO build; B is the new build; 95% intervals):
+
+| against | condition | games | Elo |
+|---|---|---|---|
+| eval2 (v4.5.5-newedax.12, standard) | 30 s a game a side | 1,102 | +60.2 (+47.9 to +72.6) |
+| the weights of 11/05 (64 slots, refit) | 30 s a game a side | 2,204 | +11.2 (+3.7 to +18.7) |
+| Edax with the original `eval.dat` | level 18 both | 4,378 | +77.5 (+69.9 to +85.2) |
+| Egaroucid (tournament branch `dev-lazysmp-ggs-b`) | 120 s a game, 8 threads | 180 | +23.2 (+3.0 to +43.6) |
+| the 48-slot build (refit) | 30 s a game a side | 4,378 | +12.1 (+6.9 to +17.3) |
+
+**Not checked**: real Android devices, Windows ARM64, the speed of the books, builds other than MSVC on Windows and the NDK on Android.
+
+[Tests and measurements](docs/validation/newedax.en.md#v455-newedax13)
 
 ## v4.5.5-newedax.12
 

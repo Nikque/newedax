@@ -129,7 +129,7 @@ wEdax-x86-64.exe -l 12 -n 4 -book-file data/my.dat
 | `book-expand-tasks` | `auto` | 1 | book を自動で広げるコマンドが、同時に広げる局面の数。[7 章](07-book-learning.md)・[9 章](09-large-books.md) |
 | `book-leaf-recalculate-rounds` | `1` | 1 | `book leaf recalculate` 系を繰り返す回数の上限。[8 章](08-book-maintenance.md) |
 | `book-store-tasks` | `auto` | `auto` | 棋譜から book を育てるコマンドが、同時に学習する棋譜の数。[7 章](07-book-learning.md)・[9 章](09-large-books.md) |
-| `probcut-model` | `standard` | `standard` | 探索の枝刈りの方式。`refit` は実験用（探索の結果が変わります。[修正一覧の v4.5.5-nikque.5](https://github.com/Nikque/edax-reversi-AVX/blob/edax-4.5.5-fixes/RELEASE-NOTES.ja.md#v455-nikque5) を読んでから使ってください） |
+| `probcut-model` | `refit` | `refit` | 探索の枝刈りの方式。v4.5.5-newedax.13 から `refit` が既定です（その版の測定の方式）。`standard` は Edax 4.5.5 の方式（v4.5.5-newedax.12 までの既定）です。探索の結果は方式で変わります（[修正一覧の v4.5.5-nikque.5](https://github.com/Nikque/edax-reversi-AVX/blob/edax-4.5.5-fixes/RELEASE-NOTES.ja.md#v455-nikque5)） |
 
 **`config.ini` の `level` についての注意**：`config.ini`（と `edax.ini`）に書いた `level` は、起動したときの level を決めるだけです。
 

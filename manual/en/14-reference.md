@@ -165,7 +165,7 @@ The "built-in value" is the value used when nothing is given.
 | `book-leaf-recalculate-rounds` | 1 to 1000000 | 1 | 1 | The limit for the number of passes of the `book leaf recalculate` family |
 | `book-seed` | 0 to 2^64 - 1, `auto` | `auto` | `auto` | The seed of the random choice among book moves of equal score (`auto`: from the clock) |
 | `book-reproducible` | `on` / `off` | `off` | `off` | Book commands give the same book from one run to the next ([chapter 7](07-book-learning.md)) |
-| `probcut-model` | `standard` / `refit` | `standard` | `standard` | The pruning method (`refit` is experimental) |
+| `probcut-model` | `refit` / `standard` | `refit` | `refit` | The pruning method (`refit` is the default since v4.5.5-newedax.13; `standard` is that of Edax 4.5.5) |
 | `book-reduce-index` | `binary` / `table` | `table` | | How `book reducecount` finds a position from its number (since v4.5.5-nikque.22; [8.4](08-book-maintenance.md)) |
 | `book-reduce-walk` | `loss` / `group` | `loss` | | The order of the walk of `book reducecount` with threads (since v4.5.5-nikque.22) |
 | `book-reduce-reuse` | `on` / `off` | `on` | | `book reduce` uses the result of the `book reducecount` just before (since v4.5.5-nikque.22) |
